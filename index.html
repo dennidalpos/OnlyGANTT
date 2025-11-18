@@ -524,23 +524,7 @@
     }
 
     .phases-header {
-      display: grid;
-      grid-template-columns: 2.5fr 1.1fr 1.1fr 0.7fr;
-      gap: 0.5rem;
-      margin-top: 1rem;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      padding: 0.5rem;
-      background: var(--bg-page);
-      border-radius: var(--radius-md);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .phases-header div:nth-child(4) {
-      text-align: right;
-      padding-right: 0.5rem;
+      display: none;
     }
 
     .phases-container {
@@ -557,7 +541,7 @@
       padding: 0.75rem;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.75rem;
       transition: all var(--transition-fast);
     }
 
@@ -568,10 +552,48 @@
     }
 
     .phase-main {
-      display: grid;
-      grid-template-columns: 2.5fr 1.1fr 1.1fr auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .phase-name-section {
+      display: flex;
+      flex-direction: column;
       gap: 0.5rem;
-      align-items: center;
+    }
+
+    .phase-name-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .phase-dates-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .phase-date-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .phase-date-field label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .phase-actions-section {
+      display: flex;
+      justify-content: flex-end;
     }
 
     .phase-extra {
@@ -1133,6 +1155,55 @@
       }
     }
 
+    @media (max-width: 1600px) {
+      .header-right {
+        font-size: 0.8125rem;
+      }
+
+      .control-label {
+        font-size: 0.8125rem;
+        padding: 0.35rem 0.75rem;
+      }
+
+      .today-label {
+        font-size: 0.8125rem;
+      }
+
+      .app-title {
+        font-size: 1.125rem;
+      }
+    }
+
+    @media (max-width: 1366px) {
+      header {
+        padding: 0.875rem 1.25rem;
+      }
+
+      .card {
+        padding: 1rem 1.25rem;
+      }
+
+      .subcard {
+        padding: 1rem;
+      }
+
+      .card-title {
+        font-size: 1rem;
+      }
+
+      .card-subtitle {
+        font-size: 0.8125rem;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .phase-dates-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 900px) {
       header {
         padding-inline: 1rem;
@@ -1154,18 +1225,6 @@
       .screensaver-title {
         font-size: 1.5rem;
       }
-    }
-
-    @media (max-width: 640px) {
-      .phases-header {
-        font-size: 0.6875rem;
-        gap: 0.375rem;
-      }
-
-      .phase-main {
-        grid-template-columns: 1.8fr 1fr 1fr auto;
-        gap: 0.375rem;
-      }
 
       .header-inner {
         flex-direction: column;
@@ -1178,6 +1237,18 @@
 
       .app-title {
         justify-content: center;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.8125rem;
+      }
+
+      .btn-small {
+        padding: 0.3rem 0.75rem;
+        font-size: 0.75rem;
       }
     }
 
@@ -3340,13 +3411,6 @@
                           </div>
                         </div>
 
-                        <div className="phases-header" role="row">
-                          <div role="columnheader">Nome fase</div>
-                          <div role="columnheader">Data inizio</div>
-                          <div role="columnheader">Data fine</div>
-                          <div role="columnheader">Azioni</div>
-                        </div>
-
                         <div className="phases-container" role="list" aria-label="Elenco fasi del progetto">
                           {phases.map((phase, index) => {
                             const isStandard = PHASE_OPTIONS.includes(phase.nome);
@@ -3355,9 +3419,9 @@
                             return (
                               <div className="phase-row" key={phase.id || index} role="listitem">
                                 <div className="phase-main">
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    <label htmlFor={`phase-name-${index}`} className="visually-hidden">
-                                      Nome fase {index + 1}
+                                  <div className="phase-name-section">
+                                    <label htmlFor={`phase-name-${index}`} className="phase-name-label">
+                                      Nome fase
                                     </label>
                                     <select
                                       id={`phase-name-${index}`}
@@ -3383,7 +3447,6 @@
                                     {selectValue === 'personalizzata' && (
                                       <input
                                         type="text"
-                                        className="phase-name"
                                         placeholder="Nome fase personalizzato"
                                         value={phase.nome}
                                         onChange={e => updatePhaseField(index, 'nome', e.target.value)}
@@ -3392,45 +3455,47 @@
                                     )}
                                   </div>
 
-                                  <div>
-                                    <label htmlFor={`phase-start-${index}`} className="visually-hidden">
-                                      Data inizio fase {index + 1}
-                                    </label>
-                                    <input
-                                      type="date"
-                                      id={`phase-start-${index}`}
-                                      className="phase-start"
-                                      value={phase.dataInizio}
-                                      onChange={e => updatePhaseField(index, 'dataInizio', e.target.value)}
-                                      aria-label={`Data inizio fase ${index + 1}`}
-                                    />
+                                  <div className="phase-dates-section">
+                                    <div className="phase-date-field">
+                                      <label htmlFor={`phase-start-${index}`}>
+                                        Data inizio
+                                      </label>
+                                      <input
+                                        type="date"
+                                        id={`phase-start-${index}`}
+                                        value={phase.dataInizio}
+                                        onChange={e => updatePhaseField(index, 'dataInizio', e.target.value)}
+                                        aria-label={`Data inizio fase ${index + 1}`}
+                                      />
+                                    </div>
+
+                                    <div className="phase-date-field">
+                                      <label htmlFor={`phase-end-${index}`}>
+                                        Data fine
+                                      </label>
+                                      <input
+                                        type="date"
+                                        id={`phase-end-${index}`}
+                                        value={phase.dataFine}
+                                        onChange={e => updatePhaseField(index, 'dataFine', e.target.value)}
+                                        min={phase.dataInizio || undefined}
+                                        aria-label={`Data fine fase ${index + 1}`}
+                                      />
+                                    </div>
                                   </div>
 
-                                  <div>
-                                    <label htmlFor={`phase-end-${index}`} className="visually-hidden">
-                                      Data fine fase {index + 1}
-                                    </label>
-                                    <input
-                                      type="date"
-                                      id={`phase-end-${index}`}
-                                      className="phase-end"
-                                      value={phase.dataFine}
-                                      onChange={e => updatePhaseField(index, 'dataFine', e.target.value)}
-                                      min={phase.dataInizio || undefined}
-                                      aria-label={`Data fine fase ${index + 1}`}
-                                    />
+                                  <div className="phase-actions-section">
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-danger btn-small"
+                                      onClick={() => removePhase(index)}
+                                      title="Rimuovi questa fase"
+                                      aria-label={`Rimuovi fase ${index + 1}`}
+                                    >
+                                      <span role="img" aria-hidden="true">🗑</span>
+                                      <span>Rimuovi</span>
+                                    </button>
                                   </div>
-
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary btn-danger btn-small phase-remove-btn"
-                                    onClick={() => removePhase(index)}
-                                    title="Rimuovi questa fase"
-                                    aria-label={`Rimuovi fase ${index + 1}`}
-                                  >
-                                    <span role="img" aria-hidden="true">🗑</span>
-                                    <span>Rimuovi</span>
-                                  </button>
                                 </div>
 
                                 <div className="phase-extra">
@@ -3891,7 +3956,7 @@
                                 message = `La fase ${a.phaseName} nel progetto ${a.projectName} risulta in ritardo sulla partenza: la data di inizio è già trascorsa ma la fase non era "In corso" o "Completata".`;
                                 break;
                               case 'fase_in_ritardo_fine':
-                                message = `La fase ${a.phaseName} nel progetto ${a.projectName} è stata impostata automaticamente su "In ritardo" perché alla data di fine non ha raggiunto il 100%.`;
+                                message = `La fase ${a.phaseName} nel progetto ${a.projectName} è stata impostata automaticamente su "In ritardo" perché alla data difine non ha raggiunto il 100%.`;
                                 break;
                               case 'fase_auto_completata':
                                 message = `La fase ${a.phaseName} nel progetto ${a.projectName} è stata marcata automaticamente come completata perché il progresso ha raggiunto il 100%.`;
