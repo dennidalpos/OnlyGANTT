@@ -1,203 +1,228 @@
-const express = require("express")
-const fs = require("fs")
-const path = require("path")
-const multer = require("multer")
+// server.js - Server Node.js con Express e persistenza JSON
 
-const app = express()
-const PORT = process.env.PORT || 3000
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-app.use(express.json({ limit: "2mb" }))
-app.use(express.urlencoded({ extended: true }))
+const app = express();
+const PORT = 3000;
 
-const publicDir = __dirname
+// Cartella per i dati persistenti
+const DATA_DIR = path.join(__dirname, 'data');
 
-app.use(express.static(publicDir))
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(publicDir, "index.html"))
-})
-
-const dataDir = path.join(__dirname, "data")
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
+// Crea cartella data se non esiste
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-function sanitizeDepartmentName(name) {
-  const base = String(name || "").trim()
-  if (!base) return "Generale"
-  return base.replace(/[^a-zA-Z0-9_-]/g, "_")
-}
+// Middleware
+app.use(express.json());
+app.use(express.static(__dirname));
 
-function getDepartmentFilePath(depName) {
-  const safe = sanitizeDepartmentName(depName)
-  return path.join(dataDir, safe + ".json")
-}
+// Configurazione multer per upload file
+const upload = multer({ dest: 'uploads/' });
 
-function readProjectsForDepartment(depName) {
-  const filePath = getDepartmentFilePath(depName)
-  if (!fs.existsSync(filePath)) {
-    return []
-  }
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8")
-    const json = JSON.parse(raw)
-    if (Array.isArray(json)) return json
-    return []
-  } catch (e) {
-    return []
-  }
-}
+// Storage in memoria (caricato da file JSON)
+let departmentsData = [];
+let projectsData = {};
+let locksData = {};
 
-function writeProjectsForDepartment(depName, projects) {
-  const filePath = getDepartmentFilePath(depName)
-  fs.writeFileSync(filePath, JSON.stringify(projects, null, 2), "utf-8")
-}
+// === FUNZIONI PERSISTENZA ===
 
-function listDepartments() {
-  const files = fs.readdirSync(dataDir, { withFileTypes: true })
-  const names = files
-    .filter(f => f.isFile() && f.name.toLowerCase().endsWith(".json"))
-    .map(f => f.name.replace(/\.json$/i, ""))
-  if (!names.includes("Generale")) {
-    names.push("Generale")
-  }
-  names.sort((a, b) => a.localeCompare(b, "it"))
-  return names
-}
+// Carica tutti i dati leggendo i file JSON nella cartella data
+function loadAllData() {
+  departmentsData = [];
+  projectsData = {};
 
-app.get("/api/departments", (req, res) => {
-  try {
-    const deps = listDepartments()
-    res.json(deps)
-  } catch (e) {
-    res.status(500).json({ error: "Errore nel leggere i reparti" })
-  }
-})
-
-app.post("/api/departments", (req, res) => {
-  const rawName = (req.body && req.body.name) || ""
-  const trimmed = rawName.trim()
-  if (!trimmed) {
-    return res.status(400).json({ error: "Nome reparto obbligatorio" })
-  }
-  const safe = sanitizeDepartmentName(trimmed)
-  const filePath = getDepartmentFilePath(trimmed)
-  if (fs.existsSync(filePath)) {
-    return res.status(409).json({ error: "Reparto già esistente", name: safe })
-  }
-  try {
-    fs.writeFileSync(filePath, "[]", "utf-8")
-    res.status(201).json({ ok: true, name: safe, originalName: trimmed })
-  } catch (e) {
-    res.status(500).json({ error: "Errore nella creazione del reparto" })
-  }
-})
-
-app.delete("/api/departments/:name", (req, res) => {
-  const dep = req.params.name
-  const filePath = getDepartmentFilePath(dep)
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "Reparto non trovato" })
-  }
-  try {
-    fs.unlinkSync(filePath)
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: "Errore nell'eliminazione del reparto" })
-  }
-})
-
-app.get("/api/projects/:department", (req, res) => {
-  const dep = req.params.department
-  try {
-    const projects = readProjectsForDepartment(dep)
-    res.json(projects)
-  } catch (e) {
-    res.status(500).json({ error: "Errore nel leggere i progetti" })
-  }
-})
-
-app.post("/api/projects/:department", (req, res) => {
-  const dep = req.params.department
-  const body = req.body
-  if (!Array.isArray(body)) {
-    return res.status(400).json({ error: "Formato non valido, atteso array di progetti" })
-  }
-  try {
-    writeProjectsForDepartment(dep, body)
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: "Errore nel salvataggio dei progetti" })
-  }
-})
-
-const upload = multer({ storage: multer.memoryStorage() })
-
-app.post("/api/upload/:department", upload.single("file"), (req, res) => {
-  const dep = req.params.department
-  if (!req.file) {
-    return res.status(400).json({ error: "File mancante" })
-  }
-  try {
-    const content = req.file.buffer.toString("utf-8")
-    const json = JSON.parse(content)
-    if (!Array.isArray(json)) {
-      return res.status(400).json({ error: "JSON non valido: atteso un array di progetti" })
+  // Legge tutti i file .json nella cartella data
+  const files = fs.readdirSync(DATA_DIR);
+  
+  files.forEach(file => {
+    if (file.endsWith('.json')) {
+      const depName = file.replace('.json', '');
+      try {
+        const filePath = path.join(DATA_DIR, file);
+        const projects = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        departmentsData.push(depName);
+        projectsData[depName] = projects;
+      } catch (err) {
+        console.error(`Errore caricamento ${file}:`, err);
+      }
     }
-    writeProjectsForDepartment(dep, json)
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(400).json({ error: "JSON non valido" })
-  }
-})
+  });
 
-const locks = {}
+  // Assicura che Home esista sempre
+  if (!departmentsData.includes('Home')) {
+    departmentsData.unshift('Home');
+    projectsData['Home'] = [];
+    saveProjects('Home');
+  }
 
-app.post("/api/lock/:department/acquire", (req, res) => {
-  const dep = decodeURIComponent(req.params.department || "")
-  const userName = ((req.body && req.body.userName) || "").trim()
-  if (!dep) {
-    return res.status(400).json({ error: "Reparto mancante" })
-  }
-  if (!userName) {
-    return res.status(400).json({ error: "userName mancante" })
-  }
-  const existing = locks[dep]
-  if (!existing || existing.userName === userName) {
-    locks[dep] = { userName, since: Date.now() }
-    return res.json({ ok: true, department: dep, userName })
-  } else {
-    return res
-      .status(423)
-      .json({ ok: false, department: dep, lockedBy: existing.userName })
-  }
-})
+  console.log(`✅ Dati caricati: ${departmentsData.length} reparti, ${Object.keys(projectsData).reduce((sum, k) => sum + (projectsData[k]?.length || 0), 0)} progetti totali`);
+}
 
-app.post("/api/lock/:department/release", (req, res) => {
-  const dep = decodeURIComponent(req.params.department || "")
-  const userName = ((req.body && req.body.userName) || "").trim()
-  if (!dep || !userName) {
-    return res.status(400).json({ error: "Reparto o userName mancanti" })
-  }
-  const existing = locks[dep]
-  if (existing && existing.userName === userName) {
-    delete locks[dep]
-  }
-  res.json({ ok: true })
-})
+// Salva progetti di un singolo department
+function saveProjects(department) {
+  const projectFile = path.join(DATA_DIR, `${department}.json`);
+  const projects = projectsData[department] || [];
+  fs.writeFileSync(projectFile, JSON.stringify(projects, null, 2), 'utf-8');
+}
 
-app.get("/api/lock/:department", (req, res) => {
-  const dep = decodeURIComponent(req.params.department || "")
-  if (!dep) {
-    return res.status(400).json({ error: "Reparto mancante" })
+// Elimina file progetti di un department
+function deleteProjectsFile(department) {
+  const projectFile = path.join(DATA_DIR, `${department}.json`);
+  if (fs.existsSync(projectFile)) {
+    fs.unlinkSync(projectFile);
   }
-  const existing = locks[dep]
-  if (!existing) {
-    return res.json({ locked: false, lockedBy: null })
-  }
-  res.json({ locked: true, lockedBy: existing.userName, since: existing.since })
-})
+}
 
+// === API ENDPOINTS ===
+
+// API: Get departments
+app.get('/api/departments', (req, res) => {
+  res.json(departmentsData);
+});
+
+// API: Create department
+app.post('/api/departments', (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string') {
+    return res.status(400).json({ error: 'Nome reparto mancante' });
+  }
+  const trimmed = name.trim();
+  if (departmentsData.includes(trimmed)) {
+    return res.status(400).json({ error: 'Reparto già esistente' });
+  }
+  departmentsData.push(trimmed);
+  projectsData[trimmed] = [];
+  
+  // Salva su disco
+  saveProjects(trimmed);
+  
+  res.json({ ok: true, department: trimmed });
+});
+
+// API: Delete department
+app.delete('/api/departments/:name', (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  if (name === 'Home') {
+    return res.status(400).json({ error: 'Non puoi eliminare il reparto Home' });
+  }
+  const index = departmentsData.indexOf(name);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Reparto non trovato' });
+  }
+  departmentsData.splice(index, 1);
+  delete projectsData[name];
+  delete locksData[name];
+  
+  // Elimina file su disco
+  deleteProjectsFile(name);
+  
+  res.json({ ok: true });
+});
+
+// API: Get projects for department
+app.get('/api/projects/:department', (req, res) => {
+  const dep = decodeURIComponent(req.params.department);
+  const projects = projectsData[dep] || [];
+  res.json(projects);
+});
+
+// API: Save projects for department
+app.post('/api/projects/:department', (req, res) => {
+  const dep = decodeURIComponent(req.params.department);
+  const projects = req.body;
+  if (!Array.isArray(projects)) {
+    return res.status(400).json({ error: 'Dati non validi' });
+  }
+  projectsData[dep] = projects;
+  
+  // Salva su disco
+  saveProjects(dep);
+  
+  res.json({ ok: true });
+});
+
+// API: Acquire lock
+app.post('/api/lock/:department/acquire', (req, res) => {
+  const dep = decodeURIComponent(req.params.department);
+  const { userName } = req.body;
+  
+  if (!userName || typeof userName !== 'string' || userName.trim() === '') {
+    return res.status(400).json({ error: 'Nome utente mancante' });
+  }
+
+  const currentLock = locksData[dep];
+  
+  if (currentLock && currentLock.lockedBy !== userName.trim()) {
+    return res.status(423).json({
+      lockedBy: currentLock.lockedBy,
+      lockedAt: currentLock.lockedAt
+    });
+  }
+
+  locksData[dep] = {
+    lockedBy: userName.trim(),
+    lockedAt: new Date().toISOString()
+  };
+
+  res.json({ ok: true });
+});
+
+// API: Release lock
+app.post('/api/lock/:department/release', (req, res) => {
+  const dep = decodeURIComponent(req.params.department);
+  const { userName } = req.body;
+
+  const currentLock = locksData[dep];
+  if (currentLock && currentLock.lockedBy === userName?.trim()) {
+    delete locksData[dep];
+  }
+
+  res.json({ ok: true });
+});
+
+// API: Upload projects from JSON file
+app.post('/api/upload/:department', upload.single('file'), (req, res) => {
+  const dep = decodeURIComponent(req.params.department);
+  const file = req.file;
+
+  if (!file) {
+    return res.status(400).json({ error: 'Nessun file caricato' });
+  }
+
+  try {
+    const fileContent = fs.readFileSync(file.path, 'utf-8');
+    const projects = JSON.parse(fileContent);
+
+    if (!Array.isArray(projects)) {
+      throw new Error('Il file JSON deve contenere un array di progetti');
+    }
+
+    projectsData[dep] = projects;
+    
+    // Salva su disco
+    saveProjects(dep);
+
+    fs.unlinkSync(file.path);
+
+    res.json({ ok: true });
+  } catch (error) {
+    if (file && file.path) {
+      try { fs.unlinkSync(file.path); } catch (e) {}
+    }
+    res.status(400).json({ error: error.message || 'Errore nel parsing del JSON' });
+  }
+});
+
+// Carica dati all'avvio
+loadAllData();
+
+// Avvia il server
 app.listen(PORT, () => {
-  console.log("Server in ascolto su http://localhost:" + PORT)
-})
+  console.log(`\n🚀 Server Only GANTT avviato su http://localhost:${PORT}`);
+  console.log(`📂 Cartella corrente: ${__dirname}`);
+  console.log(`💾 Dati persistenti in: ${DATA_DIR}\n`);
+});
