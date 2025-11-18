@@ -9,7 +9,6 @@
     content="Sistema professionale per la gestione e pianificazione progetti con diagrammi di Gantt" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    /* ==================== CSS VARIABLES ==================== */
     :root {
       --bg-page: #f4f5fb;
       --bg-card: #ffffff;
@@ -49,7 +48,6 @@
       --shadow-strong: 0 22px 55px rgba(0, 0, 0, 0.95);
     }
 
-    /* ==================== BASE STYLES ==================== */
     *,
     *::before,
     *::after {
@@ -67,7 +65,6 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ==================== HEADER ==================== */
     header {
       background: var(--bg-card);
       box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
@@ -108,7 +105,6 @@
       flex-wrap: wrap;
     }
 
-    /* ==================== BADGES & LABELS ==================== */
     .today-label {
       font-size: 0.875rem;
       color: var(--text-muted);
@@ -132,7 +128,6 @@
       color: var(--text-main);
     }
 
-    /* ==================== CONTROLS & INPUTS ==================== */
     .control-label {
       font-size: 0.875rem;
       color: var(--text-muted);
@@ -206,7 +201,6 @@
       color: var(--text-muted);
     }
 
-    /* ==================== DEPARTMENT ACTIONS ==================== */
     .department-actions {
       display: inline-flex;
       gap: 0.25rem;
@@ -245,7 +239,6 @@
       cursor: not-allowed;
     }
 
-    /* ==================== ZOOM CONTROLS ==================== */
     .zoom-toggle-group {
       display: flex;
       gap: 0.25rem;
@@ -255,7 +248,6 @@
       border: 1px solid var(--border-color);
     }
 
-    /* ==================== LOCK WARNING ==================== */
     .lock-warning-banner {
       margin: 0.75rem auto 0;
       max-width: 1700px;
@@ -282,7 +274,17 @@
       font-size: 1.25rem;
     }
 
-    /* ==================== MAIN LAYOUT ==================== */
+    .lock-warning-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .lock-warning-time {
+      font-size: 0.75rem;
+      opacity: 0.85;
+    }
+
     main {
       padding-bottom: 2rem;
     }
@@ -300,7 +302,6 @@
       margin: 0;
     }
 
-    /* ==================== CARD STYLES ==================== */
     .card {
       background: var(--bg-card);
       border-radius: var(--radius-xl);
@@ -337,7 +338,6 @@
       line-height: 1.5;
     }
 
-    /* ==================== BOTTOM LAYOUT ==================== */
     .bottom-layout {
       margin-top: 1.5rem;
     }
@@ -377,7 +377,6 @@
       min-width: 0;
     }
 
-    /* ==================== SUBCARD ==================== */
     .subcard {
       background: var(--bg-card);
       border-radius: var(--radius-lg);
@@ -400,7 +399,6 @@
       margin-bottom: 1rem;
     }
 
-    /* ==================== FORM STYLES ==================== */
     form {
       display: flex;
       flex-direction: column;
@@ -512,7 +510,6 @@
       color: var(--text-muted);
     }
 
-    /* ==================== PHASES SECTION ==================== */
     .phases-toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -604,7 +601,6 @@
       font-size: 0.8125rem;
     }
 
-    /* ==================== BUTTONS ==================== */
     .btn-row {
       display: flex;
       justify-content: flex-end;
@@ -698,7 +694,6 @@
       transform: none !important;
     }
 
-    /* ==================== PROJECTS LIST ==================== */
     .tools-box {
       padding: 1rem;
       border-radius: var(--radius-lg);
@@ -851,7 +846,6 @@
       margin-top: 0.25rem;
     }
 
-    /* ==================== GANTT CANVAS ==================== */
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -874,7 +868,6 @@
       display: block;
     }
 
-    /* ==================== BADGES ==================== */
     .percent-badge {
       display: inline-flex;
       align-items: center;
@@ -951,7 +944,6 @@
       font-weight: 700;
     }
 
-    /* ==================== ISSUES SECTION ==================== */
     .issues-section {
       margin-bottom: 1rem;
       padding: 0.875rem 1rem;
@@ -1005,7 +997,6 @@
       text-align: center;
     }
 
-    /* ==================== SCREENSAVER ==================== */
     .screensaver {
       position: fixed;
       inset: 0;
@@ -1104,15 +1095,11 @@
       animation: screensaver-orbit 30s linear infinite;
     }
 
-    /* ==================== ANIMATIONS ==================== */
     @keyframes screensaver-pulse {
-
-      0%,
-      100% {
+      0%, 100% {
         transform: scale(0.9);
         opacity: 0.5;
       }
-
       50% {
         transform: scale(1.1);
         opacity: 1;
@@ -1120,12 +1107,9 @@
     }
 
     @keyframes screensaver-float {
-
-      0%,
-      100% {
+      0%, 100% {
         transform: translateY(8px);
       }
-
       50% {
         transform: translateY(-8px);
       }
@@ -1135,25 +1119,20 @@
       from {
         transform: rotate(0deg);
       }
-
       to {
         transform: rotate(360deg);
       }
     }
 
     @keyframes pulse {
-
-      0%,
-      100% {
+      0%, 100% {
         opacity: 1;
       }
-
       50% {
         opacity: 0.5;
       }
     }
 
-    /* ==================== RESPONSIVE ==================== */
     @media (max-width: 900px) {
       header {
         padding-inline: 1rem;
@@ -1202,7 +1181,6 @@
       }
     }
 
-    /* ==================== ACCESSIBILITY ==================== */
     .visually-hidden {
       position: absolute;
       width: 1px;
@@ -1215,13 +1193,11 @@
       border: 0;
     }
 
-    /* Focus styles for keyboard navigation */
     *:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
 
-    /* Skip to main content link */
     .skip-link {
       position: absolute;
       top: -100%;
@@ -1239,7 +1215,6 @@
       top: 0;
     }
 
-    /* High contrast mode support */
     @media (prefers-contrast: high) {
       :root {
         --border-color: #000000;
@@ -1252,12 +1227,8 @@
       }
     }
 
-    /* Reduced motion support */
     @media (prefers-reduced-motion: reduce) {
-
-      *,
-      *::before,
-      *::after {
+      *, *::before, *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
@@ -1277,7 +1248,6 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 
-    // ==================== CONSTANTS & CONFIGURATION ====================
     const CONFIG = {
       DEFAULT_DEPARTMENT: 'Home',
       MS_PER_DAY: 24 * 60 * 60 * 1000,
@@ -1350,7 +1320,6 @@
       MONTHS: 'mesi'
     };
 
-    // ==================== UTILITY FUNCTIONS ====================
     let globalIdCounter = 0;
 
     function createId(prefix) {
@@ -1386,6 +1355,20 @@
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
       return `${day}/${month}/${year}`;
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
     }
 
     function diffInDays(from, to) {
@@ -1547,7 +1530,6 @@
       return { minDate, maxDate };
     }
 
-    // ==================== API FUNCTIONS ====================
     async function loadDepartments() {
       const res = await fetch('/api/departments', { cache: 'no-store' });
       const data = await res.json();
@@ -1580,7 +1562,11 @@
 
       if (res.status === 423) {
         const data = await res.json();
-        return { success: false, lockedBy: data?.lockedBy || 'utente sconosciuto' };
+        return { 
+          success: false, 
+          lockedBy: data?.lockedBy || 'utente sconosciuto',
+          lockedAt: data?.lockedAt || null
+        };
       }
 
       if (res.ok) {
@@ -1625,7 +1611,6 @@
       return await res.json();
     }
 
-    // ==================== AUTOMATIC STATUS RULES ====================
     function applyAutomaticStatusRules(projects) {
       const today = parseDateStr(formatToday());
       if (!today) return { projectsWithAuto: projects, anomalies: [] };
@@ -1642,7 +1627,6 @@
         const end = parseDateStr(project.dataFine);
         let percProj = normalizePercent(project.percentualeCompletamento);
 
-        // Auto-complete project
         if (percProj >= 100 || project.stato === 'completato') {
           if (project.stato !== 'completato' || percProj !== 100) {
             anomalies.push({
@@ -1655,7 +1639,6 @@
           percProj = 100;
         }
 
-        // Check project delays
         if (start && today > start && project.stato !== 'in_corso' && project.stato !== 'completato') {
           anomalies.push({
             type: 'progetto_in_ritardo_partenza',
@@ -1672,14 +1655,12 @@
           project.stato = 'in_ritardo';
         }
 
-        // Check phases
         if (Array.isArray(project.fasi)) {
           project.fasi.forEach(phase => {
             const fs = parseDateStr(phase.dataInizio);
             const fe = parseDateStr(phase.dataFine);
             let percPhase = normalizePercent(phase.percentualeCompletamento);
 
-            // Auto-complete phase
             if (percPhase >= 100 || phase.stato === 'completato') {
               if (phase.stato !== 'completato' || percPhase !== 100) {
                 anomalies.push({
@@ -1693,7 +1674,6 @@
               percPhase = 100;
             }
 
-            // Check phase delays
             if (fs && today > fs && phase.stato !== 'in_corso' && phase.stato !== 'completato') {
               anomalies.push({
                 type: 'fase_in_ritardo_partenza',
@@ -1712,7 +1692,6 @@
               phase.stato = 'in_ritardo';
             }
 
-            // Check holidays
             if (fs && isItalianHoliday(fs)) {
               anomalies.push({
                 type: 'fase_in_festivo_inizio',
@@ -1735,7 +1714,6 @@
       return { projectsWithAuto, anomalies };
     }
 
-    // ==================== GANTT CANVAS DRAWING ====================
     function fitText(ctx, text, maxWidth) {
       if (!text) return '';
       if (ctx.measureText(text).width <= maxWidth) return text;
@@ -1854,11 +1832,9 @@
         cssHeight
       };
 
-      // Background
       ctx.fillStyle = colors.background;
       ctx.fillRect(0, 0, parentWidth, cssHeight);
 
-      // Draw months
       ctx.fillStyle = colors.headerText;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
@@ -1897,7 +1873,6 @@
         }
       }
 
-      // Draw days/weeks
       if (zoomLevel !== ZOOM_LEVELS.MONTHS) {
         ctx.strokeStyle = colors.gridLight;
         ctx.lineWidth = 1;
@@ -1925,7 +1900,6 @@
         }
       }
 
-      // Bottom axis
       ctx.strokeStyle = colors.bottomAxis;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -1933,7 +1907,6 @@
       ctx.lineTo(CANVAS_LEFT_MARGIN + plotWidth, cssHeight - CANVAS_BOTTOM_MARGIN);
       ctx.stroke();
 
-      // Today line
       const oggi = parseDateStr(formatToday());
       if (oggi && oggi >= minDate && oggi <= maxDate) {
         const offsetOggi = diffInDays(minDate, oggi);
@@ -1952,7 +1925,6 @@
         ctx.fillText('Oggi', xOggi, CANVAS_TOP_MARGIN - 40);
       }
 
-      // Draw projects and phases
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'right';
       ctx.font = "600 13px 'Inter', system-ui, sans-serif";
@@ -1963,7 +1935,6 @@
         const rowTop = CANVAS_TOP_MARGIN + idx * CANVAS_ROW_HEIGHT;
         const centerY = rowTop + CANVAS_ROW_HEIGHT / 2;
 
-        // Project label
         ctx.fillStyle = colors.labelText;
         const nome = p.nome || `Progetto ${idx + 1}`;
         const labelMaxWidth = CANVAS_LEFT_MARGIN - 18;
@@ -1974,7 +1945,6 @@
         if (labelText !== nome) labelText = labelText.slice(0, -1) + '…';
         ctx.fillText(labelText, CANVAS_LEFT_MARGIN - 12, centerY);
 
-        // Project bar
         const s = parseDateStr(p.dataInizio);
         const e = parseDateStr(p.dataFine);
         if (s && e) {
@@ -1994,7 +1964,6 @@
           ctx.fill();
           ctx.stroke();
 
-          // Late indicator
           const percProj = normalizePercent(p.percentualeCompletamento);
           const projLate = oggi && e < oggi && percProj < 100 && p.stato !== 'completato';
           if (projLate) {
@@ -2007,7 +1976,6 @@
           }
         }
 
-        // Phases
         if (Array.isArray(p.fasi)) {
           ctx.font = "10px 'Inter', system-ui, sans-serif";
           const baseColor = p.colore || '#9ca3af';
@@ -2041,7 +2009,6 @@
               milestone: !!f.milestone
             };
 
-            // Milestone
             if (f.milestone) {
               const milestoneOffset = diffInDays(minDate, fe);
               const milestoneX = offsetToX(milestoneOffset);
@@ -2085,7 +2052,6 @@
               return;
             }
 
-            // Regular phase bar
             const mappedColor = PHASE_COLOR_MAP[f.nome];
             const faseColor = mappedColor || baseColor;
 
@@ -2107,7 +2073,6 @@
               ctx.restore();
             }
 
-            // Phase label
             if (width > 22) {
               ctx.save();
               ctx.beginPath();
@@ -2146,7 +2111,6 @@
       });
     }
 
-    // ==================== GANTT CANVAS COMPONENT ====================
     const GanttCanvas = memo(({ projects, canvasRef, zoomLevel, theme }) => {
       const hoverDataRef = useRef({ phases: [], config: null });
       const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, text: '' });
@@ -2187,7 +2151,6 @@
 
         let text = '';
 
-        // Check phases
         for (let ph of phases) {
           if (xCanvas >= ph.x1 && xCanvas <= ph.x2 && yCanvas >= ph.y1 && yCanvas <= ph.y2) {
             const percentLabel = typeof ph.percentuale === 'number' ? `${ph.percentuale}%` : '';
@@ -2203,7 +2166,6 @@
           }
         }
 
-        // Check date hover
         if (!text && config) {
           const { marginLeft, plotWidth, topMargin, bottomMargin, cssHeight, minDate, maxDate } = config;
           if (
@@ -2285,9 +2247,7 @@
       );
     });
 
-    // ==================== MAIN APP COMPONENT ====================
     function App() {
-      // State
       const [projects, setProjects] = useState([]);
       const [departments, setDepartments] = useState([CONFIG.DEFAULT_DEPARTMENT]);
       const [department, setDepartment] = useState(CONFIG.DEFAULT_DEPARTMENT);
@@ -2307,11 +2267,11 @@
       const [lockInfo, setLockInfo] = useState({
         hasLock: false,
         lockedBy: null,
+        lockedAt: null,
         loading: false,
         error: null
       });
 
-      // Form state
       const [projectName, setProjectName] = useState('');
       const [projectColor, setProjectColor] = useState(COLOR_PALETTE[0]);
       const [projectStart, setProjectStart] = useState('');
@@ -2324,17 +2284,14 @@
         return new Date().toLocaleTimeString('it-IT', { hour12: false });
       });
 
-      // Refs
       const idleTimeoutRef = useRef(null);
       const currentLockRef = useRef({ department: null, userName: null });
       const canvasRef = useRef(null);
       const paletteIndexRef = useRef(0);
 
-      // Constants
       const todayStr = formatToday();
       const todayDisplay = formatDateDisplay(todayStr);
 
-      // Computed values
       const autoData = useMemo(() => applyAutomaticStatusRules(projects), [projects]);
       const autoProjects = autoData.projectsWithAuto;
       const autoAnomalies = autoData.anomalies;
@@ -2388,7 +2345,6 @@
       const allSelectedForGantt = projects.length > 0 && selectedProjectIds.length === projects.length;
       const canEdit = userName.trim() !== '' && (department === CONFIG.DEFAULT_DEPARTMENT || lockInfo.hasLock);
 
-      // Helper functions
       function getNextPaletteColor() {
         const idx = paletteIndexRef.current;
         paletteIndexRef.current = idx + 1;
@@ -2431,7 +2387,6 @@
         setProjectPercent('');
       }, []);
 
-      // Effects
       useEffect(() => {
         setProjectColor(getNextPaletteColor());
       }, []);
@@ -2510,7 +2465,6 @@
         }
       }, [screensaverEnabled, resetIdleTimer]);
 
-      // Lock management
       useEffect(() => {
         const dep = department;
         const user = userName.trim();
@@ -2520,7 +2474,7 @@
             releaseLock(currentLockRef.current.department, currentLockRef.current.userName).catch(() => { });
             currentLockRef.current = { department: null, userName: null };
           }
-          setLockInfo({ hasLock: false, lockedBy: null, loading: false, error: null });
+          setLockInfo({ hasLock: false, lockedBy: null, lockedAt: null, loading: false, error: null });
           return;
         }
 
@@ -2545,6 +2499,7 @@
               setLockInfo({
                 hasLock: true,
                 lockedBy: user,
+                lockedAt: null,
                 loading: false,
                 error: null
               });
@@ -2552,6 +2507,7 @@
               setLockInfo({
                 hasLock: false,
                 lockedBy: result.lockedBy,
+                lockedAt: result.lockedAt,
                 loading: false,
                 error: null
               });
@@ -2562,6 +2518,7 @@
             setLockInfo({
               hasLock: false,
               lockedBy: null,
+              lockedAt: null,
               loading: false,
               error: e?.message || 'Errore di rete'
             });
@@ -2589,7 +2546,6 @@
         return () => window.removeEventListener('beforeunload', handleUnload);
       }, []);
 
-      // Event handlers
       const handleProjectStartChange = useCallback((e) => {
         const value = e.target.value;
         setProjectStart(value);
@@ -3018,7 +2974,6 @@
         setSelectedProjectIds([]);
       }, [department, resetForm]);
 
-      // Render
       return (
         <>
           <header>
@@ -3170,8 +3125,17 @@
 
           {userName.trim() !== '' && !lockInfo.loading && !lockInfo.hasLock && lockInfo.lockedBy && (
             <div className="lock-warning-banner" role="alert">
-              Il reparto <strong>{department}</strong> è in modifica da <strong>{lockInfo.lockedBy}</strong>.
-              Non apportare modifiche per evitare conflitti.
+              <div className="lock-warning-content">
+                <div>
+                  Il reparto <strong>{department}</strong> è in modifica da <strong>{lockInfo.lockedBy}</strong>.
+                  Non apportare modifiche per evitare conflitti.
+                </div>
+                {lockInfo.lockedAt && (
+                  <div className="lock-warning-time">
+                    Accesso effettuato: {formatDateTime(lockInfo.lockedAt)}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -3193,7 +3157,6 @@
 
             <section className="bottom-layout">
               <div className="bottom-inner">
-                {/* Form Column */}
                 <div className="col-form">
                   <div className="card">
                     <div className="card-header">
@@ -3537,7 +3500,6 @@
                   </div>
                 </div>
 
-                {/* Projects List Column */}
                 <div className="col-list card">
                   <div className="card-header">
                     <div>
@@ -3807,7 +3769,6 @@
                   </div>
                 </div>
 
-                {/* Issues Column */}
                 <div className="col-issues card">
                   <div className="card-header">
                     <div>
@@ -3989,7 +3950,6 @@
       );
     }
 
-    // ==================== RENDER APPLICATION ====================
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
