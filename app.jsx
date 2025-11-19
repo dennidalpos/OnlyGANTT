@@ -273,6 +273,7 @@ function App() {
     const [currentTime, setCurrentTime] = useState(() => {
         return new Date().toLocaleTimeString('it-IT', { hour12: false });
     });
+    const [isDirty, setIsDirty] = useState(false);
 
     const idleTimeoutRef = useRef(null);
     const currentLockRef = useRef({ department: null, userName: null });
@@ -360,10 +361,18 @@ function App() {
         }, window.CONFIG.IDLE_TIMEOUT);
     }, [screensaverEnabled]);
 
+    const markAsDirty = useCallback(() => {
+        setIsDirty(true);
+    }, []);
+
     const saveProjects = useCallback((data) => {
         setProjects(data);
         if (!department || department === window.CONFIG.DEFAULT_DEPARTMENT || !userName.trim()) return;
-        saveProjectsToServer(department, data).catch(() => { });
+        saveProjectsToServer(department, data)
+            .then(() => {
+                setIsDirty(false);
+            })
+            .catch(() => { });
     }, [department, userName]);
 
     const resetForm = useCallback(() => {
@@ -375,6 +384,7 @@ function App() {
         setProjectColor(getNextPaletteColor());
         setProjectStatus('da_iniziare');
         setProjectPercent('');
+        setIsDirty(false);
     }, []);
 
     useEffect(() => {
@@ -543,7 +553,8 @@ function App() {
             if (!prev || (value && prev < value)) return value || prev;
             return prev;
         });
-    }, []);
+        markAsDirty();
+    }, [markAsDirty]);
 
     const handleProjectEndChange = useCallback((e) => {
         const value = e.target.value;
@@ -551,7 +562,8 @@ function App() {
             if (projectStart && value && value < projectStart) return projectStart;
             return value;
         });
-    }, [projectStart]);
+        markAsDirty();
+    }, [projectStart, markAsDirty]);
 
     const addPhaseRow = useCallback(() => {
         if (phases.length >= window.CONFIG.MAX_PHASES_PER_PROJECT) {
@@ -587,7 +599,8 @@ function App() {
                 milestone: false
             }
         ]);
-    }, [phases, phaseTemplate, projectStart, projectEnd]);
+        markAsDirty();
+    }, [phases, phaseTemplate, projectStart, projectEnd, markAsDirty]);
 
     const updatePhaseField = useCallback((index, field, value) => {
         setPhases(prev => {
@@ -625,11 +638,13 @@ function App() {
             next[index] = phase;
             return next;
         });
-    }, []);
+        markAsDirty();
+    }, [markAsDirty]);
 
     const removePhase = useCallback((index) => {
         setPhases(prev => prev.filter((_, i) => i !== index));
-    }, []);
+        markAsDirty();
+    }, [markAsDirty]);
 
     const validateAndCollectPhases = useCallback(() => {
         const res = [];
@@ -808,6 +823,8 @@ function App() {
                 })
                 : []
         );
+        
+        setIsDirty(false);
     }, [projects, projectColor]);
 
     const deleteProject = useCallback((projectId) => {
@@ -1112,6 +1129,23 @@ function App() {
                                 Mesi
                             </button>
                         </div>
+
+                        {userName.trim() !== '' && lockInfo.hasLock && department !== CONFIG.DEFAULT_DEPARTMENT && (
+                            <div style={{
+                                fontSize: '0.875rem',
+                                padding: '0.4rem 0.85rem',
+                                borderRadius: '999px',
+                                background: 'rgba(59, 130, 246, 0.15)',
+                                color: '#3b82f6',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontWeight: '500'
+                            }} role="status" aria-live="polite">
+                                🔒 Reparto <strong>{department}</strong> in modifica da te
+                            </div>
+                        )}
                     </div>
                 </div>}
             </header>
@@ -1157,6 +1191,40 @@ function App() {
                                         <h2 className="card-title" id="project-form-title">
                                             <span role="img" aria-label="Icona documento">📝</span>
                                             <span>Gestione Progetto</span>
+                                            {isDirty && (
+                                                <span style={{
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '500',
+                                                    padding: '0.25rem 0.6rem',
+                                                    borderRadius: '999px',
+                                                    background: 'rgba(251, 191, 36, 0.15)',
+                                                    color: '#f59e0b',
+                                                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                                                    marginLeft: '0.5rem',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem'
+                                                }}>
+                                                    🟡 Modifiche non salvate
+                                                </span>
+                                            )}
+                                            {!isDirty && canEdit && (
+                                                <span style={{
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '500',
+                                                    padding: '0.25rem 0.6rem',
+                                                    borderRadius: '999px',
+                                                    background: 'rgba(34, 197, 94, 0.15)',
+                                                    color: '#16a34a',
+                                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                                    marginLeft: '0.5rem',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem'
+                                                }}>
+                                                    🟢 Salvato
+                                                </span>
+                                            )}
                                         </h2>
                                         <p className="card-subtitle">
                                             Inserisci o modifica un progetto con le sue fasi operative
@@ -1183,7 +1251,7 @@ function App() {
                                                         id="projectName"
                                                         placeholder="Es. Sito web aziendale"
                                                         value={projectName}
-                                                        onChange={e => setProjectName(e.target.value)}
+                                                        onChange={e => { setProjectName(e.target.value); markAsDirty(); }}
                                                         required
                                                         aria-required="true"
                                                     />
@@ -1195,7 +1263,7 @@ function App() {
                                                             type="color"
                                                             id="projectColor"
                                                             value={projectColor}
-                                                            onChange={e => setProjectColor(e.target.value)}
+                                                            onChange={e => { setProjectColor(e.target.value); markAsDirty(); }}
                                                             title="Colore principale del progetto"
                                                             aria-label="Seleziona colore progetto"
                                                         />
@@ -1240,7 +1308,7 @@ function App() {
                                                     <select
                                                         id="projectStatus"
                                                         value={projectStatus}
-                                                        onChange={e => setProjectStatus(e.target.value)}
+                                                        onChange={e => { setProjectStatus(e.target.value); markAsDirty(); }}
                                                         aria-label="Stato del progetto"
                                                     >
                                                         {STATUS_OPTIONS.map(o => (
@@ -1255,7 +1323,10 @@ function App() {
                                                     <select
                                                         id="projectPercent"
                                                         value={projectPercent === '' ? '' : String(projectPercent)}
-                                                        onChange={e => setProjectPercent(e.target.value === '' ? '' : Number(e.target.value))}
+                                                        onChange={e => { 
+                                                            setProjectPercent(e.target.value === '' ? '' : Number(e.target.value)); 
+                                                            markAsDirty(); 
+                                                        }}
                                                         aria-label="Percentuale di completamento del progetto"
                                                     >
                                                         <option value="">Calcolo automatico</option>
