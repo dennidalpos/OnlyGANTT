@@ -14,7 +14,7 @@ const ALLOWED_EXTENSIONS = ['.json'];
 const MAX_DEPARTMENT_NAME_LENGTH = 50;
 const MAX_PASSWORD_LENGTH = 100;
 const MIN_PASSWORD_LENGTH = 4;
-const RESERVED_NAMES = ['Home', 'CON', 'PRN', 'AUX', 'NUL'];
+const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL'];
 
 let departmentsData = [];
 let departmentPasswords = {};
