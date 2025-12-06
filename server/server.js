@@ -6,14 +6,18 @@ const fsSync = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['.json'];
 const MAX_DEPARTMENT_NAME_LENGTH = 50;
+const MAX_PASSWORD_LENGTH = 100;
+const MIN_PASSWORD_LENGTH = 4;
 const RESERVED_NAMES = ['Home', 'CON', 'PRN', 'AUX', 'NUL'];
 
 let departmentsData = [];
+let departmentPasswords = {};
 let projectsData = {};
 let locksData = {};
 
@@ -23,7 +27,7 @@ const validateDepartmentName = (name) => {
   }
 
   const trimmed = name.trim();
-  
+
   if (trimmed.length === 0) {
     return { valid: false, error: 'Nome reparto vuoto' };
   }
@@ -41,6 +45,22 @@ const validateDepartmentName = (name) => {
   }
 
   return { valid: true, name: trimmed };
+};
+
+const validatePassword = (password) => {
+  if (!password || typeof password !== 'string') {
+    return { valid: false, error: 'Password non valida' };
+  }
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { valid: false, error: `Password troppo corta (minimo ${MIN_PASSWORD_LENGTH} caratteri)` };
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return { valid: false, error: 'Password troppo lunga' };
+  }
+
+  return { valid: true };
 };
 
 const validateProjects = (projects) => {
@@ -67,23 +87,31 @@ const ensureDataDir = async () => {
 const loadAllData = async () => {
   try {
     await ensureDataDir();
-    
+
     const files = await fs.readdir(DATA_DIR);
     const jsonFiles = files.filter(file => file.endsWith('.json'));
-    
+
     departmentsData = [];
     projectsData = {};
+    departmentPasswords = {};
 
     const loadPromises = jsonFiles.map(async (file) => {
       const depName = file.replace('.json', '');
       try {
         const filePath = path.join(DATA_DIR, file);
         const content = await fs.readFile(filePath, 'utf-8');
-        const projects = JSON.parse(content);
-        
-        if (Array.isArray(projects)) {
-          departmentsData.push(depName);
-          projectsData[depName] = projects;
+        const data = JSON.parse(content);
+
+        if (data && typeof data === 'object') {
+          if (Array.isArray(data)) {
+            departmentsData.push(depName);
+            projectsData[depName] = data;
+            departmentPasswords[depName] = '';
+          } else if (data.projects && Array.isArray(data.projects)) {
+            departmentsData.push(depName);
+            projectsData[depName] = data.projects;
+            departmentPasswords[depName] = data.password || '';
+          }
         }
       } catch (err) {
         console.error(`Errore caricamento ${file}:`, err.message);
@@ -95,6 +123,7 @@ const loadAllData = async () => {
     if (!departmentsData.includes('Home')) {
       departmentsData.unshift('Home');
       projectsData['Home'] = [];
+      departmentPasswords['Home'] = '';
       await saveProjects('Home');
     }
 
@@ -103,6 +132,7 @@ const loadAllData = async () => {
     console.error('Errore critico nel caricamento dati:', error);
     departmentsData = ['Home'];
     projectsData = { 'Home': [] };
+    departmentPasswords = { 'Home': '' };
   }
 };
 
@@ -114,14 +144,20 @@ const saveProjects = async (department) => {
 
   const projectFile = path.join(DATA_DIR, `${validation.name}.json`);
   const projects = projectsData[department] || [];
-  
+  const password = departmentPasswords[department] || '';
+
   const validationResult = validateProjects(projects);
   if (!validationResult.valid) {
     throw new Error(validationResult.error);
   }
 
+  const dataToSave = {
+    password: password,
+    projects: projects
+  };
+
   try {
-    await fs.writeFile(projectFile, JSON.stringify(projects, null, 2), 'utf-8');
+    await fs.writeFile(projectFile, JSON.stringify(dataToSave, null, 2), 'utf-8');
   } catch (error) {
     console.error(`Errore salvataggio progetti per ${department}:`, error);
     throw error;
@@ -135,7 +171,7 @@ const deleteProjectsFile = async (department) => {
   }
 
   const projectFile = path.join(DATA_DIR, `${validation.name}.json`);
-  
+
   try {
     await fs.unlink(projectFile);
   } catch (error) {
@@ -147,7 +183,8 @@ const deleteProjectsFile = async (department) => {
 };
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(__dirname));
+app.use(express.static(PUBLIC_DIR));
+app.use('/src', express.static(path.join(__dirname, '..', 'src')));
 
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
@@ -157,7 +194,7 @@ app.use((err, req, res, next) => {
 });
 
 const upload = multer({
-  dest: 'uploads/',
+  dest: path.join(__dirname, '..', 'uploads'),
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -184,6 +221,11 @@ app.post('/api/departments', async (req, res) => {
       return res.status(400).json({ error: validation.error });
     }
 
+    const passwordValidation = validatePassword(req.body.password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
     const trimmed = validation.name;
 
     if (departmentsData.includes(trimmed)) {
@@ -192,6 +234,7 @@ app.post('/api/departments', async (req, res) => {
 
     departmentsData.push(trimmed);
     projectsData[trimmed] = [];
+    departmentPasswords[trimmed] = req.body.password;
 
     await saveProjects(trimmed);
 
@@ -202,9 +245,41 @@ app.post('/api/departments', async (req, res) => {
   }
 });
 
+app.post('/api/departments/:name/verify', (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const { password } = req.body;
+
+    const validation = validateDepartmentName(name);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    if (!departmentsData.includes(name)) {
+      return res.status(404).json({ error: 'Reparto non trovato' });
+    }
+
+    const storedPassword = departmentPasswords[name] || '';
+
+    if (storedPassword === '') {
+      return res.json({ ok: true, authorized: true });
+    }
+
+    if (password === storedPassword) {
+      return res.json({ ok: true, authorized: true });
+    }
+
+    res.status(401).json({ ok: false, authorized: false, error: 'Password errata' });
+  } catch (error) {
+    console.error('Errore verifica password:', error);
+    res.status(500).json({ error: 'Errore interno del server' });
+  }
+});
+
 app.delete('/api/departments/:name', async (req, res) => {
   try {
     const name = decodeURIComponent(req.params.name);
+    const { password } = req.body;
 
     if (name === 'Home') {
       return res.status(400).json({ error: 'Non puoi eliminare il reparto Home' });
@@ -220,8 +295,14 @@ app.delete('/api/departments/:name', async (req, res) => {
       return res.status(404).json({ error: 'Reparto non trovato' });
     }
 
+    const storedPassword = departmentPasswords[name] || '';
+    if (storedPassword !== '' && password !== storedPassword) {
+      return res.status(401).json({ error: 'Password errata' });
+    }
+
     departmentsData.splice(index, 1);
     delete projectsData[name];
+    delete departmentPasswords[name];
     delete locksData[name];
 
     await deleteProjectsFile(name);
@@ -319,7 +400,7 @@ app.post('/api/lock/:department/release', (req, res) => {
 
 app.post('/api/upload/:department', upload.single('file'), async (req, res) => {
   const filePath = req.file?.path;
-  
+
   try {
     const dep = decodeURIComponent(req.params.department);
 

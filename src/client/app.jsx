@@ -1,8 +1,4 @@
-// app.jsx - Componente React principale
-
 const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
-
-// Componente GanttCanvas
 const GanttCanvas = memo(({ projects, canvasRef, zoomLevel, theme }) => {
     const hoverDataRef = useRef({ phases: [], config: null });
     const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, text: '' });
@@ -154,7 +150,6 @@ const GanttCanvas = memo(({ projects, canvasRef, zoomLevel, theme }) => {
     );
 });
 
-// Funzioni API
 async function loadDepartments() {
     const res = await fetch('/api/departments', { cache: 'no-store' });
     const data = await res.json();
@@ -210,18 +205,29 @@ async function releaseLock(department, userName) {
     });
 }
 
-async function createDepartment(name) {
+async function createDepartment(name, password) {
     const res = await fetch('/api/departments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, password })
     });
     return await res.json();
 }
 
-async function deleteDepartment(department) {
+async function verifyDepartmentPassword(department, password) {
+    const res = await fetch(`/api/departments/${encodeURIComponent(department)}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+    });
+    return await res.json();
+}
+
+async function deleteDepartment(department, password) {
     const res = await fetch(`/api/departments/${encodeURIComponent(department)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
     });
     return await res.json();
 }
@@ -236,7 +242,6 @@ async function uploadProjectsFile(department, file) {
     return await res.json();
 }
 
-// Componente App
 function App() {
     const [projects, setProjects] = useState([]);
     const [departments, setDepartments] = useState([window.CONFIG.DEFAULT_DEPARTMENT]);
@@ -925,7 +930,15 @@ function App() {
         name = name.trim();
         if (!name) return;
 
-        createDepartment(name)
+        let password = prompt('Password per il reparto (minimo 4 caratteri):');
+        if (password === null) return;
+        password = password.trim();
+        if (!password || password.length < 4) {
+            alert('Password troppo corta. Minimo 4 caratteri.');
+            return;
+        }
+
+        createDepartment(name, password)
             .then(data => {
                 if (!data || data.error) {
                     alert(data?.error || 'Errore creazione reparto');
@@ -958,7 +971,11 @@ function App() {
 
         if (!confirm(`Vuoi eliminare il reparto "${department}" e tutti i suoi progetti?`)) return;
 
-        deleteDepartment(department)
+        let password = prompt('Inserisci la password del reparto per confermare:');
+        if (password === null) return;
+        password = password.trim();
+
+        deleteDepartment(department, password)
             .then(data => {
                 if (!data || !data.ok) {
                     alert(data?.error || 'Errore eliminazione reparto');
@@ -981,8 +998,43 @@ function App() {
         setSelectedProjectIds([]);
     }, [department, resetForm]);
 
-    // Render dell'interfaccia...
-    // (Il render è identico all'originale, prosegue dalla riga seguente)
+    const handleDepartmentChange = useCallback((value) => {
+        if (userName.trim() === '') {
+            alert('Inserisci il nome utente prima di selezionare il reparto.');
+            return;
+        }
+
+        if (value === window.CONFIG.DEFAULT_DEPARTMENT) {
+            setDepartment(value);
+            setEditingProjectId(null);
+            setExpandedProjectId(null);
+            setProjects([]);
+            setSelectedProjectIds([]);
+            resetForm();
+            return;
+        }
+
+        let password = prompt(`Inserisci la password per il reparto "${value}":`);
+        if (password === null) return;
+        password = password.trim();
+
+        verifyDepartmentPassword(value, password)
+            .then(data => {
+                if (data && data.authorized) {
+                    setDepartment(value);
+                    setEditingProjectId(null);
+                    setExpandedProjectId(null);
+                    setProjects([]);
+                    setSelectedProjectIds([]);
+                    resetForm();
+                } else {
+                    alert('Password errata');
+                }
+            })
+            .catch(() => {
+                alert('Errore nella verifica della password');
+            });
+    }, [userName, resetForm]);
 
     return (
         <>
@@ -1009,19 +1061,7 @@ function App() {
                             <select
                                 id="department-select"
                                 value={department}
-                                onChange={e => {
-                                    const value = e.target.value;
-                                    if (userName.trim() === '') {
-                                        alert('Inserisci il nome utente prima di selezionare il reparto.');
-                                        return;
-                                    }
-                                    setDepartment(value);
-                                    setEditingProjectId(null);
-                                    setExpandedProjectId(null);
-                                    setProjects([]);
-                                    setSelectedProjectIds([]);
-                                    resetForm();
-                                }}
+                                onChange={e => handleDepartmentChange(e.target.value)}
                                 aria-label="Seleziona reparto"
                             >
                                 {departments.map(dep => (
