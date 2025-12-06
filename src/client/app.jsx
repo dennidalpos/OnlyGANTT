@@ -232,19 +232,38 @@ async function changeDepartmentPassword(department, oldPassword, newPassword) {
     return await res.json();
 }
 
-function saveDepartmentPassword(department, password) {
+function saveCurrentUser(userName) {
     try {
-        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        localStorage.setItem('currentUser', userName);
+    } catch (e) {
+        console.error('Errore salvataggio utente:', e);
+    }
+}
+
+function getSavedUser() {
+    try {
+        return localStorage.getItem('currentUser') || '';
+    } catch (e) {
+        console.error('Errore caricamento utente:', e);
+        return '';
+    }
+}
+
+function saveDepartmentPassword(userName, department, password) {
+    try {
+        const key = `passwords_${userName}`;
+        const passwords = JSON.parse(localStorage.getItem(key) || '{}');
         passwords[department] = password;
-        localStorage.setItem('departmentPasswords', JSON.stringify(passwords));
+        localStorage.setItem(key, JSON.stringify(passwords));
     } catch (e) {
         console.error('Errore salvataggio password:', e);
     }
 }
 
-function getSavedPassword(department) {
+function getSavedPassword(userName, department) {
     try {
-        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        const key = `passwords_${userName}`;
+        const passwords = JSON.parse(localStorage.getItem(key) || '{}');
         return passwords[department] || null;
     } catch (e) {
         console.error('Errore caricamento password:', e);
@@ -252,11 +271,12 @@ function getSavedPassword(department) {
     }
 }
 
-function removeSavedPassword(department) {
+function removeSavedPassword(userName, department) {
     try {
-        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        const key = `passwords_${userName}`;
+        const passwords = JSON.parse(localStorage.getItem(key) || '{}');
         delete passwords[department];
-        localStorage.setItem('departmentPasswords', JSON.stringify(passwords));
+        localStorage.setItem(key, JSON.stringify(passwords));
     } catch (e) {
         console.error('Errore rimozione password:', e);
     }
@@ -297,7 +317,7 @@ function App() {
         }
         return 'light';
     });
-    const [userName, setUserName] = useState('');
+    const [userName, setUserName] = useState(() => getSavedUser());
     const [lockInfo, setLockInfo] = useState({
         hasLock: false,
         lockedBy: null,
@@ -445,6 +465,12 @@ function App() {
     useEffect(() => {
         document.body.dataset.theme = theme;
     }, [theme]);
+
+    useEffect(() => {
+        if (userName) {
+            saveCurrentUser(userName);
+        }
+    }, [userName]);
 
     useEffect(() => {
         loadDepartments()
@@ -1008,7 +1034,7 @@ function App() {
             return;
         }
 
-        let oldPassword = getSavedPassword(department);
+        let oldPassword = getSavedPassword(userName, department);
         if (!oldPassword) {
             oldPassword = prompt('Inserisci la password attuale:');
             if (oldPassword === null) return;
@@ -1036,7 +1062,7 @@ function App() {
         try {
             const data = await changeDepartmentPassword(department, oldPassword, newPassword);
             if (data && data.ok) {
-                saveDepartmentPassword(department, newPassword);
+                saveDepartmentPassword(userName, department, newPassword);
                 alert('Password cambiata con successo!');
             } else {
                 alert(data?.error || 'Errore nel cambio password');
@@ -1044,7 +1070,7 @@ function App() {
         } catch (e) {
             alert('Errore nel cambio password');
         }
-    }, [department]);
+    }, [department, userName]);
 
     const handleDeleteDepartment = useCallback(() => {
         if (!department || department === window.CONFIG.DEFAULT_DEPARTMENT) {
@@ -1064,7 +1090,7 @@ function App() {
                     alert(data?.error || 'Errore eliminazione reparto');
                     return;
                 }
-                removeSavedPassword(department);
+                removeSavedPassword(userName, department);
                 return loadDepartments();
             })
             .then(list => {
@@ -1080,7 +1106,7 @@ function App() {
         resetForm();
         setProjects([]);
         setSelectedProjectIds([]);
-    }, [department, resetForm]);
+    }, [department, userName, resetForm]);
 
     const handleDepartmentChange = useCallback(async (value) => {
         if (userName.trim() === '') {
@@ -1098,7 +1124,7 @@ function App() {
             return;
         }
 
-        let password = getSavedPassword(value);
+        let password = getSavedPassword(userName, value);
         let isAuthenticated = false;
 
         if (password) {
@@ -1107,11 +1133,11 @@ function App() {
                 if (data && data.authorized) {
                     isAuthenticated = true;
                 } else {
-                    removeSavedPassword(value);
+                    removeSavedPassword(userName, value);
                     password = null;
                 }
             } catch (e) {
-                removeSavedPassword(value);
+                removeSavedPassword(userName, value);
                 password = null;
             }
         }
@@ -1125,7 +1151,7 @@ function App() {
                 const data = await verifyDepartmentPassword(value, password);
                 if (data && data.authorized) {
                     isAuthenticated = true;
-                    saveDepartmentPassword(value, password);
+                    saveDepartmentPassword(userName, value, password);
                 } else {
                     alert('Password errata');
                     return;
