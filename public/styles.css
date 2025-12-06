@@ -224,6 +224,11 @@ body[data-theme="dark"] .today-label {
   color: var(--success);
 }
 
+.department-btn--password {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
 .department-btn--delete {
   color: var(--danger);
 }

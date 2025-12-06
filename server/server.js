@@ -276,6 +276,45 @@ app.post('/api/departments/:name/verify', (req, res) => {
   }
 });
 
+app.post('/api/departments/:name/change-password', async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const { oldPassword, newPassword } = req.body;
+
+    if (name === 'Home') {
+      return res.status(400).json({ error: 'Non puoi cambiare la password del reparto Home' });
+    }
+
+    const validation = validateDepartmentName(name);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    if (!departmentsData.includes(name)) {
+      return res.status(404).json({ error: 'Reparto non trovato' });
+    }
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
+    const storedPassword = departmentPasswords[name] || '';
+
+    if (storedPassword !== '' && oldPassword !== storedPassword) {
+      return res.status(401).json({ error: 'Password attuale errata' });
+    }
+
+    departmentPasswords[name] = newPassword;
+    await saveProjects(name);
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Errore cambio password:', error);
+    res.status(500).json({ error: 'Errore nel cambio password' });
+  }
+});
+
 app.delete('/api/departments/:name', async (req, res) => {
   try {
     const name = decodeURIComponent(req.params.name);

@@ -223,6 +223,45 @@ async function verifyDepartmentPassword(department, password) {
     return await res.json();
 }
 
+async function changeDepartmentPassword(department, oldPassword, newPassword) {
+    const res = await fetch(`/api/departments/${encodeURIComponent(department)}/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword })
+    });
+    return await res.json();
+}
+
+function saveDepartmentPassword(department, password) {
+    try {
+        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        passwords[department] = password;
+        localStorage.setItem('departmentPasswords', JSON.stringify(passwords));
+    } catch (e) {
+        console.error('Errore salvataggio password:', e);
+    }
+}
+
+function getSavedPassword(department) {
+    try {
+        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        return passwords[department] || null;
+    } catch (e) {
+        console.error('Errore caricamento password:', e);
+        return null;
+    }
+}
+
+function removeSavedPassword(department) {
+    try {
+        const passwords = JSON.parse(localStorage.getItem('departmentPasswords') || '{}');
+        delete passwords[department];
+        localStorage.setItem('departmentPasswords', JSON.stringify(passwords));
+    } catch (e) {
+        console.error('Errore rimozione password:', e);
+    }
+}
+
 async function deleteDepartment(department, password) {
     const res = await fetch(`/api/departments/${encodeURIComponent(department)}`, {
         method: 'DELETE',
@@ -963,6 +1002,50 @@ function App() {
         setSelectedProjectIds([]);
     }, [resetForm]);
 
+    const handleChangePassword = useCallback(async () => {
+        if (!department || department === window.CONFIG.DEFAULT_DEPARTMENT) {
+            alert('Non puoi cambiare la password del reparto Home.');
+            return;
+        }
+
+        let oldPassword = getSavedPassword(department);
+        if (!oldPassword) {
+            oldPassword = prompt('Inserisci la password attuale:');
+            if (oldPassword === null) return;
+            oldPassword = oldPassword.trim();
+        }
+
+        let newPassword = prompt('Inserisci la nuova password (minimo 4 caratteri):');
+        if (newPassword === null) return;
+        newPassword = newPassword.trim();
+
+        if (newPassword.length < 4) {
+            alert('La nuova password deve avere almeno 4 caratteri.');
+            return;
+        }
+
+        let confirmPassword = prompt('Conferma la nuova password:');
+        if (confirmPassword === null) return;
+        confirmPassword = confirmPassword.trim();
+
+        if (newPassword !== confirmPassword) {
+            alert('Le password non coincidono.');
+            return;
+        }
+
+        try {
+            const data = await changeDepartmentPassword(department, oldPassword, newPassword);
+            if (data && data.ok) {
+                saveDepartmentPassword(department, newPassword);
+                alert('Password cambiata con successo!');
+            } else {
+                alert(data?.error || 'Errore nel cambio password');
+            }
+        } catch (e) {
+            alert('Errore nel cambio password');
+        }
+    }, [department]);
+
     const handleDeleteDepartment = useCallback(() => {
         if (!department || department === window.CONFIG.DEFAULT_DEPARTMENT) {
             alert('Non puoi eliminare il reparto predefinito.');
@@ -981,6 +1064,7 @@ function App() {
                     alert(data?.error || 'Errore eliminazione reparto');
                     return;
                 }
+                removeSavedPassword(department);
                 return loadDepartments();
             })
             .then(list => {
@@ -998,7 +1082,7 @@ function App() {
         setSelectedProjectIds([]);
     }, [department, resetForm]);
 
-    const handleDepartmentChange = useCallback((value) => {
+    const handleDepartmentChange = useCallback(async (value) => {
         if (userName.trim() === '') {
             alert('Inserisci il nome utente prima di selezionare il reparto.');
             return;
@@ -1014,26 +1098,52 @@ function App() {
             return;
         }
 
-        let password = prompt(`Inserisci la password per il reparto "${value}":`);
-        if (password === null) return;
-        password = password.trim();
+        let password = getSavedPassword(value);
+        let isAuthenticated = false;
 
-        verifyDepartmentPassword(value, password)
-            .then(data => {
+        if (password) {
+            try {
+                const data = await verifyDepartmentPassword(value, password);
                 if (data && data.authorized) {
-                    setDepartment(value);
-                    setEditingProjectId(null);
-                    setExpandedProjectId(null);
-                    setProjects([]);
-                    setSelectedProjectIds([]);
-                    resetForm();
+                    isAuthenticated = true;
+                } else {
+                    removeSavedPassword(value);
+                    password = null;
+                }
+            } catch (e) {
+                removeSavedPassword(value);
+                password = null;
+            }
+        }
+
+        if (!isAuthenticated) {
+            password = prompt(`Inserisci la password per il reparto "${value}":`);
+            if (password === null) return;
+            password = password.trim();
+
+            try {
+                const data = await verifyDepartmentPassword(value, password);
+                if (data && data.authorized) {
+                    isAuthenticated = true;
+                    saveDepartmentPassword(value, password);
                 } else {
                     alert('Password errata');
+                    return;
                 }
-            })
-            .catch(() => {
+            } catch (e) {
                 alert('Errore nella verifica della password');
-            });
+                return;
+            }
+        }
+
+        if (isAuthenticated) {
+            setDepartment(value);
+            setEditingProjectId(null);
+            setExpandedProjectId(null);
+            setProjects([]);
+            setSelectedProjectIds([]);
+            resetForm();
+        }
     }, [userName, resetForm]);
 
     return (
@@ -1079,6 +1189,16 @@ function App() {
                                     aria-label="Aggiungi nuovo reparto"
                                 >
                                     +
+                                </button>
+                                <button
+                                    type="button"
+                                    className="department-btn department-btn--password"
+                                    disabled={department === CONFIG.DEFAULT_DEPARTMENT}
+                                    onClick={handleChangePassword}
+                                    title="Cambia la password del reparto corrente"
+                                    aria-label="Cambia password reparto"
+                                >
+                                    🔑
                                 </button>
                                 <button
                                     type="button"
