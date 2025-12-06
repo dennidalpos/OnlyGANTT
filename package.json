@@ -2,9 +2,9 @@
   "name": "only-gantt",
   "version": "1.0.0",
   "description": "Sistema di gestione progetti con diagrammi di Gantt",
-  "main": "server.js",
+  "main": "server/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server/server.js"
   },
   "dependencies": {
     "express": "^5.1.0",
