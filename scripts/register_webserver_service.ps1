@@ -38,12 +38,12 @@ if ($existingService) {
 }
 
 Write-Host "Creazione del servizio $ServiceName..."
-New-Service \
-    -Name $ServiceName \
-    -DisplayName $DisplayName \
-    -BinaryPathName $binaryPath \
-    -Description "Avvia il webserver OnlyGANTT tramite Node.js" \
-    -StartupType Automatic \
+New-Service `
+    -Name $ServiceName `
+    -DisplayName $DisplayName `
+    -BinaryPathName $binaryPath `
+    -Description "Avvia il webserver OnlyGANTT tramite Node.js" `
+    -StartupType Automatic `
     -ErrorAction Stop
 
 Set-Service -Name $ServiceName -StartupType Automatic
