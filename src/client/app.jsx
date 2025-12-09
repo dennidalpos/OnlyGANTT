@@ -153,10 +153,20 @@ const GanttCanvas = memo(({ projects, canvasRef, zoomLevel, theme }) => {
 async function loadDepartments() {
     const res = await fetch('/api/departments', { cache: 'no-store' });
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-        return window.filterDepartments(data);
+    if (Array.isArray(data)) {
+        const departments = window.filterDepartments(data);
+        return { departments, missingPasswordDepartments: [] };
     }
-    return [window.CONFIG.DEFAULT_DEPARTMENT];
+
+    const departments = Array.isArray(data?.departments)
+        ? window.filterDepartments(data.departments)
+        : [window.CONFIG.DEFAULT_DEPARTMENT];
+
+    const missingPasswordDepartments = Array.isArray(data?.missingPasswordDepartments)
+        ? data.missingPasswordDepartments.filter(dep => departments.includes(dep))
+        : [];
+
+    return { departments, missingPasswordDepartments };
 }
 
 async function loadProjects(department) {
@@ -305,6 +315,7 @@ function App() {
     const [projects, setProjects] = useState([]);
     const [departments, setDepartments] = useState([window.CONFIG.DEFAULT_DEPARTMENT]);
     const [department, setDepartment] = useState(window.CONFIG.DEFAULT_DEPARTMENT);
+    const [missingPasswordDepartments, setMissingPasswordDepartments] = useState([]);
     const [editingProjectId, setEditingProjectId] = useState(null);
     const [expandedProjectId, setExpandedProjectId] = useState(null);
     const [screensaverEnabled, setScreensaverEnabled] = useState(true);
@@ -474,16 +485,21 @@ function App() {
 
     useEffect(() => {
         loadDepartments()
-            .then(merged => {
-                setDepartments(merged);
+            .then(data => {
+                const depList = Array.isArray(data?.departments) && data.departments.length > 0
+                    ? data.departments
+                    : [window.CONFIG.DEFAULT_DEPARTMENT];
+                setDepartments(depList);
+                setMissingPasswordDepartments(Array.isArray(data?.missingPasswordDepartments) ? data.missingPasswordDepartments : []);
                 setDepartment(prev => {
-                    if (prev && merged.indexOf(prev) !== -1) return prev;
+                    if (prev && depList.indexOf(prev) !== -1) return prev;
                     return window.CONFIG.DEFAULT_DEPARTMENT;
                 });
             })
             .catch(() => {
                 setDepartments([window.CONFIG.DEFAULT_DEPARTMENT]);
                 setDepartment(window.CONFIG.DEFAULT_DEPARTMENT);
+                setMissingPasswordDepartments([]);
             });
     }, []);
 
@@ -1011,10 +1027,13 @@ function App() {
                 }
                 return loadDepartments();
             })
-            .then(list => {
-                if (list) {
-                    setDepartments(list);
-                    if (list.indexOf(name) !== -1) {
+            .then(data => {
+                if (data) {
+                    const depList = Array.isArray(data.departments) ? data.departments : [];
+                    const missing = Array.isArray(data.missingPasswordDepartments) ? data.missingPasswordDepartments : [];
+                    setDepartments(depList);
+                    setMissingPasswordDepartments(missing);
+                    if (depList.indexOf(name) !== -1) {
                         setDepartment(name);
                     }
                 }
@@ -1063,6 +1082,7 @@ function App() {
             const data = await changeDepartmentPassword(department, oldPassword, newPassword);
             if (data && data.ok) {
                 saveDepartmentPassword(userName, department, newPassword);
+                setMissingPasswordDepartments(prev => prev.filter(dep => dep !== department));
                 alert('Password cambiata con successo!');
             } else {
                 alert(data?.error || 'Errore nel cambio password');
@@ -1093,10 +1113,13 @@ function App() {
                 removeSavedPassword(userName, department);
                 return loadDepartments();
             })
-            .then(list => {
-                if (list) {
-                    setDepartments(list);
-                    setDepartment(list[0] || window.CONFIG.DEFAULT_DEPARTMENT);
+            .then(data => {
+                if (data) {
+                    const depList = Array.isArray(data.departments) ? data.departments : [];
+                    const missing = Array.isArray(data.missingPasswordDepartments) ? data.missingPasswordDepartments : [];
+                    setDepartments(depList);
+                    setMissingPasswordDepartments(missing);
+                    setDepartment(depList[0] || window.CONFIG.DEFAULT_DEPARTMENT);
                 }
             })
             .catch(() => {
@@ -1126,8 +1149,35 @@ function App() {
 
         let password = getSavedPassword(userName, value);
         let isAuthenticated = false;
+        const needsPasswordSetup = missingPasswordDepartments.includes(value);
 
-        if (password) {
+        if (needsPasswordSetup) {
+            let newPassword = prompt(`Il reparto "${value}" non ha una password. Inseriscila per completare l'aggiornamento:`);
+            if (newPassword === null) return;
+            newPassword = newPassword.trim();
+
+            if (newPassword.length < 4) {
+                alert('La password deve avere almeno 4 caratteri.');
+                return;
+            }
+
+            try {
+                const changeResult = await changeDepartmentPassword(value, '', newPassword);
+                if (!changeResult || !changeResult.ok) {
+                    alert(changeResult?.error || 'Errore nella configurazione della password.');
+                    return;
+                }
+                saveDepartmentPassword(userName, value, newPassword);
+                setMissingPasswordDepartments(prev => prev.filter(dep => dep !== value));
+                password = newPassword;
+                isAuthenticated = true;
+            } catch (e) {
+                alert('Errore nella configurazione della password.');
+                return;
+            }
+        }
+
+        if (!isAuthenticated && password) {
             try {
                 const data = await verifyDepartmentPassword(value, password);
                 if (data && data.authorized) {
@@ -1170,7 +1220,7 @@ function App() {
             setSelectedProjectIds([]);
             resetForm();
         }
-    }, [userName, resetForm]);
+    }, [userName, resetForm, missingPasswordDepartments]);
 
     return (
         <>
