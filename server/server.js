@@ -20,6 +20,7 @@ let departmentsData = [];
 let departmentPasswords = {};
 let projectsData = {};
 let locksData = {};
+let departmentsNeedingPasswordSetup = {};
 
 const validateDepartmentName = (name) => {
   if (!name || typeof name !== 'string') {
@@ -94,6 +95,7 @@ const loadAllData = async () => {
     departmentsData = [];
     projectsData = {};
     departmentPasswords = {};
+    departmentsNeedingPasswordSetup = {};
 
     const loadPromises = jsonFiles.map(async (file) => {
       const depName = file.replace('.json', '');
@@ -107,10 +109,13 @@ const loadAllData = async () => {
             departmentsData.push(depName);
             projectsData[depName] = data;
             departmentPasswords[depName] = '';
+            departmentsNeedingPasswordSetup[depName] = true;
           } else if (data.projects && Array.isArray(data.projects)) {
             departmentsData.push(depName);
             projectsData[depName] = data.projects;
-            departmentPasswords[depName] = data.password || '';
+            const hasPassword = typeof data.password === 'string' && data.password.trim() !== '';
+            departmentPasswords[depName] = hasPassword ? data.password : '';
+            departmentsNeedingPasswordSetup[depName] = !hasPassword;
           }
         }
       } catch (err) {
@@ -124,7 +129,10 @@ const loadAllData = async () => {
       departmentsData.unshift('Home');
       projectsData['Home'] = [];
       departmentPasswords['Home'] = '';
+      departmentsNeedingPasswordSetup['Home'] = false;
       await saveProjects('Home');
+    } else {
+      departmentsNeedingPasswordSetup['Home'] = false;
     }
 
     console.log(`✅ Dati caricati: ${departmentsData.length} reparti, ${Object.values(projectsData).reduce((sum, p) => sum + p.length, 0)} progetti totali`);
@@ -133,6 +141,7 @@ const loadAllData = async () => {
     departmentsData = ['Home'];
     projectsData = { 'Home': [] };
     departmentPasswords = { 'Home': '' };
+    departmentsNeedingPasswordSetup = { 'Home': false };
   }
 };
 
@@ -207,7 +216,8 @@ const upload = multer({
 
 app.get('/api/departments', (req, res) => {
   try {
-    res.json(departmentsData);
+    const missingPasswordDepartments = departmentsData.filter(dep => departmentsNeedingPasswordSetup[dep]);
+    res.json({ departments: departmentsData, missingPasswordDepartments });
   } catch (error) {
     console.error('Errore get departments:', error);
     res.status(500).json({ error: 'Errore interno del server' });
@@ -235,6 +245,7 @@ app.post('/api/departments', async (req, res) => {
     departmentsData.push(trimmed);
     projectsData[trimmed] = [];
     departmentPasswords[trimmed] = req.body.password;
+    departmentsNeedingPasswordSetup[trimmed] = false;
 
     await saveProjects(trimmed);
 
@@ -306,6 +317,7 @@ app.post('/api/departments/:name/change-password', async (req, res) => {
     }
 
     departmentPasswords[name] = newPassword;
+    departmentsNeedingPasswordSetup[name] = false;
     await saveProjects(name);
 
     res.json({ ok: true });
@@ -343,6 +355,7 @@ app.delete('/api/departments/:name', async (req, res) => {
     delete projectsData[name];
     delete departmentPasswords[name];
     delete locksData[name];
+    delete departmentsNeedingPasswordSetup[name];
 
     await deleteProjectsFile(name);
 
