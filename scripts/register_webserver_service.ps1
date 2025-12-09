@@ -15,15 +15,15 @@ function Assert-Administrator {
 Assert-Administrator
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Resolve-Path (Join-Path $scriptDir "..")
-$serverScript = Join-Path $projectRoot "server\\server.js"
+$projectRoot = (Resolve-Path (Join-Path $scriptDir ".." -ErrorAction Stop)).ProviderPath
+$serverScript = Join-Path $projectRoot "server\server.js"
 
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) {
     Write-Error "Node.js non è stato trovato nel PATH. Installa Node.js o aggiungilo al PATH corrente." -ErrorAction Stop
 }
 
-$binaryPath = "\"$($node.Source)\" \"$serverScript\""
+$binaryPath = '"{0}" "{1}"' -f $node.Source, $serverScript
 
 $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($existingService) {
