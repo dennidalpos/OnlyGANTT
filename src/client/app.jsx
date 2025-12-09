@@ -292,6 +292,17 @@ function removeSavedPassword(userName, department) {
     }
 }
 
+function clearUserData(userName) {
+    try {
+        localStorage.removeItem('currentUser');
+        if (userName) {
+            localStorage.removeItem(`passwords_${userName}`);
+        }
+    } catch (e) {
+        console.error('Errore pulizia dati utente:', e);
+    }
+}
+
 async function deleteDepartment(department, password) {
     const res = await fetch(`/api/departments/${encodeURIComponent(department)}`, {
         method: 'DELETE',
@@ -1222,6 +1233,26 @@ function App() {
         }
     }, [userName, resetForm, missingPasswordDepartments]);
 
+    const handleLogout = useCallback(() => {
+        const trimmedUser = userName.trim();
+
+        if (currentLockRef.current.department && currentLockRef.current.userName) {
+            releaseLock(currentLockRef.current.department, currentLockRef.current.userName).catch(() => { });
+            currentLockRef.current = { department: null, userName: null };
+        }
+
+        clearUserData(trimmedUser);
+
+        setUserName('');
+        setDepartment(window.CONFIG.DEFAULT_DEPARTMENT);
+        setProjects([]);
+        setSelectedProjectIds([]);
+        setLockInfo({ hasLock: false, lockedBy: null, lockedAt: null, loading: false, error: null });
+        setEditingProjectId(null);
+        setExpandedProjectId(null);
+        resetForm();
+    }, [userName, resetForm]);
+
     return (
         <>
             <header>
@@ -1305,6 +1336,16 @@ function App() {
                                 aria-label="Nome utente"
                             />
                         </div>
+
+                        <button
+                            type="button"
+                            className="btn btn-danger btn-small"
+                            onClick={handleLogout}
+                            disabled={userName.trim() === ''}
+                            title="Esci e cancella i dati salvati dell'utente corrente"
+                        >
+                            Logout
+                        </button>
 
                         <label
                             className="control-label"
