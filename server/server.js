@@ -195,13 +195,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(PUBLIC_DIR));
 app.use('/src', express.static(path.join(__dirname, '..', 'src')));
 
-app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    return res.status(400).json({ error: 'JSON non valido' });
-  }
-  next();
-});
-
 const upload = multer({
   dest: path.join(__dirname, '..', 'uploads'),
   limits: { fileSize: MAX_FILE_SIZE },
@@ -450,7 +443,14 @@ app.post('/api/lock/:department/release', (req, res) => {
   }
 });
 
-app.post('/api/upload/:department', upload.single('file'), async (req, res) => {
+app.post('/api/upload/:department', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      return next(err);
+    }
+    next();
+  });
+}, async (req, res) => {
   const filePath = req.file?.path;
 
   try {
@@ -494,6 +494,21 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'JSON non valido' });
+  }
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File troppo grande (max 10MB)' });
+    }
+    return res.status(400).json({ error: 'Errore nel caricamento del file' });
+  }
+
+  if (err.message === 'Tipo di file non consentito') {
+    return res.status(400).json({ error: err.message });
+  }
+
   console.error('Errore non gestito:', err);
   res.status(500).json({ error: 'Errore interno del server' });
 });
