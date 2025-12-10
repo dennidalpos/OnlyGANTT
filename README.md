@@ -1,4 +1,3 @@
-```markdown
 # Only GANTT
 
 Sistema di gestione progetti con **diagrammi di Gantt**, pensato per team che vogliono uno strumento leggero, installabile in locale e orientato alla pianificazione operativa.
@@ -97,8 +96,79 @@ Nessun build tool obbligatorio: basta avviare il server Node e aprire il browser
    * compila il form per creare il primo **progetto** e le sue **fasi**
    * marca i progetti con **“In Gantt”** per visualizzarli nel diagramma.
 
-Per dettagli su installazione e configurazione vedi il README dedicato (es. `README-node.md`).
-Per una guida passo–passo all’utilizzo vedi `README-uso.md`.
+---
+
+## Installazione come Servizio Windows
+
+Per eseguire OnlyGANTT automaticamente all'avvio di Windows, puoi installarlo come servizio di sistema.
+
+### Prerequisiti
+
+1. **Node.js** installato e disponibile nel PATH
+2. **NSSM** (Non-Sucking Service Manager) - necessario perche' Node.js non puo' essere eseguito direttamente come servizio Windows
+
+### Installare NSSM
+
+1. Scarica NSSM da [nssm.cc/download](https://nssm.cc/download)
+2. Estrai l'archivio
+3. Copia `nssm.exe` (dalla cartella `win64` o `win32`) in una di queste posizioni:
+   - Nella cartella `tools\` del progetto
+   - In una cartella presente nel PATH di sistema (es. `C:\Windows\System32`)
+
+### Installare il servizio
+
+1. Apri **PowerShell come Amministratore**
+2. Naviga nella cartella del progetto:
+
+   ```powershell
+   cd C:\percorso\OnlyGANTT
+   ```
+
+3. Esegui lo script di installazione:
+
+   ```powershell
+   .\scripts\register_webserver_service.ps1
+   ```
+
+4. (Opzionale) Personalizza nome del servizio:
+
+   ```powershell
+   .\scripts\register_webserver_service.ps1 -ServiceName "MioGantt" -DisplayName "Il mio Gantt"
+   ```
+
+### Gestire il servizio
+
+Dopo l'installazione, puoi gestire il servizio con i comandi standard di Windows:
+
+```powershell
+# Verificare lo stato
+Get-Service -Name "OnlyGanttWeb"
+
+# Avviare
+Start-Service -Name "OnlyGanttWeb"
+
+# Fermare
+Stop-Service -Name "OnlyGanttWeb"
+
+# Riavviare
+Restart-Service -Name "OnlyGanttWeb"
+```
+
+Oppure usa il pannello **Servizi** di Windows (`services.msc`).
+
+### Disinstallare il servizio
+
+```powershell
+.\scripts\uninstall_service.ps1
+```
+
+### Log del servizio
+
+I log del servizio vengono salvati in `logs/`:
+- `service-stdout.log` - Output standard
+- `service-stderr.log` - Errori
+
+I file di log vengono ruotati automaticamente quando superano 1 MB.
 
 ---
 
@@ -106,17 +176,26 @@ Per una guida passo–passo all’utilizzo vedi `README-uso.md`.
 
 ```text
 only-gantt/
-├─ server.js           # Server Node.js/Express e logica di persistenza JSON
-├─ package.json        # Dipendenze e script npm
-├─ index.html          # Pagina principale, mount React, inclusione script
-├─ app.jsx             # Componente React principale (UI Gantt, form, alert)
-├─ styles.css          # Stili (tema chiaro/scuro, layout, tooltip, screensaver)
-├─ config.js           # Costanti globali (canvas, timeout, stati, palette…)
-├─ utils-date.js       # Utilità per date
-├─ utils-logic.js      # Logica di business (percentuali, ritardi, festività…)
-├─ utils-gantt.js      # Disegno del Gantt su canvas
-├─ data/               # File JSON di persistenza (creati/run-time)
-└─ uploads/            # Cartella temporanea per import JSON (run-time)
+├─ server/
+│  └─ server.js            # Server Node.js/Express e logica di persistenza JSON
+├─ src/
+│  ├─ client/
+│  │  └─ app.jsx           # Componente React principale (UI Gantt, form, alert)
+│  └─ utils/
+│     ├─ config.js         # Costanti globali (canvas, timeout, stati, palette)
+│     ├─ utils-date.js     # Utilita' per date
+│     ├─ utils-logic.js    # Logica di business (percentuali, ritardi, festivita')
+│     └─ utils-gantt.js    # Disegno del Gantt su canvas
+├─ public/
+│  ├─ index.html           # Pagina principale, mount React
+│  └─ styles.css           # Stili (tema chiaro/scuro, layout, tooltip)
+├─ scripts/
+│  ├─ register_webserver_service.ps1  # Installa servizio Windows
+│  └─ uninstall_service.ps1           # Rimuove servizio Windows
+├─ data/                   # File JSON di persistenza (creati a runtime)
+├─ logs/                   # Log del servizio Windows (creati a runtime)
+├─ uploads/                # Cartella temporanea per import JSON (runtime)
+└─ package.json            # Dipendenze e script npm
 ```
 
 ---
