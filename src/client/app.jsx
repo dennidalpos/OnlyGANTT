@@ -357,6 +357,12 @@
 
     const handleAdminLogout = async () => {
       if (!adminToken) return;
+      try {
+        await releaseLock();
+      } catch (err) {
+        // Ignore release errors
+      }
+
       await api.adminLogout(adminToken);
       setAdminToken(null);
       setUserName('');

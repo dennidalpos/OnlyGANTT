@@ -284,14 +284,15 @@
 
     ctx.imageSmoothingEnabled = false;
 
-    const headerYearY = 6;
-    const headerMonthLabelY = 14;
-    const headerMonthY = 22;
-    const headerTodayY = 34;
-    const headerMsY = 48;
-    const headerWeekY = 62;
-    const headerDayLetterY = 74;
-    const headerDayNumberY = 86;
+    const headerBaseY = config.gantt.CANVAS_TOP_MARGIN;
+    const headerDayNumberY = headerBaseY - 14;
+    const headerDayLetterY = headerBaseY - 30;
+    const headerWeekY = headerBaseY - 50;
+    const headerMsY = headerBaseY - 68;
+    const headerTodayY = headerBaseY - 86;
+    const headerMonthY = headerBaseY - 102;
+    const headerMonthLabelY = headerBaseY - 114;
+    const headerYearY = headerBaseY - 124;
 
     // Background
     ctx.fillStyle = config.gantt.BACKGROUND_COLOR;
@@ -299,7 +300,7 @@
 
     // Header
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, canvasWidth, 36);
+    ctx.fillRect(0, 0, canvasWidth, headerDayNumberY + 8);
 
     ctx.font = 'bold 14px sans-serif';
     ctx.fillStyle = config.gantt.TEXT_COLOR;
@@ -616,17 +617,36 @@
 
     ctx.setLineDash([]);
 
-    // MS labels (in header, staggered)
+    // MS labels (in header, staggered to avoid overlap)
     ctx.fillStyle = config.gantt.MILESTONE_COLOR;
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-    const msLabels = milestones.map(ms => ms.x).sort((a, b) => a - b);
-    const minSpacing = 30;
+    const msLabelText = 'MS';
+    const msLabelPadding = 4;
+    const msLabelSpacing = 8;
+    const msLabelRowHeight = 12;
+    const msLabelWidth = ctx.measureText(msLabelText).width + (msLabelPadding * 2);
+    const msLabelRows = [];
+    const msLabelPlacements = [];
 
-    msLabels.forEach((x, i) => {
-      if (i > 0 && x - msLabels[i - 1] < minSpacing) return;
-      ctx.fillText('MS', x, headerMsY);
+    milestones
+      .slice()
+      .sort((a, b) => a.x - b.x)
+      .forEach(ms => {
+        let targetRow = msLabelRows.findIndex(lastX => ms.x - lastX >= msLabelWidth + msLabelSpacing);
+        if (targetRow === -1) {
+          targetRow = msLabelRows.length;
+          msLabelRows.push(-Infinity);
+        }
+        msLabelRows[targetRow] = ms.x;
+        msLabelPlacements.push({ x: ms.x, rowIndex: targetRow });
+      });
+
+    msLabelPlacements.forEach(label => {
+      const y = headerMsY - (label.rowIndex * msLabelRowHeight);
+      ctx.fillText(msLabelText, label.x, y);
     });
 
     // Milestones (diamonds)

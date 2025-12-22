@@ -83,6 +83,32 @@ Consulta [`context.md`](context.md) per l'ambiente di runtime, la struttura dei 
 - Node.js 18 o superiore
 - Windows Server (o qualsiasi OS, ma ottimizzato per Windows)
 
+### Installazione su Windows Server
+1. **Installa Node.js 18+**  
+   Scarica l'MSI da <https://nodejs.org> e completa l'installazione con i default.
+2. **Verifica Node e npm**  
+   ```powershell
+   node -v
+   npm -v
+   ```
+3. **Apri la porta 3000 (o quella scelta)**  
+   Esegui come amministratore:
+   ```powershell
+   netsh advfirewall firewall add rule name="OnlyGANTT" dir=in action=allow protocol=TCP localport=3000
+   ```
+4. **Installa le dipendenze**  
+   ```powershell
+   npm install
+   ```
+5. **Avvia il server**  
+   ```powershell
+   npm start
+   ```
+6. **(Opzionale) Servizio Windows**  
+   Per l'esecuzione in background puoi usare NSSM:
+   - Crea un servizio che esegue `npm start` nella cartella del progetto.
+   - Configura il servizio per il riavvio automatico.
+
 ### Installare le dipendenze
 ```bash
 npm install
@@ -182,7 +208,9 @@ Il server gira su `http://localhost:3000`
 - Heartbeat automatico ogni 5 minuti
 - `sendBeacon` allo scaricamento della pagina per rilasciare il lock (chiusura, refresh, cambio pagina)
 - Cambio reparto: rilascio del lock prima dell’accesso al nuovo reparto
-- Pulsante logout che libera lock e stato di modifica
+- Cambio nome utente: rilascio del lock precedente e ri‑acquisizione con il nuovo utente
+- Logout utente o admin: rilascio automatico del lock
+- Admin può rilasciare lock attivi dal pannello strumenti
 - Stato lock mostrato in header (utente)
 
 ### Diagramma di Gantt
@@ -196,6 +224,7 @@ Il server gira su `http://localhost:3000`
 - **Toggle globale**: attiva/disattiva tutti i filtri
 - **Default viste**: 4 mesi con tutti i filtri separatori/dettaglio attivi, vista completa con soli separatori mesi/anni
 - **Altri filtri**: weekend, festività, solo milestone, evidenzia ritardi
+- **Etichette milestone**: posizionate nell’header sopra il diagramma, con spaziatura verticale per evitare sovrapposizioni
 
 ### Gestione Progetto
 - **Salva (nelle fasi)**: salva il progetto corrente senza chiuderlo e forza il refresh del Gantt ad ogni click.

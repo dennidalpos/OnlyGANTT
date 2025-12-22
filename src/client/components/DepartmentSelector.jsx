@@ -172,6 +172,25 @@
       }
     };
 
+    const handleAdminReleaseLock = async () => {
+      if (!selectedDept) {
+        setAdminActionError('Seleziona un reparto');
+        return;
+      }
+
+      setAdminActionLoading(true);
+      setAdminActionError('');
+
+      try {
+        await api.adminReleaseLock(selectedDept, adminToken);
+        await loadDepartments();
+      } catch (err) {
+        setAdminActionError(err.message || 'Sblocco lock fallito');
+      } finally {
+        setAdminActionLoading(false);
+      }
+    };
+
     const handlePasswordChange = async ({ removePassword = false } = {}) => {
       if (activeDeptObj?.protected && !oldPassword) {
         setError('Inserisci la vecchia password');
@@ -298,6 +317,15 @@
                     </button>
 
                     <button
+                      onClick={handleAdminReleaseLock}
+                      className="btn-danger"
+                      disabled={adminActionLoading}
+                      style={{ marginTop: '0.5rem' }}
+                    >
+                      Sblocca lock reparto
+                    </button>
+
+                    <button
                       onClick={handleAdminDeleteDepartment}
                       className="btn-secondary"
                       disabled={adminActionLoading}
@@ -383,6 +411,15 @@
                       disabled={adminActionLoading}
                     >
                       Reset password
+                    </button>
+
+                    <button
+                      onClick={handleAdminReleaseLock}
+                      className="btn-danger"
+                      disabled={adminActionLoading}
+                      style={{ marginTop: '0.5rem' }}
+                    >
+                      Sblocca lock reparto
                     </button>
 
                     <button
