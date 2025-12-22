@@ -227,6 +227,7 @@
     }, [filters, viewMode]);
 
     const hasUnsavedChanges = isDirty || (showProjectForm && hasDraftChanges);
+    const showProjectUnsavedBadge = showProjectForm && hasUnsavedChanges;
 
     useEffect(() => {
       const handleBeforeUnload = (event) => {
@@ -432,9 +433,16 @@
         newProjects = [...projects, projectData];
       }
 
-      setIsSavingProject(true);
       updateProjects(newProjects);
       refreshGantt();
+
+      if (keepEditing) {
+        setEditingProject(projectData);
+        setProjectDraft(projectData);
+        return true;
+      }
+
+      setIsSavingProject(true);
 
       let saveOk = false;
       try {
@@ -750,7 +758,7 @@
                       <h2 className="card-title">Gestione Progetto</h2>
                       {showProjectForm && (
                         <div>
-                          {isDirty ? (
+                          {showProjectUnsavedBadge ? (
                             <span className="badge badge-warning">Modifiche non salvate</span>
                           ) : (
                             <span className="badge badge-success">Salvato</span>
