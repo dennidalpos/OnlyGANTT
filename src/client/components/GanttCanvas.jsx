@@ -11,6 +11,7 @@
 
   const gantt = window.OnlyGantt.gantt;
   const dateUtils = window.OnlyGantt.dateUtils;
+  const config = window.AppConfig;
 
   function GanttCanvas({
     viewMode,
@@ -249,7 +250,8 @@
           const { phase, project } = hit;
           const percentage = phase.percentualeCompletamento || 0;
           const phaseLabel = phase.milestone ? 'Milestone' : 'Fase';
-          const tooltipText = `${phaseLabel}: ${phase.nome || 'Senza nome'}\n${percentage}%\nProgetto: ${project.nome}\n${phase.dataInizio || '?'} - ${phase.dataFine || '?'}\nStato: ${phase.stato}`;
+          const stateLabel = config.stateLabels?.[phase.stato] || phase.stato;
+          const tooltipText = `${phaseLabel}: ${phase.nome || 'Senza nome'}\n${percentage}%\nProgetto: ${project.nome}\n${phase.dataInizio || '?'} - ${phase.dataFine || '?'}\nStato: ${stateLabel}`;
 
           setTooltip({
             x: e.clientX,

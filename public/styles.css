@@ -130,6 +130,10 @@ body {
   min-width: 320px;
 }
 
+.header-section-department .header-section-content {
+  align-items: flex-end;
+}
+
 .header-user-section {
   align-items: flex-end;
 }
