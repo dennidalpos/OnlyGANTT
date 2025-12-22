@@ -1,0 +1,887 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
+const { validateDepartmentData, ensureIDs } = require('./schema');
+
+const app = express();
+
+// Load config (will be available after first static file is served, but we hardcode server values here)
+const CONFIG = {
+  port: 3000,
+  dataDir: 'data',
+  enableBak: true,
+  lockTimeoutMinutes: 60,
+  adminSessionTtlHours: 8,
+  maxUploadBytes: 2000000,
+  adminUser: process.env.ONLYGANTT_ADMIN_USER || 'admin',
+  adminPassword: process.env.ONLYGANTT_ADMIN_PASSWORD || 'admin123' // In production, use env variable
+};
+
+// Middleware
+app.use(express.json());
+
+// Static files
+app.use(express.static('public'));
+app.use('/src', express.static('src'));
+
+// In-memory stores
+const locks = new Map(); // key: department, value: { userName, lockedAt, expiresAt }
+const adminTokens = new Map(); // key: token, value: { createdAt, expiresAt }
+
+// Reserved Windows filenames (case-insensitive)
+const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+
+// Helper: normalize department name
+function normalizeDepartmentName(name) {
+  if (!name || typeof name !== 'string') {
+    return null;
+  }
+
+  const trimmed = name.trim();
+
+  // Max length
+  if (trimmed.length > 50) {
+    return null;
+  }
+
+  // Check for invalid characters
+  if (!/^[A-Za-z0-9 _-]+$/.test(trimmed)) {
+    return null;
+  }
+
+  // Check for .. / \
+  if (trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\')) {
+    return null;
+  }
+
+  // Check reserved names (case-insensitive)
+  if (RESERVED_NAMES.includes(trimmed.toUpperCase())) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+// Helper: get file path for department
+function getDepartmentFilePath(department) {
+  const normalized = normalizeDepartmentName(department);
+  if (!normalized) return null;
+  return path.join(CONFIG.dataDir, `${normalized}.json`);
+}
+
+// Helper: ensure data directory exists
+function ensureDataDir() {
+  if (!fs.existsSync(CONFIG.dataDir)) {
+    fs.mkdirSync(CONFIG.dataDir, { recursive: true });
+  }
+}
+
+// Helper: atomic write (Windows-safe)
+function atomicWrite(filePath, data) {
+  const tmpPath = filePath + '.tmp';
+  const bakPath = filePath + '.bak';
+
+  // Write to temp file
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+
+  // Backup existing file
+  if (CONFIG.enableBak && fs.existsSync(filePath)) {
+    if (fs.existsSync(bakPath)) {
+      fs.unlinkSync(bakPath);
+    }
+    fs.copyFileSync(filePath, bakPath);
+  }
+
+  // Delete original
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
+  // Rename temp to original
+  fs.renameSync(tmpPath, filePath);
+}
+
+// Helper: read department data
+function readDepartmentData(department) {
+  const filePath = getDepartmentFilePath(department);
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { data: null, error: null, filePath };
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(content);
+    return { data, error: null, filePath };
+  } catch (err) {
+    err.code = 'INVALID_JSON';
+    err.department = department;
+    err.filePath = filePath;
+    return { data: null, error: err, filePath };
+  }
+}
+
+function getDepartmentDataOrRespond(res, department) {
+  const { data, error, filePath } = readDepartmentData(department);
+  if (error) {
+    errorResponse(res, 500, 'INVALID_JSON', `Invalid JSON data for department ${department}`, {
+      file: path.basename(filePath)
+    });
+    return null;
+  }
+
+  if (!data) {
+    errorResponse(res, 404, 'NOT_FOUND', 'Department not found');
+    return null;
+  }
+
+  return data;
+}
+
+// Helper: write department data
+function writeDepartmentData(department, data) {
+  const filePath = getDepartmentFilePath(department);
+  if (!filePath) {
+    throw new Error('Invalid department name');
+  }
+
+  // Validate schema
+  const errors = validateDepartmentData(data);
+  if (errors.length > 0) {
+    throw new Error(`Validation failed: ${errors.join('; ')}`);
+  }
+
+  // Ensure IDs
+  ensureIDs(data);
+
+  atomicWrite(filePath, data);
+}
+
+function getDepartmentValidationErrors(data) {
+  const errors = validateDepartmentData(data);
+  return errors;
+}
+
+
+// Helper: standard error response
+function errorResponse(res, statusCode, code, message, details = null) {
+  const payload = {
+    error: {
+      code,
+      message
+    }
+  };
+  if (details) {
+    payload.error.details = details;
+  }
+  res.status(statusCode).json(payload);
+}
+
+// Helper: check admin token
+function isValidAdminToken(token) {
+  if (!token) return false;
+  const session = adminTokens.get(token);
+  if (!session) return false;
+
+  // Check expiration
+  if (new Date() > new Date(session.expiresAt)) {
+    adminTokens.delete(token);
+    return false;
+  }
+
+  return true;
+}
+
+// Middleware: require admin
+function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return errorResponse(res, 401, 'UNAUTHORIZED', 'Admin authentication required');
+  }
+
+  const token = authHeader.substring(7);
+  if (!isValidAdminToken(token)) {
+    return errorResponse(res, 401, 'UNAUTHORIZED', 'Invalid or expired admin token');
+  }
+
+  next();
+}
+
+// Helper: clean expired locks
+function cleanExpiredLocks() {
+  const now = new Date();
+  for (const [dept, lock] of locks.entries()) {
+    if (new Date(lock.expiresAt) < now) {
+      locks.delete(dept);
+    }
+  }
+}
+
+// Helper: get lock info
+function getLockInfo(department) {
+  cleanExpiredLocks();
+  const lock = locks.get(department);
+  if (!lock) {
+    return { locked: false };
+  }
+  return {
+    locked: true,
+    lockedBy: lock.userName,
+    lockedAt: lock.lockedAt,
+    expiresAt: lock.expiresAt,
+    clientHost: lock.clientHost || null
+  };
+}
+
+// Helper: check lock ownership
+function isLockOwner(department, userName) {
+  const lock = locks.get(department);
+  if (!lock) return false;
+  return lock.userName === userName;
+}
+
+// Initialize
+ensureDataDir();
+
+function validateExistingDepartments() {
+  try {
+    const files = fs.readdirSync(CONFIG.dataDir);
+    files.forEach(file => {
+      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+        const deptName = file.replace('.json', '');
+        const { data, error } = readDepartmentData(deptName);
+        if (error) {
+          console.warn(`Invalid JSON for department ${deptName}:`, error.message);
+          return;
+        }
+        if (!data) return;
+
+        const errors = getDepartmentValidationErrors(data);
+        if (errors.length > 0) {
+          console.warn(`Validation errors in department ${deptName}:`, errors);
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('Failed to validate existing departments:', err.message);
+  }
+}
+
+validateExistingDepartments();
+
+// === ROUTES ===
+
+// GET /api/departments - List all departments
+app.get('/api/departments', (req, res) => {
+  try {
+    ensureDataDir();
+    const files = fs.readdirSync(CONFIG.dataDir);
+    const departments = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+        const deptName = file.replace('.json', '');
+        const { data, error } = readDepartmentData(deptName);
+        if (error) {
+          console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+          continue;
+        }
+        if (!data) continue;
+
+        departments.push({
+          name: deptName,
+          protected: !!(data.password && data.password.trim()),
+          needsPasswordSetup: false,
+          readOnly: false
+        });
+      }
+    }
+
+    res.json({ departments });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', 'Failed to list departments');
+  }
+});
+
+// POST /api/departments - Create department (admin only)
+app.post('/api/departments', requireAdmin, (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return errorResponse(res, 400, 'INVALID_NAME', 'Department name is required');
+    }
+
+    const normalized = normalizeDepartmentName(name);
+    if (!normalized) {
+      return errorResponse(res, 400, 'INVALID_NAME', 'Invalid department name');
+    }
+
+    const filePath = getDepartmentFilePath(normalized);
+    if (fs.existsSync(filePath)) {
+      return errorResponse(res, 409, 'ALREADY_EXISTS', 'Department already exists');
+    }
+
+    const data = {
+      password: null,
+      projects: [],
+      meta: {
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'admin',
+        revision: 1
+      }
+    };
+
+    writeDepartmentData(normalized, data);
+    res.json({ name: normalized });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// DELETE /api/departments/:name - Delete department (admin only)
+app.delete('/api/departments/:name', requireAdmin, (req, res) => {
+  try {
+    const { name } = req.params;
+
+    const filePath = getDepartmentFilePath(name);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return errorResponse(res, 404, 'NOT_FOUND', 'Department not found');
+    }
+
+    // Release lock if exists
+    locks.delete(name);
+
+    // Delete file and backup
+    fs.unlinkSync(filePath);
+    const bakPath = filePath + '.bak';
+    if (fs.existsSync(bakPath)) {
+      fs.unlinkSync(bakPath);
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/departments/:name/verify - Verify password
+app.post('/api/departments/:name/verify', (req, res) => {
+  try {
+    const { name } = req.params;
+    const { password } = req.body;
+
+    const data = getDepartmentDataOrRespond(res, name);
+    if (!data) return;
+
+    // If no password set, any password is accepted (setup mode)
+    if (!data.password || !data.password.trim()) {
+      return res.json({ ok: true });
+    }
+
+    // Check password
+    if (data.password === password) {
+      return res.json({ ok: true });
+    }
+
+    return res.status(401).json({
+      ok: false,
+      error: {
+        code: 'INVALID_PASSWORD',
+        message: 'Invalid password'
+      }
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/departments/:name/change-password - Change or setup password
+app.post('/api/departments/:name/change-password', (req, res) => {
+  try {
+    const { name } = req.params;
+    const { oldPassword, newPassword } = req.body;
+
+    const data = getDepartmentDataOrRespond(res, name);
+    if (!data) return;
+
+    if (typeof newPassword !== 'string') {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'newPassword is required');
+    }
+
+    // Check if setup mode (no password set)
+    const isSetupMode = !data.password || !data.password.trim();
+
+    if (!isSetupMode) {
+      // Change mode: verify old password
+      if (data.password !== oldPassword) {
+        return errorResponse(res, 401, 'INVALID_PASSWORD', 'Invalid old password');
+      }
+    }
+
+    // Update password
+    data.password = newPassword.trim() ? newPassword : null;
+    data.meta.updatedAt = new Date().toISOString();
+    data.meta.updatedBy = 'password_change';
+    data.meta.revision = (data.meta.revision || 0) + 1;
+
+    writeDepartmentData(name, data);
+    res.json({ ok: true });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/departments/:name/reset-password - Reset password (admin only)
+app.post('/api/departments/:name/reset-password', requireAdmin, (req, res) => {
+  try {
+    const { name } = req.params;
+    const { newPassword } = req.body;
+
+    const data = getDepartmentDataOrRespond(res, name);
+    if (!data) return;
+
+    data.password = newPassword || null;
+    data.meta.updatedAt = new Date().toISOString();
+    data.meta.updatedBy = 'admin';
+    data.meta.revision = (data.meta.revision || 0) + 1;
+
+    writeDepartmentData(name, data);
+    res.json({ ok: true });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/projects/:department - Get projects
+app.get('/api/projects/:department', (req, res) => {
+  try {
+    const { department } = req.params;
+
+    const data = getDepartmentDataOrRespond(res, department);
+    if (!data) return;
+
+    const validationErrors = getDepartmentValidationErrors(data);
+
+    res.json({
+      projects: data.projects || [],
+      meta: data.meta || { updatedAt: new Date().toISOString(), updatedBy: 'system', revision: 1 },
+      validationErrors
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/departments/:name/export - Export full department data
+app.get('/api/departments/:name/export', (req, res) => {
+  try {
+    const { name } = req.params;
+
+    const data = getDepartmentDataOrRespond(res, name);
+    if (!data) return;
+
+    const validationErrors = getDepartmentValidationErrors(data);
+
+    res.json({ data, validationErrors });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/departments/:name/import - Import full department data
+app.post('/api/departments/:name/import', (req, res) => {
+  try {
+    const { name } = req.params;
+    const { data, userName } = req.body;
+
+    if (!data || typeof data !== 'object') {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'data is required');
+    }
+
+    if (!userName) {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'userName is required');
+    }
+
+    // Check lock ownership
+    cleanExpiredLocks();
+    if (!isLockOwner(name, userName)) {
+      const lockInfo = getLockInfo(name);
+      if (lockInfo.locked) {
+        return res.status(423).json({
+          lockedBy: lockInfo.lockedBy,
+          lockedAt: lockInfo.lockedAt,
+          expiresAt: lockInfo.expiresAt
+        });
+      } else {
+        return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to import');
+      }
+    }
+
+    const errors = getDepartmentValidationErrors(data);
+    if (errors.length > 0) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid department data', { errors });
+    }
+
+    data.meta = {
+      updatedAt: new Date().toISOString(),
+      updatedBy: userName,
+      revision: (data.meta?.revision || 0) + 1
+    };
+
+    writeDepartmentData(name, data);
+
+    res.json({ ok: true, meta: data.meta });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/projects/:department - Save projects
+app.post('/api/projects/:department', (req, res) => {
+  try {
+    const { department } = req.params;
+    const { projects, expectedRevision, userName } = req.body;
+
+    // Check expectedRevision
+    if (expectedRevision === undefined || expectedRevision === null) {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'expectedRevision is required');
+    }
+
+    // Check lock ownership
+    cleanExpiredLocks();
+    if (!isLockOwner(department, userName)) {
+      const lockInfo = getLockInfo(department);
+      if (lockInfo.locked) {
+        return res.status(423).json({
+          lockedBy: lockInfo.lockedBy,
+          lockedAt: lockInfo.lockedAt,
+          expiresAt: lockInfo.expiresAt
+        });
+      } else {
+        return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to save');
+      }
+    }
+
+    const data = getDepartmentDataOrRespond(res, department);
+    if (!data) return;
+
+    // Check revision
+    const currentRevision = data.meta?.revision || 0;
+    if (currentRevision !== expectedRevision) {
+      return res.status(409).json({
+        error: {
+          code: 'REVISION_MISMATCH',
+          message: 'Data has been updated by another user',
+          details: { expectedRevision, currentRevision }
+        },
+        currentRevision,
+        meta: data.meta
+      });
+    }
+
+    // Validate projects
+    const validationData = { ...data, projects };
+    const errors = validateDepartmentData(validationData);
+    if (errors.length > 0) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid project data', { errors });
+    }
+
+    // Update
+    data.projects = projects;
+    data.meta = {
+      updatedAt: new Date().toISOString(),
+      updatedBy: userName || 'unknown',
+      revision: currentRevision + 1
+    };
+
+    writeDepartmentData(department, data);
+
+    res.json({
+      ok: true,
+      meta: data.meta
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/upload/:department - Upload JSON
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: CONFIG.maxUploadBytes
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/json' || file.originalname.endsWith('.json')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JSON files are allowed'));
+    }
+  }
+});
+
+app.post('/api/upload/:department', upload.single('file'), (req, res) => {
+  try {
+    const { department } = req.params;
+
+    // Check lock ownership
+    cleanExpiredLocks();
+    const userName = req.body.userName || 'unknown';
+    if (!isLockOwner(department, userName)) {
+      const lockInfo = getLockInfo(department);
+      if (lockInfo.locked) {
+        return res.status(423).json({
+          lockedBy: lockInfo.lockedBy,
+          lockedAt: lockInfo.lockedAt,
+          expiresAt: lockInfo.expiresAt
+        });
+      } else {
+        return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to upload');
+      }
+    }
+
+    if (!req.file) {
+      return errorResponse(res, 400, 'NO_FILE', 'No file uploaded');
+    }
+
+    // Parse JSON
+    let uploadedData;
+    try {
+      uploadedData = JSON.parse(req.file.buffer.toString('utf8'));
+    } catch (err) {
+      return errorResponse(res, 400, 'INVALID_JSON', 'Invalid JSON file');
+    }
+
+    // Validate
+    const errors = validateDepartmentData(uploadedData);
+    if (errors.length > 0) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid data schema', { errors });
+    }
+
+    // Load existing data
+    const data = getDepartmentDataOrRespond(res, department);
+    if (!data) return;
+
+    // Replace only projects, keep password
+    data.projects = uploadedData.projects || [];
+    data.meta = {
+      updatedAt: new Date().toISOString(),
+      updatedBy: userName,
+      revision: (data.meta?.revision || 0) + 1
+    };
+
+    writeDepartmentData(department, data);
+
+    res.json({
+      ok: true,
+      meta: data.meta
+    });
+  } catch (err) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return errorResponse(res, 400, 'FILE_TOO_LARGE', 'File size exceeds limit');
+    }
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// === LOCK ROUTES ===
+
+// POST /api/lock/:department/acquire
+app.post('/api/lock/:department/acquire', (req, res) => {
+  try {
+    const { department } = req.params;
+    const { userName, clientHost } = req.body;
+
+    if (!userName) {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'userName is required');
+    }
+
+    cleanExpiredLocks();
+
+    const existing = locks.get(department);
+
+    // Check if locked by another user
+    if (existing && existing.userName !== userName) {
+      return res.status(423).json({
+        lockedBy: existing.userName,
+        lockedAt: existing.lockedAt,
+        expiresAt: existing.expiresAt,
+        clientHost: existing.clientHost || null
+      });
+    }
+
+    // Acquire or refresh lock
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + CONFIG.lockTimeoutMinutes * 60 * 1000);
+
+    locks.set(department, {
+      userName,
+      clientHost: clientHost || null,
+      lockedAt: existing ? existing.lockedAt : now.toISOString(),
+      expiresAt: expiresAt.toISOString()
+    });
+
+    res.json({
+      locked: true,
+      lockedBy: userName,
+      lockedAt: locks.get(department).lockedAt,
+      expiresAt: expiresAt.toISOString(),
+      clientHost: locks.get(department).clientHost
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/lock/:department/release
+app.post('/api/lock/:department/release', (req, res) => {
+  try {
+    const { department } = req.params;
+    const { userName } = req.body;
+
+    const lock = locks.get(department);
+    if (lock && lock.userName === userName) {
+      locks.delete(department);
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/lock/:department/status
+app.get('/api/lock/:department/status', (req, res) => {
+  try {
+    const { department } = req.params;
+
+    const lockInfo = getLockInfo(department);
+    res.json(lockInfo);
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/lock/:department/heartbeat
+app.post('/api/lock/:department/heartbeat', (req, res) => {
+  try {
+    const { department } = req.params;
+    const { userName } = req.body;
+
+    cleanExpiredLocks();
+
+    const lock = locks.get(department);
+    if (!lock || lock.userName !== userName) {
+      return errorResponse(res, 409, 'LOCK_NOT_OWNED', 'Lock not owned by user');
+    }
+
+    // Refresh expiration
+    const expiresAt = new Date(Date.now() + CONFIG.lockTimeoutMinutes * 60 * 1000);
+    lock.expiresAt = expiresAt.toISOString();
+
+    res.status(204).send();
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/lock/:department/admin-release
+app.post('/api/lock/:department/admin-release', requireAdmin, (req, res) => {
+  try {
+    const { department } = req.params;
+    locks.delete(department);
+    res.status(204).send();
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// === ADMIN ROUTES ===
+
+// POST /api/admin/login
+app.post('/api/admin/login', (req, res) => {
+  try {
+    const { userId, password } = req.body;
+
+    if (userId !== CONFIG.adminUser) {
+      return errorResponse(res, 401, 'INVALID_USER', 'Invalid admin user');
+    }
+
+    if (password !== CONFIG.adminPassword) {
+      return errorResponse(res, 401, 'INVALID_PASSWORD', 'Invalid admin password');
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + CONFIG.adminSessionTtlHours * 60 * 60 * 1000);
+
+    adminTokens.set(token, {
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString()
+    });
+
+    res.json({ token });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// POST /api/admin/logout
+app.post('/api/admin/logout', requireAdmin, (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader.substring(7);
+    adminTokens.delete(token);
+    res.status(204).send();
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// GET /api/admin/departments
+app.get('/api/admin/departments', requireAdmin, (req, res) => {
+  try {
+    ensureDataDir();
+    const files = fs.readdirSync(CONFIG.dataDir);
+    const departments = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+        const deptName = file.replace('.json', '');
+
+        try {
+          const { data, error } = readDepartmentData(deptName);
+          if (error) {
+            console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+            continue;
+          }
+          if (!data) continue;
+
+          departments.push({
+            name: deptName,
+            file: file,
+            protected: !!(data.password && data.password.trim()),
+            needsPasswordSetup: false,
+            meta: data.meta,
+            lock: getLockInfo(deptName)
+          });
+        } catch (err) {
+          // Skip invalid files
+        }
+      }
+    }
+
+    res.json({ departments });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+// Start server
+const PORT = CONFIG.port;
+app.listen(PORT, () => {
+  console.log(`OnlyGANTT server running on http://localhost:${PORT}`);
+  console.log(`Data directory: ${path.resolve(CONFIG.dataDir)}`);
+});

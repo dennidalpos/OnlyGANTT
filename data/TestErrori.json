@@ -1,0 +1,516 @@
+{
+  "password": "test123",
+  "projects": [
+    {
+      "id": "57232e55-ed5a-4245-8d5e-3e4e40c5668e",
+      "nome": "TestErrori 1",
+      "colore": "#ef4444",
+      "dataInizio": "2025-01-01",
+      "dataFine": "2025-02-01",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "0dbe79a8-7b61-48b2-8073-6c25b62d9b4f",
+          "nome": "Analisi",
+          "dataInizio": "2025-01-06",
+          "dataFine": "2025-01-26",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "3acd837d-3fd7-4b27-b473-be58ed005e3d",
+      "nome": "TestErrori 2",
+      "colore": "#f59e0b",
+      "dataInizio": "2025-01-16",
+      "dataFine": "2025-04-15",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "1c2735e8-30c1-459f-b130-225c0e8322c9",
+          "nome": "Analisi",
+          "dataInizio": "2025-01-05",
+          "dataFine": "2025-01-10",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "3eea010b-8232-43ab-81be-64efb8fc4d56",
+      "nome": "TestErrori 3",
+      "colore": "#8b5cf6",
+      "dataInizio": "2025-01-31",
+      "dataFine": "2025-04-30",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "15c7c481-2a96-406e-9a5f-7e13e4ea8578",
+          "nome": "Analisi",
+          "dataInizio": "2025-01-21",
+          "dataFine": "2025-05-10",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fuori range",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "4c4fdcb3-2c3e-454a-98dd-b2bbaeaa989a",
+      "nome": "TestErrori 4",
+      "colore": "#3b82f6",
+      "dataInizio": "2025-02-15",
+      "dataFine": "2025-05-15",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "106be8cc-e225-4898-90aa-9e4bc0111655",
+          "nome": "Analisi",
+          "dataInizio": "2025-02-20",
+          "dataFine": "2025-03-11",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        },
+        {
+          "id": "fc8bbed7-8216-42c5-9ec2-24f6b257ea70",
+          "nome": "Deploy",
+          "dataInizio": "2025-05-20",
+          "dataFine": "2025-05-20",
+          "stato": "da_iniziare",
+          "percentualeCompletamento": 0,
+          "milestone": true,
+          "note": "Milestone fuori range",
+          "colore": "#ef4444",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "582e8426-65e4-46d1-b6f7-a894e6cc031d",
+      "nome": "TestErrori 5",
+      "colore": "#10b981",
+      "dataInizio": "2025-03-01",
+      "dataFine": "2025-05-30",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "dfaf51a2-eb66-48ab-ba68-4a3a13e48cdb",
+          "nome": "Analisi",
+          "dataInizio": "2025-12-24",
+          "dataFine": "2025-12-26",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Festività",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "9ba128e5-dd2a-44e9-9a60-b544efcc99c7",
+      "nome": "TestErrori 6",
+      "colore": "#06b6d4",
+      "dataInizio": "2025-03-16",
+      "dataFine": "2025-06-14",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "3330bf48-da61-4374-8898-c37f29264c36",
+          "nome": "Analisi",
+          "dataInizio": null,
+          "dataFine": null,
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "c7ff10ad-ecfb-40b1-82c9-903cc037f346",
+      "nome": "TestErrori 7",
+      "colore": "#f97316",
+      "dataInizio": null,
+      "dataFine": null,
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "8b8b2206-3184-40a8-b83f-a541cab2e4ba",
+          "nome": "Analisi",
+          "dataInizio": "2025-04-05",
+          "dataFine": "2025-04-25",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "351e1fbd-2c16-49f8-b23c-56c5de1de403",
+      "nome": "TestErrori 8",
+      "colore": "#c084fc",
+      "dataInizio": "2025-04-15",
+      "dataFine": "2025-07-14",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": []
+    },
+    {
+      "id": "9f8d364e-aaa2-45e6-975f-db00f85eea2d",
+      "nome": "TestErrori 9",
+      "colore": "#22c55e",
+      "dataInizio": "2025-04-30",
+      "dataFine": "2025-07-29",
+      "stato": "in_corso",
+      "percentualeCompletamento": 100,
+      "fasi": [
+        {
+          "id": "8b96a9a9-61a4-4bd1-8cf6-122df881a7c5",
+          "nome": "Analisi",
+          "dataInizio": "2025-05-05",
+          "dataFine": "2025-05-25",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "0d3b323b-0d6d-42f2-aee6-da59bcb28b65",
+      "nome": "TestErrori 10",
+      "colore": "#0ea5e9",
+      "dataInizio": "2025-05-01",
+      "dataFine": "2025-06-01",
+      "stato": "in_ritardo",
+      "percentualeCompletamento": 100,
+      "fasi": [
+        {
+          "id": "507782f7-7d32-474e-bcd8-2055b704c52e",
+          "nome": "Analisi",
+          "dataInizio": "2025-05-20",
+          "dataFine": "2025-06-09",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        },
+        {
+          "id": "488a87e7-df9f-4534-9640-9a5b9e77325b",
+          "nome": "Test",
+          "dataInizio": "2025-04-20",
+          "dataFine": "2025-06-10",
+          "stato": "in_ritardo",
+          "percentualeCompletamento": 100,
+          "milestone": false,
+          "note": "Ritardo e fuori range",
+          "colore": "#f59e0b",
+          "includeFestivi": true
+        },
+        {
+          "id": "b4fea27d-143b-4174-9ab1-6bd48d7a098f",
+          "nome": "Deploy",
+          "dataInizio": "2025-06-15",
+          "dataFine": "2025-06-15",
+          "stato": "da_iniziare",
+          "percentualeCompletamento": 0,
+          "milestone": true,
+          "note": "Milestone fuori range",
+          "colore": "#ef4444",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "97e3da23-0eb1-42aa-87c7-147a1894aad8",
+      "nome": "TestErrori 11",
+      "colore": "#ef4444",
+      "dataInizio": "2025-01-01",
+      "dataFine": "2025-02-01",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "8143d387-5926-4188-baaf-8b7e62bec3dc",
+          "nome": "Analisi",
+          "dataInizio": "2025-06-04",
+          "dataFine": "2025-06-24",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "d96562bd-3d79-4bee-8b63-e81619b569b3",
+      "nome": "TestErrori 12",
+      "colore": "#f59e0b",
+      "dataInizio": "2025-06-14",
+      "dataFine": "2025-09-12",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "2077210c-c5ff-46e0-8511-cd9d4918302d",
+          "nome": "Analisi",
+          "dataInizio": "2025-01-05",
+          "dataFine": "2025-01-10",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "9c9a1607-326b-411b-af95-9db2e13b9731",
+      "nome": "TestErrori 13",
+      "colore": "#8b5cf6",
+      "dataInizio": "2025-06-29",
+      "dataFine": "2025-09-27",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "b314b558-b50e-4763-848a-6d7e696cb832",
+          "nome": "Analisi",
+          "dataInizio": "2025-06-19",
+          "dataFine": "2025-10-07",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fuori range",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "9c30da53-7773-4782-b921-9aa655d3dd61",
+      "nome": "TestErrori 14",
+      "colore": "#3b82f6",
+      "dataInizio": "2025-07-14",
+      "dataFine": "2025-10-12",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "1474ad49-e7c5-473f-9ddf-6f97c7333b96",
+          "nome": "Analisi",
+          "dataInizio": "2025-07-19",
+          "dataFine": "2025-08-08",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        },
+        {
+          "id": "0c90bf6c-b054-4f36-bf2e-19777862e64a",
+          "nome": "Deploy",
+          "dataInizio": "2025-10-17",
+          "dataFine": "2025-10-17",
+          "stato": "da_iniziare",
+          "percentualeCompletamento": 0,
+          "milestone": true,
+          "note": "Milestone fuori range",
+          "colore": "#ef4444",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "5374565f-232f-4099-ad94-27851b512949",
+      "nome": "TestErrori 15",
+      "colore": "#10b981",
+      "dataInizio": "2025-07-29",
+      "dataFine": "2025-10-27",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "91edcd79-d5ce-41c0-9d91-1073cce05b72",
+          "nome": "Analisi",
+          "dataInizio": "2025-12-24",
+          "dataFine": "2025-12-26",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Festività",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "45cf8afa-127c-49aa-adf6-ff013c015108",
+      "nome": "TestErrori 16",
+      "colore": "#06b6d4",
+      "dataInizio": "2025-08-13",
+      "dataFine": "2025-11-11",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "144e3423-06bd-4c78-9e1d-6204ce628cff",
+          "nome": "Analisi",
+          "dataInizio": null,
+          "dataFine": null,
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "478b86fa-c95c-45c3-8939-88ee0223a678",
+      "nome": "TestErrori 17",
+      "colore": "#f97316",
+      "dataInizio": null,
+      "dataFine": null,
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": [
+        {
+          "id": "69d4ccfa-ee9d-468d-bc84-c125fc0f898b",
+          "nome": "Analisi",
+          "dataInizio": "2025-09-02",
+          "dataFine": "2025-09-22",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "f84b928e-577b-4760-b55a-9eef9380528e",
+      "nome": "TestErrori 18",
+      "colore": "#c084fc",
+      "dataInizio": "2025-09-12",
+      "dataFine": "2025-12-11",
+      "stato": "in_corso",
+      "percentualeCompletamento": 0,
+      "fasi": []
+    },
+    {
+      "id": "b2c787c9-e57a-4e27-b1ef-0e2f2cba6d60",
+      "nome": "TestErrori 19",
+      "colore": "#22c55e",
+      "dataInizio": "2025-09-27",
+      "dataFine": "2025-12-26",
+      "stato": "in_corso",
+      "percentualeCompletamento": 100,
+      "fasi": [
+        {
+          "id": "0d10e532-e28d-45a6-922e-5f20ccccbfc3",
+          "nome": "Analisi",
+          "dataInizio": "2025-10-02",
+          "dataFine": "2025-10-22",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        }
+      ]
+    },
+    {
+      "id": "10c5b3cb-27a5-4f8f-827f-ee2ef5d65dfc",
+      "nome": "TestErrori 20",
+      "colore": "#0ea5e9",
+      "dataInizio": "2025-05-01",
+      "dataFine": "2025-06-01",
+      "stato": "in_ritardo",
+      "percentualeCompletamento": 100,
+      "fasi": [
+        {
+          "id": "0f3c671e-2875-4781-b928-4f49cf0d1b8f",
+          "nome": "Analisi",
+          "dataInizio": "2025-10-17",
+          "dataFine": "2025-11-06",
+          "stato": "in_corso",
+          "percentualeCompletamento": 20,
+          "milestone": false,
+          "note": "Fase base",
+          "colore": "#3b82f6",
+          "includeFestivi": true
+        },
+        {
+          "id": "f8b7d6eb-4e14-4d0a-815b-6a0d38c8a43e",
+          "nome": "Test",
+          "dataInizio": "2025-04-20",
+          "dataFine": "2025-06-10",
+          "stato": "in_ritardo",
+          "percentualeCompletamento": 100,
+          "milestone": false,
+          "note": "Ritardo e fuori range",
+          "colore": "#f59e0b",
+          "includeFestivi": true
+        },
+        {
+          "id": "1789c213-3ed3-4910-9b40-e2a68ef1d47a",
+          "nome": "Deploy",
+          "dataInizio": "2025-06-15",
+          "dataFine": "2025-06-15",
+          "stato": "da_iniziare",
+          "percentualeCompletamento": 0,
+          "milestone": true,
+          "note": "Milestone fuori range",
+          "colore": "#ef4444",
+          "includeFestivi": true
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "updatedAt": "2025-12-22T12:27:57Z",
+    "updatedBy": "system",
+    "revision": 1
+  }
+}

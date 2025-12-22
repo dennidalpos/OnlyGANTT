@@ -8,7 +8,7 @@ Applicazione di diagramma di Gantt interattiva con blocco multi‑utente, pensat
 - **Diagramma di Gantt interattivo**: rendering Canvas 2D con viste 4 mesi e completa
 - **Sistema di lock multi‑utente**: blocco a livello di reparto con timeout e heartbeat
 - **Persistenza JSON**: archiviazione su file con scritture atomiche (compatibile Windows)
-- **Gestione reparti**: reparti protetti da password con import/export
+- **Gestione reparti**: reparti opzionalmente protetti da password con import/export reparto e import/export progetti
 - **Tema scuro**: UI moderna solo dark
 - **Festività italiane**: rilevamento automatico inclusi Pasqua e Pasquetta
 - **Avvisi completi**: ritardi, conflitti, anomalie e dati mancanti
@@ -180,14 +180,61 @@ Il server gira su `http://localhost:3000`
 - Lock a livello reparto (un utente per volta)
 - Timeout configurabile (default: 60 minuti)
 - Heartbeat automatico ogni 5 minuti
-- `sendBeacon` allo scaricamento della pagina per rilasciare il lock
-- Stato lock mostrato in header
+- `sendBeacon` allo scaricamento della pagina per rilasciare il lock (chiusura, refresh, cambio pagina)
+- Cambio reparto: rilascio del lock prima dell’accesso al nuovo reparto
+- Pulsante logout che libera lock e stato di modifica
+- Stato lock mostrato in header (utente)
 
 ### Diagramma di Gantt
 - **Vista 4 mesi**: scorrevole, 25px al giorno, tooltip attivi
-- **Vista completa**: adatta a tutti i dati, senza scroll, senza tooltip (per export PNG)
+- **Vista completa**: adatta a tutti i dati, senza scroll, tooltip attivi (per export PNG)
 - **Auto "Vai a Oggi"**: centratura automatica su oggi all'apertura del reparto
-- **Filtri**: settimane, giorni, numeri, divisori, weekend, festività, solo milestone, evidenzia ritardi
+- **Filtri separatori**: giorni, settimane, mesi, anni
+- **Filtri dettaglio**: lettere/numeri giorni, numeri settimane, etichette mesi/anni
+- **Default vista ridotta**: festivi attivi, separatori e dettagli completi
+- **Default vista completa**: separatori mesi/anni, dettaglio anni + ritardi
+- **Toggle globale**: attiva/disattiva tutti i filtri
+- **Default viste**: 4 mesi con tutti i filtri separatori/dettaglio attivi, vista completa con soli separatori mesi/anni
+- **Altri filtri**: weekend, festività, solo milestone, evidenzia ritardi
+
+### Gestione Progetto
+- **Salva (nelle fasi)**: salva il progetto corrente senza chiuderlo e forza il refresh del Gantt ad ogni click.
+- **Salva progetto e chiudi**: salva e chiude la scheda progetto; in caso di errore, il progetto rimane aperto.
+- **Elimina progetto**: rimuove il progetto dopo conferma, aggiorna lista e Gantt e non lascia selezioni residue.
+- **Modifiche non salvate**: prima di cambiare reparto viene richiesto se salvare o annullare le modifiche.
+
+### Password reparto
+- **Reparti senza password**: accesso diretto.
+- **Cambio password**: dopo l’aggiornamento è richiesto un nuovo accesso con la nuova password.
+- **Rimozione password**: un reparto protetto può tornare senza password (utente o admin).
+
+### Accesso admin
+- **Operazioni reparto**: creazione, modifica e cancellazione reparti senza inserire il nome utente.
+- **Sblocco lock**: pulsante admin per rimuovere lock attivi su un reparto.
+- **Import/Export reparto**: visibili e utilizzabili solo con accesso admin (sezione "Reparto corrente").
+
+## Troubleshooting
+
+### File reparto JSON non valido
+Se un file `data/<Reparto>.json` è corrotto o contiene JSON invalido, le API che leggono quel reparto rispondono con errore `INVALID_JSON`.
+Controlla il file indicato nel payload di errore, correggi il JSON o ripristina un backup `.bak` valido, quindi riavvia il server se necessario.
+
+### HeaderBar (UI)
+- Pulsanti e controlli con **dimensioni, padding e radius uniformi**.
+- Spaziature coerenti per allineare elementi e badge in tutte le viste.
+
+### Import/Export
+- **Elenco progetti**: import/export progetti per trasferirli tra reparti diversi
+- **Topbar**: import/export reparto completo (configurazione + progetti)
+- Validazione dati lato server e client con elenco errori mostrato in UI
+
+### Percentuale completamento
+- Valore `null` = calcolo automatico (media delle fasi)
+- Checkbox "Auto" su progetti e fasi (default per i nuovi progetti)
+
+### Reparti senza password
+- La creazione dei reparti non richiede una password obbligatoria
+- È possibile impostare una password in un secondo momento dalla sezione reparto
 
 ### Festività italiane
 Festività fisse:
@@ -212,7 +259,7 @@ L'applicazione rileva e mostra:
 - **Fasi in ritardo**: data fine superata, non completate
 - **Fasi fuori intervallo progetto**: date fase fuori date progetto
 - **Milestone fuori intervallo progetto**: milestone fuori date progetto
-- **Fasi in festività**: fasi pianificate in giorni festivi
+- **Fasi in festività/weekend**: fasi pianificate in giorni festivi o nel weekend (quando non si includono festivi/weekend)
 - **Fasi senza date**: fasi senza data inizio/fine
 - **Progetti senza fasi**: progetti vuoti
 - **Progetti senza date**: progetti senza data inizio/fine
@@ -227,6 +274,11 @@ L'applicazione rileva e mostra:
 - **Export JSON**: download progetti come file JSON
 - **Import JSON**: upload file JSON (sostituisce i progetti, mantiene la password)
 - **Export PNG**: esporta il Gantt come immagine PNG (forza vista completa)
+
+### Festività/Weekend nelle fasi
+Ogni fase ha la checkbox **"Include festività e weekend"**:
+- **Attiva**: la fase può includere giorni festivi o weekend e non genera alert.
+- **Disattiva**: vengono segnalate le fasi che attraversano festività o weekend.
 
 ## Configurazione
 
@@ -363,14 +415,14 @@ npm start
 
 1. **Modifica credenziali admin** in `server/server.js`:
    ```javascript
-   adminUser: process.env.ADMIN_USER || 'admin',
-   adminPassword: process.env.ADMIN_PASSWORD || 'changeme'
+   adminUser: process.env.ONLYGANTT_ADMIN_USER || 'admin',
+   adminPassword: process.env.ONLYGANTT_ADMIN_PASSWORD || 'changeme'
    ```
 
 2. **Configura variabili ambiente**:
    ```bash
-   export ADMIN_USER=mio_admin
-   export ADMIN_PASSWORD=password_sicura
+   export ONLYGANTT_ADMIN_USER=mio_admin
+   export ONLYGANTT_ADMIN_PASSWORD=password_sicura
    ```
 
 3. **Avvia in produzione** (esempio con PM2):
@@ -379,6 +431,32 @@ npm start
    pm2 start server/server.js --name onlygantt
    pm2 save
    ```
+
+### Windows Server con NSSM
+
+Per eseguire OnlyGANTT come servizio su Windows Server:
+
+1. **Installa NSSM** (Non-Sucking Service Manager) e aggiungilo al `PATH`.
+2. **Crea il servizio**:
+   ```powershell
+   nssm install OnlyGANTT
+   ```
+3. **Configura i parametri principali**:
+   - **Application**: `C:\Program Files\nodejs\node.exe`
+   - **Startup directory**: cartella del progetto (es. `C:\OnlyGANTT`)
+   - **Arguments**: `server\server.js`
+4. **Imposta le variabili d'ambiente del servizio**:
+   ```powershell
+   nssm set OnlyGANTT AppEnvironmentExtra ONLYGANTT_ADMIN_USER=admin
+   nssm set OnlyGANTT AppEnvironmentExtra ONLYGANTT_ADMIN_PASSWORD=admin123
+   ```
+   > Per aggiungere più variabili usa righe separate oppure un'unica stringa con `;`.
+5. **Avvia il servizio**:
+   ```powershell
+   nssm start OnlyGANTT
+   ```
+
+Per log e rotazione, usa la sezione **I/O** di NSSM (stdout/stderr) per salvare i file log in una directory dedicata.
 
 ### Dietro Reverse Proxy (nginx)
 
