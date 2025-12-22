@@ -178,6 +178,12 @@
               type="date"
               value={formData.dataFine || ''}
               onChange={(e) => handleProjectChange('dataFine', e.target.value || null)}
+              onFocus={() => {
+                if (!formData.dataFine && formData.dataInizio) {
+                  handleProjectChange('dataFine', formData.dataInizio);
+                }
+              }}
+              min={formData.dataInizio || undefined}
               disabled={readOnly}
             />
           </div>
@@ -312,6 +318,12 @@
                   type="date"
                   value={fase.dataFine || ''}
                   onChange={(e) => handlePhaseChange(index, 'dataFine', e.target.value || null)}
+                  onFocus={() => {
+                    if (!fase.dataFine && fase.dataInizio) {
+                      handlePhaseChange(index, 'dataFine', fase.dataInizio);
+                    }
+                  }}
+                  min={fase.dataInizio || undefined}
                   disabled={readOnly}
                 />
               </div>
@@ -450,7 +462,7 @@
         )}
 
         <div className="button-group">
-          <button onClick={handleSave} className="btn-success" disabled={readOnly || isSaving}>
+          <button onClick={() => handleSave(false)} className="btn-success" disabled={readOnly || isSaving}>
             {isSaving ? 'Salvataggio...' : 'Salva progetto e chiudi'}
           </button>
           {project && !readOnly && (
