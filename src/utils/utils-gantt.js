@@ -284,14 +284,15 @@
 
     ctx.imageSmoothingEnabled = false;
 
-    const headerYearY = 6;
-    const headerMonthLabelY = 14;
-    const headerMonthY = 22;
-    const headerTodayY = 34;
-    const headerMsY = 48;
-    const headerWeekY = 62;
-    const headerDayNumberY = config.gantt.CANVAS_TOP_MARGIN - 3;
-    const headerDayLetterY = headerDayNumberY - 12;
+    const headerBaseY = config.gantt.CANVAS_TOP_MARGIN;
+    const headerDayNumberY = headerBaseY - 14;
+    const headerDayLetterY = headerBaseY - 30;
+    const headerWeekY = headerBaseY - 50;
+    const headerMsY = headerBaseY - 68;
+    const headerTodayY = headerBaseY - 86;
+    const headerMonthY = headerBaseY - 102;
+    const headerMonthLabelY = headerBaseY - 114;
+    const headerYearY = headerBaseY - 124;
 
     // Background
     ctx.fillStyle = config.gantt.BACKGROUND_COLOR;
@@ -299,7 +300,7 @@
 
     // Header
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, canvasWidth, headerTodayY + 12);
+    ctx.fillRect(0, 0, canvasWidth, headerDayNumberY + 8);
 
     ctx.font = 'bold 14px sans-serif';
     ctx.fillStyle = config.gantt.TEXT_COLOR;
