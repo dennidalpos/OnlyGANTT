@@ -290,8 +290,8 @@
     const headerTodayY = 34;
     const headerMsY = 48;
     const headerWeekY = 62;
-    const headerDayLetterY = 74;
-    const headerDayNumberY = 86;
+    const headerDayNumberY = config.gantt.CANVAS_TOP_MARGIN - 3;
+    const headerDayLetterY = headerDayNumberY - 12;
 
     // Background
     ctx.fillStyle = config.gantt.BACKGROUND_COLOR;
@@ -299,7 +299,7 @@
 
     // Header
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, canvasWidth, 36);
+    ctx.fillRect(0, 0, canvasWidth, headerTodayY + 12);
 
     ctx.font = 'bold 14px sans-serif';
     ctx.fillStyle = config.gantt.TEXT_COLOR;
