@@ -22,6 +22,13 @@
     const heartbeatIntervalRef = useRef(null);
     const previousLockRef = useRef(null);
 
+    const stopHeartbeat = useCallback(() => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+    }, []);
+
     // Heartbeat
     const startHeartbeat = useCallback(() => {
       stopHeartbeat();
@@ -38,14 +45,7 @@
           stopHeartbeat();
         }
       }, config.lock.heartbeatMinutes * 60 * 1000);
-    }, [department, userName]);
-
-    const stopHeartbeat = useCallback(() => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-    }, []);
+    }, [department, userName, stopHeartbeat]);
 
     // Acquire lock with debounce
     const acquireLock = useCallback(() => {
@@ -114,7 +114,7 @@
       } catch (err) {
         // Ignore errors on release
       }
-    }, [department, userName, stopHeartbeat]);
+    }, [department, userName, releaseLockFor]);
 
     // Effect: acquire lock when department/user changes
     useEffect(() => {
