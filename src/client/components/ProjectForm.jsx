@@ -462,7 +462,7 @@
         )}
 
         <div className="button-group">
-          <button onClick={handleSave} className="btn-success" disabled={readOnly || isSaving}>
+          <button onClick={() => handleSave(false)} className="btn-success" disabled={readOnly || isSaving}>
             {isSaving ? 'Salvataggio...' : 'Salva progetto e chiudi'}
           </button>
           {project && !readOnly && (
