@@ -20,6 +20,7 @@
     const abortControllerRef = useRef(null);
     const debounceTimerRef = useRef(null);
     const heartbeatIntervalRef = useRef(null);
+    const previousLockRef = useRef(null);
 
     // Heartbeat
     const startHeartbeat = useCallback(() => {
@@ -88,14 +89,25 @@
       }, config.lock.acquireDebounceMs);
     }, [department, userName, enabled, startHeartbeat]);
 
-    // Release lock
-    const releaseLock = useCallback(async () => {
-      if (!department || !userName) return;
+    const releaseLockFor = useCallback(async (targetDepartment, targetUserName) => {
+      if (!targetDepartment || !targetUserName) return;
 
       stopHeartbeat();
 
       try {
-        await api.releaseLock(department, userName);
+        await api.releaseLock(targetDepartment, targetUserName);
+      } catch (err) {
+        // Ignore errors on release
+      }
+    }, [stopHeartbeat]);
+
+    // Release lock
+    const releaseLock = useCallback(async () => {
+      if (!department || !userName) return;
+
+      try {
+        await releaseLockFor(department, userName);
+        previousLockRef.current = null;
         setLockInfo(null);
         setIsLocked(false);
         setError(null);
@@ -106,6 +118,20 @@
 
     // Effect: acquire lock when department/user changes
     useEffect(() => {
+      const previous = previousLockRef.current;
+      const hasChanged = previous && (previous.department !== department || previous.userName !== userName || !enabled);
+      if (hasChanged) {
+        releaseLockFor(previous.department, previous.userName);
+        setLockInfo(null);
+        setIsLocked(false);
+      }
+
+      if (enabled && department && userName) {
+        previousLockRef.current = { department, userName };
+      } else if (!enabled) {
+        previousLockRef.current = null;
+      }
+
       if (enabled) {
         acquireLock();
       } else {
@@ -122,7 +148,7 @@
         }
         stopHeartbeat();
       };
-    }, [department, userName, enabled, acquireLock, releaseLock, stopHeartbeat]);
+    }, [department, userName, enabled, acquireLock, releaseLock, releaseLockFor, stopHeartbeat]);
 
     // Effect: release lock on unload (sendBeacon)
     useEffect(() => {

@@ -83,6 +83,32 @@ Consulta [`context.md`](context.md) per l'ambiente di runtime, la struttura dei 
 - Node.js 18 o superiore
 - Windows Server (o qualsiasi OS, ma ottimizzato per Windows)
 
+### Installazione su Windows Server
+1. **Installa Node.js 18+**  
+   Scarica l'MSI da <https://nodejs.org> e completa l'installazione con i default.
+2. **Verifica Node e npm**  
+   ```powershell
+   node -v
+   npm -v
+   ```
+3. **Apri la porta 3000 (o quella scelta)**  
+   Esegui come amministratore:
+   ```powershell
+   netsh advfirewall firewall add rule name="OnlyGANTT" dir=in action=allow protocol=TCP localport=3000
+   ```
+4. **Installa le dipendenze**  
+   ```powershell
+   npm install
+   ```
+5. **Avvia il server**  
+   ```powershell
+   npm start
+   ```
+6. **(Opzionale) Servizio Windows**  
+   Per l'esecuzione in background puoi usare NSSM:
+   - Crea un servizio che esegue `npm start` nella cartella del progetto.
+   - Configura il servizio per il riavvio automatico.
+
 ### Installare le dipendenze
 ```bash
 npm install
@@ -182,7 +208,8 @@ Il server gira su `http://localhost:3000`
 - Heartbeat automatico ogni 5 minuti
 - `sendBeacon` allo scaricamento della pagina per rilasciare il lock (chiusura, refresh, cambio pagina)
 - Cambio reparto: rilascio del lock prima dell’accesso al nuovo reparto
-- Pulsante logout che libera lock e stato di modifica
+- Logout utente o admin: rilascio automatico del lock
+- Admin può rilasciare lock attivi dal pannello strumenti
 - Stato lock mostrato in header (utente)
 
 ### Diagramma di Gantt
