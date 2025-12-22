@@ -19,33 +19,45 @@
 
     const abortControllerRef = useRef(null);
     const debounceTimerRef = useRef(null);
-    const heartbeatIntervalRef = useRef(null);
+    const heartbeatTimeoutRef = useRef(null);
     const previousLockRef = useRef(null);
+
+    const stopHeartbeat = useCallback(() => {
+      if (heartbeatTimeoutRef.current) {
+        clearTimeout(heartbeatTimeoutRef.current);
+        heartbeatTimeoutRef.current = null;
+      }
+    }, []);
 
     // Heartbeat
     const startHeartbeat = useCallback(() => {
       stopHeartbeat();
 
-      heartbeatIntervalRef.current = setInterval(async () => {
-        if (!department || !userName) return;
+      const scheduleHeartbeat = async () => {
+        const baseMs = config.lock.heartbeatMinutes * 60 * 1000;
+        const jitterMs = config.lock.heartbeatJitterMs || 0;
+        const delay = baseMs + Math.floor(Math.random() * jitterMs);
 
-        try {
-          await api.heartbeatLock(department, userName);
-        } catch (err) {
-          // If heartbeat fails, consider lock lost
-          setIsLocked(false);
-          setError({ message: 'Lost lock connection' });
-          stopHeartbeat();
-        }
-      }, config.lock.heartbeatMinutes * 60 * 1000);
-    }, [department, userName]);
+        heartbeatTimeoutRef.current = setTimeout(async () => {
+          if (!department || !userName) {
+            scheduleHeartbeat();
+            return;
+          }
 
-    const stopHeartbeat = useCallback(() => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-    }, []);
+          try {
+            await api.heartbeatLock(department, userName);
+            scheduleHeartbeat();
+          } catch (err) {
+            // If heartbeat fails, consider lock lost
+            setIsLocked(false);
+            setError({ message: 'Lost lock connection' });
+            stopHeartbeat();
+          }
+        }, delay);
+      };
+
+      scheduleHeartbeat();
+    }, [department, userName, stopHeartbeat]);
 
     // Acquire lock with debounce
     const acquireLock = useCallback(() => {
@@ -114,7 +126,7 @@
       } catch (err) {
         // Ignore errors on release
       }
-    }, [department, userName, stopHeartbeat]);
+    }, [department, userName, releaseLockFor]);
 
     // Effect: acquire lock when department/user changes
     useEffect(() => {
