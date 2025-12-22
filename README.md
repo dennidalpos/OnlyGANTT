@@ -208,6 +208,7 @@ Il server gira su `http://localhost:3000`
 - Heartbeat automatico ogni 5 minuti
 - `sendBeacon` allo scaricamento della pagina per rilasciare il lock (chiusura, refresh, cambio pagina)
 - Cambio reparto: rilascio del lock prima dell’accesso al nuovo reparto
+- Cambio nome utente: rilascio del lock precedente e ri‑acquisizione con il nuovo utente
 - Logout utente o admin: rilascio automatico del lock
 - Admin può rilasciare lock attivi dal pannello strumenti
 - Stato lock mostrato in header (utente)
@@ -223,6 +224,7 @@ Il server gira su `http://localhost:3000`
 - **Toggle globale**: attiva/disattiva tutti i filtri
 - **Default viste**: 4 mesi con tutti i filtri separatori/dettaglio attivi, vista completa con soli separatori mesi/anni
 - **Altri filtri**: weekend, festività, solo milestone, evidenzia ritardi
+- **Etichette milestone**: posizionate nell’header sopra il diagramma, con spaziatura verticale per evitare sovrapposizioni
 
 ### Gestione Progetto
 - **Salva (nelle fasi)**: salva il progetto corrente senza chiuderlo e forza il refresh del Gantt ad ogni click.
