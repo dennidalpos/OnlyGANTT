@@ -38,10 +38,6 @@
     }, []);
 
     useEffect(() => {
-      setPendingUserName(userName);
-    }, [userName]);
-
-    useEffect(() => {
       if (!menuOpen) return;
 
       const handleClickOutside = (event) => {
