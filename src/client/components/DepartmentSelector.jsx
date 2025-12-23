@@ -17,6 +17,8 @@
     department,
     onDepartmentChange,
     adminToken,
+    lockInfo,
+    onAdminReleaseLock,
     compact = false
   }) {
     const [departments, setDepartments] = useState([]);
@@ -26,7 +28,6 @@
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [error, setError] = useState('');
-    const [showAdminTools, setShowAdminTools] = useState(false);
     const [adminNewDept, setAdminNewDept] = useState('');
     const [adminResetPassword, setAdminResetPassword] = useState('');
     const [adminActionError, setAdminActionError] = useState('');
@@ -223,6 +224,8 @@
 
     const selectedDeptObj = departments.find(d => d.name === selectedDept);
     const activeDeptObj = departments.find(d => d.name === department);
+    const lockStatusLabel = lockInfo?.locked ? 'Bloccato' : 'Sbloccato';
+    const lockStatusBadge = lockInfo?.locked ? 'badge-warning' : 'badge-success';
 
     return (
       <div className={compact ? 'department-selector-inline' : 'card'}>
@@ -269,19 +272,12 @@
 
             {adminToken && (
               <div className="admin-tools">
-                <button
-                  onClick={() => setShowAdminTools(prev => !prev)}
-                  className="btn-secondary"
-                >
-                  {showAdminTools ? 'Nascondi' : 'Mostra'} strumenti admin
-                </button>
+                <div className="admin-tools-panel compact">
+                  {adminActionError && (
+                    <div className="alert-item">{adminActionError}</div>
+                  )}
 
-                {showAdminTools && (
-                  <div className="admin-tools-panel">
-                    {adminActionError && (
-                      <div className="alert-item">{adminActionError}</div>
-                    )}
-
+                  <div className="admin-tools-row">
                     <div className="form-group">
                       <label>Nuovo reparto</label>
                       <input
@@ -293,48 +289,60 @@
                     </div>
                     <button
                       onClick={handleAdminCreateDepartment}
-                      className="btn-success"
+                      className="btn-success btn-small"
                       disabled={adminActionLoading}
                     >
                       Crea reparto
                     </button>
+                  </div>
 
-                    <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                      <label>Reset password reparto (vuoto per rimuovere)</label>
+                  <div className="admin-tools-row">
+                    <div className="form-group">
+                      <label>Reset password reparto</label>
                       <input
                         type="text"
                         value={adminResetPassword}
                         onChange={(e) => setAdminResetPassword(e.target.value)}
-                        placeholder="Nuova password"
+                        placeholder="Vuoto per rimuovere"
                       />
                     </div>
                     <button
                       onClick={handleAdminResetPassword}
-                      className="btn-secondary"
+                      className="btn-secondary btn-small"
                       disabled={adminActionLoading}
                     >
                       Reset password
                     </button>
+                  </div>
 
-                    <button
-                      onClick={handleAdminReleaseLock}
-                      className="btn-danger"
-                      disabled={adminActionLoading}
-                      style={{ marginTop: '0.5rem' }}
-                    >
-                      Sblocca lock reparto
-                    </button>
+                  {department && (
+                    <div className="admin-tools-row admin-tools-row-inline">
+                      <div className="admin-lock-status">
+                        <span className="text-muted">Stato reparto</span>
+                        <span className={`badge ${lockStatusBadge}`}>{lockStatusLabel}</span>
+                      </div>
+                      {lockInfo?.locked && (
+                        <button
+                          onClick={onAdminReleaseLock || handleAdminReleaseLock}
+                          className="btn-danger btn-small"
+                          disabled={adminActionLoading}
+                        >
+                          Sblocca reparto
+                        </button>
+                      )}
+                    </div>
+                  )}
 
+                  <div className="admin-tools-row">
                     <button
                       onClick={handleAdminDeleteDepartment}
-                      className="btn-secondary"
+                      className="btn-secondary btn-small"
                       disabled={adminActionLoading}
-                      style={{ marginTop: '0.5rem' }}
                     >
                       Elimina reparto
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -366,19 +374,12 @@
 
             {adminToken && (
               <div className="admin-tools" style={{ marginTop: '0.5rem' }}>
-                <button
-                  onClick={() => setShowAdminTools(prev => !prev)}
-                  className="btn-secondary"
-                >
-                  {showAdminTools ? 'Nascondi' : 'Mostra'} strumenti admin
-                </button>
+                <div className="admin-tools-panel compact">
+                  {adminActionError && (
+                    <div className="alert-item">{adminActionError}</div>
+                  )}
 
-                {showAdminTools && (
-                  <div className="admin-tools-panel">
-                    {adminActionError && (
-                      <div className="alert-item">{adminActionError}</div>
-                    )}
-
+                  <div className="admin-tools-row">
                     <div className="form-group">
                       <label>Nuovo reparto</label>
                       <input
@@ -390,48 +391,60 @@
                     </div>
                     <button
                       onClick={handleAdminCreateDepartment}
-                      className="btn-success"
+                      className="btn-success btn-small"
                       disabled={adminActionLoading}
                     >
                       Crea reparto
                     </button>
+                  </div>
 
-                    <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                      <label>Reset password reparto (vuoto per rimuovere)</label>
+                  <div className="admin-tools-row">
+                    <div className="form-group">
+                      <label>Reset password reparto</label>
                       <input
                         type="text"
                         value={adminResetPassword}
                         onChange={(e) => setAdminResetPassword(e.target.value)}
-                        placeholder="Nuova password"
+                        placeholder="Vuoto per rimuovere"
                       />
                     </div>
                     <button
                       onClick={handleAdminResetPassword}
-                      className="btn-secondary"
+                      className="btn-secondary btn-small"
                       disabled={adminActionLoading}
                     >
                       Reset password
                     </button>
+                  </div>
 
-                    <button
-                      onClick={handleAdminReleaseLock}
-                      className="btn-danger"
-                      disabled={adminActionLoading}
-                      style={{ marginTop: '0.5rem' }}
-                    >
-                      Sblocca lock reparto
-                    </button>
+                  {department && (
+                    <div className="admin-tools-row admin-tools-row-inline">
+                      <div className="admin-lock-status">
+                        <span className="text-muted">Stato reparto</span>
+                        <span className={`badge ${lockStatusBadge}`}>{lockStatusLabel}</span>
+                      </div>
+                      {lockInfo?.locked && (
+                        <button
+                          onClick={onAdminReleaseLock || handleAdminReleaseLock}
+                          className="btn-danger btn-small"
+                          disabled={adminActionLoading}
+                        >
+                          Sblocca reparto
+                        </button>
+                      )}
+                    </div>
+                  )}
 
+                  <div className="admin-tools-row">
                     <button
                       onClick={handleAdminDeleteDepartment}
-                      className="btn-secondary"
+                      className="btn-secondary btn-small"
                       disabled={adminActionLoading}
-                      style={{ marginTop: '0.5rem' }}
                     >
                       Elimina reparto
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             )}
 

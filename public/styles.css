@@ -171,6 +171,7 @@ body {
   padding: var(--spacing-xs) var(--spacing-md);
   min-width: 100px;
   text-align: center;
+  gap: 0.2rem;
 }
 
 .header-item {
@@ -209,8 +210,21 @@ body {
   margin-top: var(--spacing-xs);
 }
 
-.header-screensaver {
-  padding: 0 var(--spacing-sm);
+.header-screensaver-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  background-color: transparent;
+}
+
+.header-screensaver-toggle.is-active {
+  color: var(--accent-light);
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .datetime-time {
@@ -290,6 +304,33 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+}
+
+.admin-tools-panel.compact {
+  padding: var(--spacing-xs);
+  gap: var(--spacing-xs);
+}
+
+.admin-tools-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: flex-end;
+}
+
+.admin-tools-row .form-group {
+  margin-bottom: 0;
+}
+
+.admin-tools-row-inline {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-lock-status {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
 }
 
 .app-title {

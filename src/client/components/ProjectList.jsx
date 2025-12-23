@@ -87,14 +87,6 @@
 
     const allSelected = projects.length > 0 && selectedProjectIds.size === projects.length;
 
-    const toggleAllInGantt = () => {
-      if (allSelected) {
-        deselectAllInGantt();
-      } else {
-        selectAllInGantt();
-      }
-    };
-
     return (
       <div className="card">
         <h2 className="card-title">Elenco Progetti</h2>
@@ -119,18 +111,21 @@
           </div>
 
           <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            <button onClick={toggleAllInGantt} className={`${allSelected ? 'btn-danger' : 'btn-secondary'} btn-small`}>
-              {allSelected ? 'Nessuno in Gantt' : 'Tutti in Gantt'}
-            </button>
+            <label className="checkbox-label compact">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => (e.target.checked ? selectAllInGantt() : deselectAllInGantt())}
+                disabled={projects.length === 0}
+              />
+              Visualizza tutti i progetti su diagramma
+            </label>
           </div>
 
           <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            <button onClick={onExportJSON} className="btn-secondary btn-small">
-              Export Progetti
-            </button>
             {!readOnly && (
               <label className="btn-secondary btn-small" style={{ cursor: 'pointer', margin: 0 }}>
-                Import Progetti
+                Importa progetti
                 <input
                   type="file"
                   accept=".json"
@@ -145,6 +140,9 @@
                 />
               </label>
             )}
+            <button onClick={onExportJSON} className="btn-secondary btn-small">
+              Export Progetti
+            </button>
           </div>
         </div>
 

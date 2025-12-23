@@ -174,7 +174,7 @@
     }, [department, projects]);
 
     useEffect(() => {
-      if (!showProjectForm || !projectDraft) {
+      if (!projectDraft) {
         setHasDraftChanges(false);
         return;
       }
@@ -185,7 +185,7 @@
       const currentProject = stripProjectIds(projectDraft);
       const hasChanges = JSON.stringify(baseProject) !== JSON.stringify(currentProject);
       setHasDraftChanges(hasChanges);
-    }, [showProjectForm, projectDraft, editingProject]);
+    }, [projectDraft, editingProject]);
 
     // Effect: screensaver activity tracking
     useEffect(() => {
@@ -228,7 +228,7 @@
       gantt.invalidateCache();
     }, [filters, viewMode]);
 
-    const hasUnsavedChanges = isDirty || (showProjectForm && hasDraftChanges);
+    const hasUnsavedChanges = isDirty || hasDraftChanges;
     const showProjectUnsavedBadge = showProjectForm && hasUnsavedChanges;
 
     useEffect(() => {
@@ -354,7 +354,41 @@
       setScrollToTodayTrigger(prev => prev + 1);
     };
 
+    const resetSessionState = async ({ nextUserName = '', nextAdminToken = null } = {}) => {
+      try {
+        await releaseLock();
+      } catch (err) {
+        // Ignore release errors
+      }
+
+      setDepartment(null);
+      setLockEnabled(false);
+      setEditingProject(null);
+      setShowProjectForm(false);
+      setProjectDraft(null);
+      setSelectedProjectIds(new Set());
+      setDepartmentValidationErrors([]);
+      setFocusedProjectId(null);
+      setAdminToken(nextAdminToken);
+      setUserName(nextUserName);
+    };
+
+    const handleUserNameChange = async (nextUserName) => {
+      if (nextUserName === userName) return true;
+
+      const canProceed = await confirmPendingChanges('cambiare utente');
+      if (!canProceed) return false;
+
+      await resetSessionState({ nextUserName, nextAdminToken: null });
+      return true;
+    };
+
     const handleAdminLogin = async (adminId, password) => {
+      const canProceed = await confirmPendingChanges('passare ad admin');
+      if (!canProceed) return;
+
+      await resetSessionState({ nextUserName: '', nextAdminToken: null });
+
       const result = await api.adminLogin(adminId, password);
       setAdminToken(result.token);
       setUserName(adminId);
@@ -362,16 +396,16 @@
 
     const handleAdminLogout = async () => {
       if (!adminToken) return;
+      const canProceed = await confirmPendingChanges('uscire');
+      if (!canProceed) return;
+
       try {
-        await releaseLock();
-        setLockEnabled(false);
+        await api.adminLogout(adminToken);
       } catch (err) {
-        // Ignore release errors
+        // Ignore admin logout errors
       }
 
-      await api.adminLogout(adminToken);
-      setAdminToken(null);
-      setUserName('');
+      await resetSessionState({ nextUserName: '', nextAdminToken: null });
     };
 
     const handleAdminReleaseLock = async () => {
@@ -433,6 +467,13 @@
 
     const handleNewProject = () => {
       if (readOnlyDepartment) return;
+      if (projectDraft && hasDraftChanges && !showProjectForm) {
+        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla e creare un nuovo progetto?');
+        if (!shouldDiscard) {
+          setShowProjectForm(true);
+          return;
+        }
+      }
       const draft = logic.createNewProject();
       setEditingProject(null);
       setProjectDraft(draft);
@@ -441,6 +482,13 @@
 
     const handleEditProject = (project) => {
       if (readOnlyDepartment) return;
+      if (projectDraft && hasDraftChanges && !showProjectForm && editingProject?.id !== project.id) {
+        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla per modificarne un altro?');
+        if (!shouldDiscard) {
+          setShowProjectForm(true);
+          return;
+        }
+      }
       setEditingProject(project);
       setProjectDraft(project);
       setShowProjectForm(true);
@@ -502,8 +550,18 @@
 
     const handleCancelProjectForm = () => {
       setShowProjectForm(false);
+    };
+
+    const handleResumeProjectForm = () => {
+      if (!projectDraft) return;
+      setShowProjectForm(true);
+    };
+
+    const handleDiscardProjectDraft = () => {
+      setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
+      setHasDraftChanges(false);
     };
 
     const handleDeleteProject = async (projectId) => {
@@ -568,28 +626,15 @@
       const canProceed = await confirmPendingChanges('uscire');
       if (!canProceed) return;
 
-      try {
-        await releaseLock();
-      } catch (err) {
-        // Ignore release errors
-      }
-
       if (adminToken) {
         try {
           await api.adminLogout(adminToken);
         } catch (err) {
           // Ignore admin logout errors
         }
-        setAdminToken(null);
       }
 
-      setDepartment(null);
-      setLockEnabled(false);
-      setEditingProject(null);
-      setShowProjectForm(false);
-      setSelectedProjectIds(new Set());
-      setUserName('');
-      setFocusedProjectId(null);
+      await resetSessionState({ nextUserName: '', nextAdminToken: null });
     };
 
     const handleImportJSON = async (file) => {
@@ -706,7 +751,7 @@
       <div>
         <HeaderBar
           userName={userName}
-          onUserNameChange={setUserName}
+          onUserNameChange={handleUserNameChange}
           department={department}
           onDepartmentChange={handleDepartmentChange}
           screensaverEnabled={screensaverEnabled}
@@ -811,6 +856,24 @@
                       >
                         Nuovo Progetto
                       </button>
+                      {!showProjectForm && projectDraft && (
+                        <button
+                          onClick={handleResumeProjectForm}
+                          className="btn-secondary"
+                          disabled={readOnlyDepartment || isSavingProject}
+                        >
+                          Riprendi modifica
+                        </button>
+                      )}
+                      {!showProjectForm && projectDraft && (
+                        <button
+                          onClick={handleDiscardProjectDraft}
+                          className="btn-secondary"
+                          disabled={readOnlyDepartment || isSavingProject}
+                        >
+                          Scarta bozza
+                        </button>
+                      )}
                       {showProjectForm && (
                         <button
                           onClick={() => projectDraft && handleSaveProject(projectDraft)}
@@ -835,7 +898,7 @@
                           className="btn-secondary"
                           disabled={isSavingProject}
                         >
-                          Annulla
+                          Torna indietro
                         </button>
                       )}
                     </div>

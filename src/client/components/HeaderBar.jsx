@@ -37,6 +37,7 @@
     const [adminPassword, setAdminPassword] = useState('');
     const [adminError, setAdminError] = useState('');
     const [adminLoading, setAdminLoading] = useState(false);
+    const [pendingUserName, setPendingUserName] = useState(userName);
 
     // Update clock every second
     useEffect(() => {
@@ -47,9 +48,21 @@
       return () => clearInterval(interval);
     }, []);
 
+    useEffect(() => {
+      setPendingUserName(userName);
+    }, [userName]);
+
     const timeString = currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const dateString = currentTime.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' });
     const DepartmentSelector = window.OnlyGantt.components.DepartmentSelector;
+
+    const handleUserNameCommit = async () => {
+      if (pendingUserName === userName) return;
+      const ok = await onUserNameChange(pendingUserName);
+      if (!ok) {
+        setPendingUserName(userName);
+      }
+    };
 
     const handleAdminSubmit = async () => {
       if (!adminId || !adminPassword) {
@@ -88,6 +101,8 @@
                         department={department}
                         onDepartmentChange={onDepartmentChange}
                         adminToken={adminToken}
+                        lockInfo={lockInfo}
+                        onAdminReleaseLock={onAdminReleaseLock}
                         compact
                       />
                     )}
@@ -133,8 +148,10 @@
                       <input
                         id="userName"
                         type="text"
-                        value={userName}
-                        onChange={(e) => onUserNameChange(e.target.value)}
+                        value={pendingUserName}
+                        onChange={(e) => setPendingUserName(e.target.value)}
+                        onBlur={handleUserNameCommit}
+                        onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
                         placeholder="Inserisci nome"
                       />
                     </div>
@@ -201,25 +218,9 @@
                     >
                       Logout admin
                     </button>
-                    {lockInfo && lockInfo.locked && (
-                      <button
-                        onClick={onAdminReleaseLock}
-                        className="btn-danger btn-small header-button"
-                      >
-                        Sblocca lock
-                      </button>
-                    )}
                   </>
                 )}
               </div>
-
-              {adminToken && lockInfo && lockInfo.locked && (
-                <div className="header-admin-lock">
-                  <span className="badge badge-warning">
-                    Lock: {lockInfo.lockedBy}
-                  </span>
-                </div>
-              )}
 
               {showAdmin && (
                 <div className="admin-panel">
@@ -265,17 +266,15 @@
                 </div>
               )}
             </div>
-
-            <label className="checkbox-label header-item header-screensaver">
-              <input
-                type="checkbox"
-                checked={screensaverEnabled}
-                onChange={(e) => onScreensaverToggle(e.target.checked)}
-              />
-              Screensaver
-            </label>
-
             <div className="header-datetime">
+              <label className={`checkbox-label header-screensaver-toggle${screensaverEnabled ? ' is-active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={screensaverEnabled}
+                  onChange={(e) => onScreensaverToggle(e.target.checked)}
+                />
+                Screensaver
+              </label>
               <span className="datetime-time">{timeString}</span>
               <span className="datetime-date">{dateString}</span>
             </div>

@@ -472,7 +472,7 @@
             </button>
           )}
           <button onClick={onCancel} className="btn-secondary" disabled={isSaving}>
-            Annulla
+            Torna indietro
           </button>
         </div>
       </div>
