@@ -1130,8 +1130,29 @@ canvas.gantt-canvas {
 
 .project-item-highlight {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
-  background-color: rgba(59, 130, 246, 0.12);
+  box-shadow:
+    0 0 0 2px rgba(59, 130, 246, 0.5),
+    0 0 0 6px rgba(59, 130, 246, 0.2);
+  background-color: rgba(59, 130, 246, 0.18);
+  animation: project-highlight-pulse 1.4s ease-out 2;
+}
+
+@keyframes project-highlight-pulse {
+  0% {
+    box-shadow:
+      0 0 0 2px rgba(59, 130, 246, 0.6),
+      0 0 0 6px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(59, 130, 246, 0.7),
+      0 0 0 10px rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(59, 130, 246, 0.5),
+      0 0 0 6px rgba(59, 130, 246, 0.2);
+  }
 }
 
 .project-item-alert-error {

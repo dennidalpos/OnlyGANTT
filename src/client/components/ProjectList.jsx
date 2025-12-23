@@ -36,7 +36,10 @@
       const target = projectRefs.current[focusedProjectId];
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setHighlightedProjectId(focusedProjectId);
+        setHighlightedProjectId(null);
+        window.requestAnimationFrame(() => {
+          setHighlightedProjectId(focusedProjectId);
+        });
         if (highlightTimerRef.current) {
           clearTimeout(highlightTimerRef.current);
         }
