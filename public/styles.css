@@ -510,6 +510,117 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+@media (min-width: 1920px) {
+  :root {
+    --spacing-xs: 0.35rem;
+    --spacing-sm: 0.65rem;
+    --spacing-md: 1.25rem;
+    --spacing-lg: 1.75rem;
+    --spacing-xl: 2.5rem;
+  }
+
+  body {
+    font-size: 1.05rem;
+  }
+
+  .app-header {
+    padding: var(--spacing-lg) var(--spacing-xl);
+  }
+
+  .header-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--spacing-xl);
+  }
+
+  .header-section {
+    min-width: 240px;
+    padding: var(--spacing-md);
+  }
+
+  .header-section-title {
+    font-size: 0.8rem;
+  }
+
+  .header-button,
+  .header-item {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .app-title {
+    font-size: 1.85rem;
+  }
+
+  .main-container {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: var(--spacing-xl);
+  }
+
+  .bottom-layout {
+    grid-template-columns: minmax(360px, 1.2fr) minmax(360px, 1.2fr) minmax(320px, 1fr);
+    gap: var(--spacing-xl);
+  }
+
+  .card {
+    padding: var(--spacing-xl);
+  }
+
+  .card-title {
+    font-size: 1.45rem;
+  }
+
+  label {
+    font-size: 0.95rem;
+  }
+
+  input[type="text"],
+  input[type="password"],
+  input[type="date"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 0.95rem;
+    min-height: 44px;
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+
+  textarea {
+    min-height: 110px;
+  }
+
+  button,
+  .btn-secondary,
+  .btn-success,
+  .btn-danger {
+    font-size: 0.95rem;
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+
+  .btn-small {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.85rem;
+  }
+
+  .badge {
+    font-size: 0.85rem;
+  }
+
+  .project-name {
+    font-size: 1.1rem;
+  }
+
+  .project-info,
+  .alert-item,
+  .phase-name {
+    font-size: 0.95rem;
+  }
+
+  .gantt-options-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
 /* Badges */
 .badge {
   display: inline-block;
