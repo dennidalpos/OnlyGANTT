@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  const { useState, useEffect, useRef } = React;
+  const { useState, useEffect, useRef, useMemo } = React;
 
   const config = window.AppConfig;
   const storage = window.OnlyGantt.storage;
@@ -628,6 +628,7 @@
           setShowProjectForm(false);
           setEditingProject(null);
           setProjectDraft(null);
+          setHasDraftChanges(false);
         }
       }
 
@@ -837,15 +838,21 @@
     };
 
     // Filter projects for Gantt display
-    const visibleProjects = projects.filter(p => selectedProjectIds.has(p.id));
+    const visibleProjects = useMemo(
+      () => projects.filter(p => selectedProjectIds.has(p.id)),
+      [projects, selectedProjectIds]
+    );
 
     // Apply "only milestones" filter
-    const ganttProjects = filters.showOnlyMilestones
-      ? visibleProjects.map(p => ({
-          ...p,
-          fasi: p.fasi.filter(f => f.milestone)
-        }))
-      : visibleProjects;
+    const ganttProjects = useMemo(
+      () => (filters.showOnlyMilestones
+        ? visibleProjects.map(p => ({
+            ...p,
+            fasi: p.fasi.filter(f => f.milestone)
+          }))
+        : visibleProjects),
+      [filters.showOnlyMilestones, visibleProjects]
+    );
 
     return (
       <div>
@@ -1062,7 +1069,7 @@
                       >
                         Nuovo Progetto
                       </button>
-                      {!showProjectForm && projectDraft && (
+                      {!showProjectForm && projectDraft && hasDraftChanges && (
                         <button
                           onClick={handleResumeProjectForm}
                           className="btn-secondary"
@@ -1071,7 +1078,7 @@
                           Riprendi modifica
                         </button>
                       )}
-                      {!showProjectForm && projectDraft && (
+                      {!showProjectForm && projectDraft && hasDraftChanges && (
                         <button
                           onClick={handleDiscardProjectDraft}
                           className="btn-secondary"
