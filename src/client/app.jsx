@@ -554,11 +554,9 @@
     const handleNewProject = () => {
       if (readOnlyDepartment) return;
       if (projectDraft && hasDraftChanges && !showProjectForm) {
-        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla e creare un nuovo progetto?');
-        if (!shouldDiscard) {
-          setShowProjectForm(true);
-          return;
-        }
+        setEditingProject(null);
+        setProjectDraft(null);
+        setHasDraftChanges(false);
       }
       const draft = logic.createNewProject();
       setEditingProject(null);
@@ -569,11 +567,9 @@
     const handleEditProject = (project) => {
       if (readOnlyDepartment) return;
       if (projectDraft && hasDraftChanges && !showProjectForm && editingProject?.id !== project.id) {
-        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla per modificarne un altro?');
-        if (!shouldDiscard) {
-          setShowProjectForm(true);
-          return;
-        }
+        setEditingProject(null);
+        setProjectDraft(null);
+        setHasDraftChanges(false);
       }
       setEditingProject(project);
       setProjectDraft(project);
