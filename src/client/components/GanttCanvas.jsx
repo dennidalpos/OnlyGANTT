@@ -260,14 +260,8 @@
       }
     }, []);
 
-    // Tooltip (only in 4months mode)
+    // Tooltip
     const handleMouseMove = useCallback((e) => {
-      if (viewMode !== '4months') {
-        if (tooltip) {
-          setTooltip(null);
-        }
-        return;
-      }
       if (!layout) {
         setTooltip(null);
         return;
@@ -323,7 +317,7 @@
       } else {
         setTooltip(null);
       }
-    }, [viewMode, layout, tooltip]);
+    }, [layout]);
 
     const handleMouseLeave = useCallback(() => {
       setTooltip(null);
