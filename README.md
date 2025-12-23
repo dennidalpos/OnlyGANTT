@@ -349,6 +349,8 @@ I file devono essere caricati in questo ordine esatto (vedi `public/index.html`)
 - Cache layout: il layout del Gantt è cache‑ato e ricalcolato solo quando necessario
 - AbortController: tutte le chiamate API sensibili supportano l'aborto
 - Debounce: l'acquisizione lock è debounced (300ms)
+- Scroll sincrono Gantt: aggiornamento scroll e trasformazioni tramite `requestAnimationFrame`
+- Scrollbar Gantt: riuso del contenuto per evitare ricreazioni DOM frequenti
 
 ### Scritture atomiche Windows‑safe
 Il server usa scritture atomiche per compatibilità Windows:

@@ -32,6 +32,9 @@
     const scrollPositionsRef = useRef({});
     const lastViewModeRef = useRef(viewMode);
     const scrollLeftRef = useRef(0);
+    const scrollbarWidthRef = useRef(0);
+    const scrollRafRef = useRef(null);
+    const pendingScrollLeftRef = useRef(0);
 
     const updateScrollbars = useCallback((newLayout) => {
       if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {
@@ -40,15 +43,26 @@
 
       const containerWidth = wrapperRef.current ? wrapperRef.current.clientWidth : 0;
       const scrollbarWidth = Math.max(newLayout.canvasWidth, containerWidth);
-      const scrollbarContent = document.createElement('div');
-      scrollbarContent.style.width = `${scrollbarWidth}px`;
-      scrollbarContent.style.height = '1px';
+      if (scrollbarWidthRef.current !== scrollbarWidth) {
+        const ensureScrollbarContent = (scrollbar) => {
+          let content = scrollbar.querySelector('.gantt-scrollbar-content');
+          if (!content) {
+            content = document.createElement('div');
+            content.className = 'gantt-scrollbar-content';
+            scrollbar.innerHTML = '';
+            scrollbar.appendChild(content);
+          }
+          return content;
+        };
 
-      topScrollbarRef.current.innerHTML = '';
-      topScrollbarRef.current.appendChild(scrollbarContent.cloneNode());
-
-      bottomScrollbarRef.current.innerHTML = '';
-      bottomScrollbarRef.current.appendChild(scrollbarContent);
+        const topContent = ensureScrollbarContent(topScrollbarRef.current);
+        const bottomContent = ensureScrollbarContent(bottomScrollbarRef.current);
+        topContent.style.width = `${scrollbarWidth}px`;
+        topContent.style.height = '1px';
+        bottomContent.style.width = `${scrollbarWidth}px`;
+        bottomContent.style.height = '1px';
+        scrollbarWidthRef.current = scrollbarWidth;
+      }
 
       const currentScroll = scrollLeftRef.current;
       topScrollbarRef.current.scrollLeft = currentScroll;
@@ -134,6 +148,7 @@
     useEffect(() => {
       if (viewMode !== '4months') {
         setScrollLeft(0);
+        scrollbarWidthRef.current = 0;
         return;
       }
       if (!layout) return;
@@ -203,7 +218,14 @@
     // Sync scrollbars
     const handleScroll = useCallback((source) => {
       const left = source.scrollLeft;
-      setScrollLeft(left);
+      pendingScrollLeftRef.current = left;
+
+      if (scrollRafRef.current === null) {
+        scrollRafRef.current = window.requestAnimationFrame(() => {
+          scrollRafRef.current = null;
+          setScrollLeft(pendingScrollLeftRef.current);
+        });
+      }
 
       if (source !== topScrollbarRef.current && topScrollbarRef.current) {
         topScrollbarRef.current.scrollLeft = left;
@@ -231,7 +253,14 @@
       };
     }, [handleScroll, viewMode]);
 
-    // Tooltip (only in 4months mode)
+    useEffect(() => () => {
+      if (scrollRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    }, []);
+
+    // Tooltip
     const handleMouseMove = useCallback((e) => {
       if (!layout) {
         setTooltip(null);
@@ -288,7 +317,7 @@
       } else {
         setTooltip(null);
       }
-    }, [viewMode, layout]);
+    }, [layout]);
 
     const handleMouseLeave = useCallback(() => {
       setTooltip(null);
