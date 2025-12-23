@@ -791,6 +791,31 @@ canvas.gantt-canvas {
   color: var(--accent-light);
 }
 
+.gantt-context-menu {
+  position: fixed;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.25rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 2100;
+}
+
+.gantt-context-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+}
+
+.gantt-context-menu button:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
 /* Project List */
 .project-item {
   background-color: var(--bg-tertiary);

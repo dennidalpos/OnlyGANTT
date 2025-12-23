@@ -19,11 +19,9 @@
     onCancel,
     readOnly,
     isSaving,
-    onDraftChange,
-    focusedPhaseId
+    onDraftChange
   }) {
     const [formData, setFormData] = useState(null);
-    const phaseRefs = React.useRef({});
 
     useEffect(() => {
       if (project) {
@@ -41,17 +39,6 @@
       }
     }, [project, onDraftChange]);
 
-    useEffect(() => {
-      if (!focusedPhaseId) return;
-      const target = phaseRefs.current[focusedPhaseId];
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const input = target.querySelector('input[type="text"]');
-        if (input) {
-          input.focus();
-        }
-      }
-    }, [focusedPhaseId, formData]);
 
     if (!formData) return null;
 
@@ -262,11 +249,6 @@
         {formData.fasi.map((fase, index) => (
           <React.Fragment key={fase.id}>
             <div
-              ref={(el) => {
-                if (el) {
-                  phaseRefs.current[fase.id] = el;
-                }
-              }}
               style={{
                 padding: '1rem',
                 backgroundColor: 'var(--bg-tertiary)',

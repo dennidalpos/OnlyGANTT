@@ -99,7 +99,7 @@
     const [isSavingProject, setIsSavingProject] = useState(false);
     const [hasDraftChanges, setHasDraftChanges] = useState(false);
     const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
-    const [focusedPhaseId, setFocusedPhaseId] = useState(null);
+    const [focusedProjectId, setFocusedProjectId] = useState(null);
 
     // Admin state
     const [adminToken, setAdminToken] = useState(null);
@@ -305,7 +305,7 @@
       setShowProjectForm(false);
       setSelectedProjectIds(new Set());
       setDepartmentValidationErrors([]);
-      setFocusedPhaseId(null);
+      setFocusedProjectId(null);
     };
 
     const getGridFilterDefaults = (mode) => {
@@ -401,12 +401,13 @@
       }
     };
 
-    const handleGanttPhaseContextMenu = (project, phase) => {
-      if (!project || !phase) return;
-      setEditingProject(project);
-      setProjectDraft(project);
-      setShowProjectForm(true);
-      setFocusedPhaseId(phase.id);
+    const handleGanttPhaseContextMenu = (project) => {
+      if (!project) return;
+      setFocusedProjectId(project.id);
+    };
+
+    const handleProjectFocusHandled = () => {
+      setFocusedProjectId(null);
     };
 
     const handleExportPNG = () => {
@@ -436,7 +437,6 @@
       setEditingProject(null);
       setProjectDraft(draft);
       setShowProjectForm(true);
-      setFocusedPhaseId(null);
     };
 
     const handleEditProject = (project) => {
@@ -444,7 +444,6 @@
       setEditingProject(project);
       setProjectDraft(project);
       setShowProjectForm(true);
-      setFocusedPhaseId(null);
     };
 
     const handleSaveProject = async (projectData, { keepEditing } = {}) => {
@@ -505,7 +504,6 @@
       setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
-      setFocusedPhaseId(null);
     };
 
     const handleDeleteProject = async (projectId) => {
@@ -591,7 +589,7 @@
       setShowProjectForm(false);
       setSelectedProjectIds(new Set());
       setUserName('');
-      setFocusedPhaseId(null);
+      setFocusedProjectId(null);
     };
 
     const handleImportJSON = async (file) => {
@@ -853,7 +851,6 @@
                         readOnly={readOnlyDepartment}
                         isSaving={isSavingProject}
                         onDraftChange={setProjectDraft}
-                        focusedPhaseId={focusedPhaseId}
                       />
                     </div>
                   )}
@@ -872,6 +869,8 @@
                         validationErrors={validationErrors}
                         readOnly={readOnlyDepartment}
                         isSaving={isSavingProject}
+                        focusedProjectId={focusedProjectId}
+                        onFocusHandled={handleProjectFocusHandled}
                       />
                 </div>
 

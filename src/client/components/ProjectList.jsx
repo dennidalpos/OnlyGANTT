@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  const { useState } = React;
+  const { useState, useEffect, useRef } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -23,9 +23,23 @@
     onExportJSON,
     validationErrors = [],
     readOnly,
-    isSaving
+    isSaving,
+    focusedProjectId,
+    onFocusHandled
   }) {
     const [expandedProjects, setExpandedProjects] = useState(new Set());
+    const projectRefs = useRef({});
+
+    useEffect(() => {
+      if (!focusedProjectId) return;
+      const target = projectRefs.current[focusedProjectId];
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      if (onFocusHandled) {
+        onFocusHandled();
+      }
+    }, [focusedProjectId, onFocusHandled]);
 
     const toggleExpand = (projectId) => {
       const newExpanded = new Set(expandedProjects);
@@ -133,7 +147,15 @@
               const isSelected = selectedProjectIds.has(project.id);
 
               return (
-                <div key={project.id} className={`project-item${severityClass}`}>
+                <div
+                  key={project.id}
+                  ref={(el) => {
+                    if (el) {
+                      projectRefs.current[project.id] = el;
+                    }
+                  }}
+                  className={`project-item${severityClass}`}
+                >
                   <div className="project-header">
                     <div>
                       <h3 className="project-name">

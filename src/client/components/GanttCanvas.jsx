@@ -28,6 +28,7 @@
     const [tooltip, setTooltip] = useState(null);
     const [layout, setLayout] = useState(null);
     const [scrollLeft, setScrollLeft] = useState(0);
+    const [contextMenu, setContextMenu] = useState(null);
     const scrollPositionsRef = useRef({});
     const lastViewModeRef = useRef(viewMode);
     const scrollLeftRef = useRef(0);
@@ -305,11 +306,38 @@
 
       if (hit && hit.type === 'phase') {
         e.preventDefault();
-        if (onPhaseContextMenu) {
-          onPhaseContextMenu(hit.project, hit.phase);
-        }
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          project: hit.project
+        });
+      } else if (contextMenu) {
+        setContextMenu(null);
       }
-    }, [layout, onPhaseContextMenu]);
+    }, [layout, contextMenu]);
+
+    const handleMenuAction = useCallback(() => {
+      if (contextMenu?.project && onPhaseContextMenu) {
+        onPhaseContextMenu(contextMenu.project);
+      }
+      setContextMenu(null);
+    }, [contextMenu, onPhaseContextMenu]);
+
+    useEffect(() => {
+      if (!contextMenu) return;
+      const handleClick = () => setContextMenu(null);
+      const handleEscape = (event) => {
+        if (event.key === 'Escape') {
+          setContextMenu(null);
+        }
+      };
+      window.addEventListener('click', handleClick);
+      window.addEventListener('keydown', handleEscape);
+      return () => {
+        window.removeEventListener('click', handleClick);
+        window.removeEventListener('keydown', handleEscape);
+      };
+    }, [contextMenu]);
 
     const isScrollable = viewMode === '4months';
 
@@ -357,6 +385,21 @@
             {tooltip.text.split('\n').map((line, i) => (
               <div key={i}>{line}</div>
             ))}
+          </div>
+        )}
+
+        {contextMenu && (
+          <div
+            className="gantt-context-menu"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`
+            }}
+            role="menu"
+          >
+            <button type="button" onClick={handleMenuAction} role="menuitem">
+              Vai su Progetto
+            </button>
           </div>
         )}
       </div>
