@@ -19,6 +19,7 @@
   const ProjectForm = window.OnlyGantt.components.ProjectForm;
   const ProjectList = window.OnlyGantt.components.ProjectList;
   const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
+  const DepartmentSelector = window.OnlyGantt.components.DepartmentSelector;
 
   // Hooks
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
@@ -60,6 +61,7 @@
   function App() {
     // User state
     const [userName, setUserName] = useState(storage.getCurrentUser() || '');
+    const [pendingUserName, setPendingUserName] = useState(storage.getCurrentUser() || '');
 
     // Department state
     const [department, setDepartment] = useState(null);
@@ -158,6 +160,10 @@
       storage.setCurrentUser(userName);
     }, [userName]);
 
+    useEffect(() => {
+      setPendingUserName(userName);
+    }, [userName]);
+
     // Effect: select all projects in Gantt when department changes
     useEffect(() => {
       if (!department) return;
@@ -174,7 +180,7 @@
     }, [department, projects]);
 
     useEffect(() => {
-      if (!showProjectForm || !projectDraft) {
+      if (!projectDraft) {
         setHasDraftChanges(false);
         return;
       }
@@ -185,7 +191,7 @@
       const currentProject = stripProjectIds(projectDraft);
       const hasChanges = JSON.stringify(baseProject) !== JSON.stringify(currentProject);
       setHasDraftChanges(hasChanges);
-    }, [showProjectForm, projectDraft, editingProject]);
+    }, [projectDraft, editingProject]);
 
     // Effect: screensaver activity tracking
     useEffect(() => {
@@ -228,7 +234,7 @@
       gantt.invalidateCache();
     }, [filters, viewMode]);
 
-    const hasUnsavedChanges = isDirty || (showProjectForm && hasDraftChanges);
+    const hasUnsavedChanges = isDirty || hasDraftChanges;
     const showProjectUnsavedBadge = showProjectForm && hasUnsavedChanges;
 
     useEffect(() => {
@@ -354,24 +360,52 @@
       setScrollToTodayTrigger(prev => prev + 1);
     };
 
+    const resetSessionState = async ({ nextUserName = '', nextAdminToken = null } = {}) => {
+      try {
+        await releaseLock();
+      } catch (err) {
+        // Ignore release errors
+      }
+
+      setDepartment(null);
+      setLockEnabled(false);
+      setEditingProject(null);
+      setShowProjectForm(false);
+      setProjectDraft(null);
+      setSelectedProjectIds(new Set());
+      setDepartmentValidationErrors([]);
+      setFocusedProjectId(null);
+      setAdminToken(nextAdminToken);
+      setUserName(nextUserName);
+    };
+
+    const handleUserNameChange = async (nextUserName) => {
+      if (nextUserName === userName) return true;
+
+      const canProceed = await confirmPendingChanges('cambiare utente');
+      if (!canProceed) return false;
+
+      await resetSessionState({ nextUserName, nextAdminToken: null });
+      return true;
+    };
+
     const handleAdminLogin = async (adminId, password) => {
+      const canProceed = await confirmPendingChanges('passare ad admin');
+      if (!canProceed) return;
+
+      await resetSessionState({ nextUserName: '', nextAdminToken: null });
+
       const result = await api.adminLogin(adminId, password);
       setAdminToken(result.token);
       setUserName(adminId);
     };
 
-    const handleAdminLogout = async () => {
-      if (!adminToken) return;
-      try {
-        await releaseLock();
-        setLockEnabled(false);
-      } catch (err) {
-        // Ignore release errors
-      }
-
-      await api.adminLogout(adminToken);
-      setAdminToken(null);
-      setUserName('');
+    const handleAdminLoginPrompt = async () => {
+      const adminId = prompt('ID Admin');
+      if (adminId === null || !adminId.trim()) return;
+      const password = prompt('Password');
+      if (password === null) return;
+      await handleAdminLogin(adminId, password);
     };
 
     const handleAdminReleaseLock = async () => {
@@ -381,6 +415,65 @@
         refreshLock();
       } catch (err) {
         alert(`Errore durante lo sblocco: ${err.message}`);
+      }
+    };
+
+    const handleAdminCreateDepartment = async ({ name, password }) => {
+      if (!adminToken) return;
+      try {
+        await api.createDepartment(name, adminToken);
+        if (password) {
+          await api.resetPassword(name, password, adminToken);
+        }
+      } catch (err) {
+        alert(err.message || 'Creazione reparto fallita');
+      }
+    };
+
+    const handleAdminDeleteDepartment = async ({ department: targetDepartment }) => {
+      if (!adminToken || !targetDepartment) return;
+      try {
+        await api.deleteDepartment(targetDepartment, adminToken);
+        if (department === targetDepartment) {
+          await handleDepartmentChange(null);
+        }
+      } catch (err) {
+        alert(err.message || 'Eliminazione reparto fallita');
+      }
+    };
+
+    const handleAdminResetPassword = async ({ department: targetDepartment, newPassword }) => {
+      if (!adminToken || !targetDepartment) return;
+      try {
+        await api.resetPassword(targetDepartment, newPassword, adminToken);
+        alert('Password reparto aggiornata');
+      } catch (err) {
+        alert(err.message || 'Reset password fallito');
+      }
+    };
+
+    const handleUserNameCommit = async () => {
+      if (pendingUserName === userName) return;
+      const ok = await handleUserNameChange(pendingUserName);
+      if (!ok) {
+        setPendingUserName(userName);
+      }
+    };
+
+    const handleChangePassword = async ({ oldPassword, newPassword }) => {
+      if (!department) return false;
+
+      try {
+        await api.changePassword(department, oldPassword, newPassword);
+        if (userName) {
+          storage.removePassword(userName, department);
+        }
+        alert('Password aggiornata. Effettua nuovamente l’accesso al reparto.');
+        await handleDepartmentChange(null);
+        return true;
+      } catch (err) {
+        alert(err.message || 'Cambio password fallito');
+        return false;
       }
     };
 
@@ -433,6 +526,13 @@
 
     const handleNewProject = () => {
       if (readOnlyDepartment) return;
+      if (projectDraft && hasDraftChanges && !showProjectForm) {
+        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla e creare un nuovo progetto?');
+        if (!shouldDiscard) {
+          setShowProjectForm(true);
+          return;
+        }
+      }
       const draft = logic.createNewProject();
       setEditingProject(null);
       setProjectDraft(draft);
@@ -441,6 +541,13 @@
 
     const handleEditProject = (project) => {
       if (readOnlyDepartment) return;
+      if (projectDraft && hasDraftChanges && !showProjectForm && editingProject?.id !== project.id) {
+        const shouldDiscard = confirm('Hai una modifica in sospeso. Vuoi scartarla per modificarne un altro?');
+        if (!shouldDiscard) {
+          setShowProjectForm(true);
+          return;
+        }
+      }
       setEditingProject(project);
       setProjectDraft(project);
       setShowProjectForm(true);
@@ -502,8 +609,18 @@
 
     const handleCancelProjectForm = () => {
       setShowProjectForm(false);
+    };
+
+    const handleResumeProjectForm = () => {
+      if (!projectDraft) return;
+      setShowProjectForm(true);
+    };
+
+    const handleDiscardProjectDraft = () => {
+      setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
+      setHasDraftChanges(false);
     };
 
     const handleDeleteProject = async (projectId) => {
@@ -568,28 +685,15 @@
       const canProceed = await confirmPendingChanges('uscire');
       if (!canProceed) return;
 
-      try {
-        await releaseLock();
-      } catch (err) {
-        // Ignore release errors
-      }
-
       if (adminToken) {
         try {
           await api.adminLogout(adminToken);
         } catch (err) {
           // Ignore admin logout errors
         }
-        setAdminToken(null);
       }
 
-      setDepartment(null);
-      setLockEnabled(false);
-      setEditingProject(null);
-      setShowProjectForm(false);
-      setSelectedProjectIds(new Set());
-      setUserName('');
-      setFocusedProjectId(null);
+      await resetSessionState({ nextUserName: '', nextAdminToken: null });
     };
 
     const handleImportJSON = async (file) => {
@@ -706,11 +810,8 @@
       <div>
         <HeaderBar
           userName={userName}
-          onUserNameChange={setUserName}
           department={department}
           onDepartmentChange={handleDepartmentChange}
-          screensaverEnabled={screensaverEnabled}
-          onScreensaverToggle={setScreensaverEnabled}
           lockInfo={lockInfo}
           isLocked={isLocked}
           lockEnabled={lockEnabled}
@@ -722,9 +823,10 @@
           canImportExport={!!department && (!!adminToken || !readOnlyDepartment)}
           readOnlyDepartment={readOnlyDepartment}
           adminToken={adminToken}
-          onAdminLogin={handleAdminLogin}
-          onAdminLogout={handleAdminLogout}
-          onAdminReleaseLock={handleAdminReleaseLock}
+          onChangePassword={handleChangePassword}
+          onAdminCreateDepartment={handleAdminCreateDepartment}
+          onAdminDeleteDepartment={handleAdminDeleteDepartment}
+          onAdminResetPassword={handleAdminResetPassword}
         />
 
         {lockError && lockError.lockedBy && (
@@ -737,7 +839,38 @@
         )}
 
         <main className="main-container">
-          {!department ? null : (
+          {!department ? (
+            <div className="card" style={{ maxWidth: '520px', margin: '0 auto' }}>
+              <h2 className="card-title">Accesso reparto</h2>
+              <div className="form-group">
+                <label htmlFor="userNameAccess">Nome utente</label>
+                <input
+                  id="userNameAccess"
+                  type="text"
+                  value={pendingUserName}
+                  onChange={(e) => setPendingUserName(e.target.value)}
+                  onBlur={handleUserNameCommit}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
+                  placeholder="Inserisci nome"
+                />
+              </div>
+              {!adminToken && (
+                <button onClick={handleAdminLoginPrompt} className="btn-secondary btn-small" style={{ marginBottom: '1rem' }}>
+                  Accesso admin
+                </button>
+              )}
+              {DepartmentSelector && (
+                <DepartmentSelector
+                  userName={userName}
+                  department={department}
+                  onDepartmentChange={handleDepartmentChange}
+                  adminToken={adminToken}
+                  lockInfo={lockInfo}
+                  onAdminReleaseLock={handleAdminReleaseLock}
+                />
+              )}
+            </div>
+          ) : (
             <>
               {departmentValidationErrors.length > 0 && (
                 <div className="card" style={{ marginBottom: '1rem' }}>
@@ -811,6 +944,24 @@
                       >
                         Nuovo Progetto
                       </button>
+                      {!showProjectForm && projectDraft && (
+                        <button
+                          onClick={handleResumeProjectForm}
+                          className="btn-secondary"
+                          disabled={readOnlyDepartment || isSavingProject}
+                        >
+                          Riprendi modifica
+                        </button>
+                      )}
+                      {!showProjectForm && projectDraft && (
+                        <button
+                          onClick={handleDiscardProjectDraft}
+                          className="btn-secondary"
+                          disabled={readOnlyDepartment || isSavingProject}
+                        >
+                          Scarta bozza
+                        </button>
+                      )}
                       {showProjectForm && (
                         <button
                           onClick={() => projectDraft && handleSaveProject(projectDraft)}
@@ -835,7 +986,7 @@
                           className="btn-secondary"
                           disabled={isSavingProject}
                         >
-                          Annulla
+                          Torna indietro
                         </button>
                       )}
                     </div>
