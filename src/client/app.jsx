@@ -418,6 +418,23 @@
       }
     };
 
+    const handleChangePassword = async ({ oldPassword, newPassword }) => {
+      if (!department) return false;
+
+      try {
+        await api.changePassword(department, oldPassword, newPassword);
+        if (userName) {
+          storage.removePassword(userName, department);
+        }
+        alert('Password aggiornata. Effettua nuovamente l’accesso al reparto.');
+        await handleDepartmentChange(null);
+        return true;
+      } catch (err) {
+        alert(err.message || 'Cambio password fallito');
+        return false;
+      }
+    };
+
     const handleEnableLock = () => {
       if (!department) return;
       if (!effectiveUserName) {
@@ -770,6 +787,7 @@
           onAdminLogin={handleAdminLogin}
           onAdminLogout={handleAdminLogout}
           onAdminReleaseLock={handleAdminReleaseLock}
+          onChangePassword={handleChangePassword}
         />
 
         {lockError && lockError.lockedBy && (

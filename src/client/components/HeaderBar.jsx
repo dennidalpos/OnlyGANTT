@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  const { useState, useEffect } = React;
+  const { useState, useEffect, useRef } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -29,7 +29,8 @@
     adminToken,
     onAdminLogin,
     onAdminLogout,
-    onAdminReleaseLock
+    onAdminReleaseLock,
+    onChangePassword
   }) {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [showAdmin, setShowAdmin] = useState(false);
@@ -38,6 +39,14 @@
     const [adminError, setAdminError] = useState('');
     const [adminLoading, setAdminLoading] = useState(false);
     const [pendingUserName, setPendingUserName] = useState(userName);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [showPasswordPanel, setShowPasswordPanel] = useState(false);
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const menuRef = useRef(null);
+    const menuButtonRef = useRef(null);
 
     // Update clock every second
     useEffect(() => {
@@ -52,8 +61,30 @@
       setPendingUserName(userName);
     }, [userName]);
 
-    const timeString = currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const dateString = currentTime.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' });
+    useEffect(() => {
+      if (!menuOpen) return;
+
+      const handleClickOutside = (event) => {
+        if (menuRef.current?.contains(event.target)) return;
+        if (menuButtonRef.current?.contains(event.target)) return;
+        setMenuOpen(false);
+      };
+
+      const handleEscape = (event) => {
+        if (event.key === 'Escape') {
+          setMenuOpen(false);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }, [menuOpen]);
+
+    const timeString = currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
     const DepartmentSelector = window.OnlyGantt.components.DepartmentSelector;
 
     const handleUserNameCommit = async () => {
@@ -62,6 +93,13 @@
       if (!ok) {
         setPendingUserName(userName);
       }
+    };
+
+    const handleMenuAction = (action) => {
+      if (action) {
+        action();
+      }
+      setMenuOpen(false);
     };
 
     const handleAdminSubmit = async () => {
@@ -84,200 +122,268 @@
       }
     };
 
+    const handlePasswordSubmit = async () => {
+      if (!department) return;
+      if (!newPassword.trim()) {
+        setPasswordError('Inserisci una nuova password');
+        return;
+      }
+
+      setPasswordError('');
+      setPasswordLoading(true);
+
+      try {
+        const ok = await onChangePassword({
+          oldPassword,
+          newPassword
+        });
+
+        if (ok) {
+          setOldPassword('');
+          setNewPassword('');
+          setShowPasswordPanel(false);
+        }
+      } catch (err) {
+        setPasswordError(err.message || 'Cambio password fallito');
+      } finally {
+        setPasswordLoading(false);
+      }
+    };
+
     return (
       <header className="app-header">
-        <div className="header-grid">
+        <div className="header-compact">
           <div className="header-left">
-            <h1 className="app-title">OnlyGANTT</h1>
-
-            <div className="header-sections">
-              <div className="header-section header-section-department">
-                <div className="header-section-title">Reparto corrente</div>
-                <div className="header-section-content">
-                  <div className="header-department">
-                    {DepartmentSelector && (
-                      <DepartmentSelector
-                        userName={userName}
-                        department={department}
-                        onDepartmentChange={onDepartmentChange}
-                        adminToken={adminToken}
-                        lockInfo={lockInfo}
-                        onAdminReleaseLock={onAdminReleaseLock}
-                        compact
-                      />
-                    )}
-                  </div>
-                  {adminToken && (
-                    <div className="header-import-export">
-                      <button
-                        onClick={onExportDepartment}
-                        className="btn-secondary btn-small header-button"
-                        disabled={!canImportExport}
-                        title="Export reparto completo (progetti + configurazione)"
-                      >
-                        Export Reparto
-                      </button>
-                      <label className={`btn-secondary btn-small header-button ${!canImportExport ? 'disabled' : ''}`} style={{ cursor: canImportExport ? 'pointer' : 'not-allowed', margin: 0 }}>
-                        Import Reparto
-                        <input
-                          type="file"
-                          accept=".json"
-                          onChange={(e) => {
-                            if (!canImportExport) return;
-                            const file = e.target.files[0];
-                            if (file) {
-                              onImportDepartment(file);
-                              e.target.value = '';
-                            }
-                          }}
-                          style={{ display: 'none' }}
-                          disabled={!canImportExport}
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {!adminToken && (
-                <div className="header-section">
-                  <div className="header-section-title">Nome utente</div>
-                  <div className="header-section-content header-user-section">
-                    <div className="form-group mb-0" style={{ width: '180px' }}>
-                      <label htmlFor="userName">Nome utente</label>
-                      <input
-                        id="userName"
-                        type="text"
-                        value={pendingUserName}
-                        onChange={(e) => setPendingUserName(e.target.value)}
-                        onBlur={handleUserNameCommit}
-                        onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
-                        placeholder="Inserisci nome"
-                      />
-                    </div>
-
-                    <div className="header-user-actions">
-                      {readOnlyDepartment ? (
-                        lockEnabled ? (
-                          lockInfo && lockInfo.locked ? (
-                            <span className="badge badge-error">
-                              Locked by {lockInfo.lockedBy}
-                            </span>
-                          ) : (
-                            <span className="badge badge-warning">Read-Only</span>
-                          )
-                        ) : (
-                          <div className="header-lock-group">
-                            <span className="badge badge-secondary">Lock disattivo</span>
-                            <button onClick={onEnableLock} className="btn-small btn-success header-button">
-                              Modifica reparto
-                            </button>
-                          </div>
-                        )
-                      ) : isLocked ? (
-                        <div className="header-lock-group">
-                          <span className="badge badge-success">Lock attivo</span>
-                          <button onClick={onReleaseLock} className="btn-small btn-secondary header-button">
-                            Rilascia lock
-                          </button>
-                        </div>
-                      ) : lockInfo && lockInfo.locked ? (
-                        <span className="badge badge-error">
-                          Locked by {lockInfo.lockedBy}
-                        </span>
-                      ) : (
-                        <span className="badge badge-secondary">No lock</span>
-                      )}
-
-                      <button onClick={onUserLogout} className="btn-secondary btn-small header-button">
-                        Logout
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="header-summary">
+              <span>
+                <strong>Reparto:</strong> {department || '—'}
+              </span>
+              <span className="header-summary-sep">|</span>
+              <span>
+                <strong>Utente:</strong> {userName || '—'}
+              </span>
             </div>
           </div>
 
-          <div className="header-right">
-            <div className="header-section header-admin-group">
-              <div className="header-section-title">Accesso admin</div>
-              <div className="header-section-content header-admin-actions">
-                <button
-                  onClick={() => setShowAdmin((prev) => !prev)}
-                  className={adminToken ? 'btn-success header-button' : 'btn-secondary header-button'}
-                >
-                  {adminToken ? 'Admin attivo' : 'Accesso Admin'}
-                </button>
+          <div className="header-center" />
 
-                {adminToken && (
-                  <>
-                    <button
-                      onClick={onAdminLogout}
-                      className="btn-secondary btn-small header-button"
-                    >
-                      Logout admin
-                    </button>
-                  </>
-                )}
-              </div>
+          <div className="header-right header-actions">
+            {adminToken && <span className="badge badge-success">Admin attivo</span>}
+            <span className="header-time">⏱ {timeString}</span>
+            <button
+              ref={menuButtonRef}
+              className="header-menu-button"
+              onClick={() => setMenuOpen(prev => !prev)}
+              aria-label="Apri menu"
+            >
+              ☰
+            </button>
 
-              {showAdmin && (
-                <div className="admin-panel">
-                  {adminToken ? (
-                    <div className="admin-panel-row">
-                      <span className="badge badge-success">Sessione admin attiva</span>
-                      <div className="header-admin-tools">
-                        <span className="text-muted">Strumenti admin attivi.</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="form-group">
-                        <label>ID Admin</label>
-                        <input
-                          type="text"
-                          value={adminId}
-                          onChange={(e) => setAdminId(e.target.value)}
-                          placeholder="admin"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Password</label>
-                        <input
-                          type="password"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAdminSubmit()}
-                        />
-                      </div>
-                      {adminError && (
-                        <div className="alert-item">{adminError}</div>
-                      )}
-                      <button
-                        onClick={handleAdminSubmit}
-                        className="btn-success header-button"
-                        disabled={adminLoading}
-                      >
-                        {adminLoading ? 'Accesso...' : 'Entra'}
-                      </button>
-                    </>
+            {menuOpen && (
+              <div ref={menuRef} className="header-menu-panel">
+                <div className="header-menu-section">
+                  <div className="header-menu-title">Accesso</div>
+                  <div className="form-group">
+                    <label htmlFor="menuUserName">Utente</label>
+                    <input
+                      id="menuUserName"
+                      type="text"
+                      value={pendingUserName}
+                      onChange={(e) => setPendingUserName(e.target.value)}
+                      onBlur={handleUserNameCommit}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
+                      placeholder="Inserisci nome"
+                    />
+                  </div>
+                  {DepartmentSelector && (
+                    <DepartmentSelector
+                      userName={userName}
+                      department={department}
+                      onDepartmentChange={onDepartmentChange}
+                      adminToken={adminToken}
+                      lockInfo={lockInfo}
+                      onAdminReleaseLock={onAdminReleaseLock}
+                      compact
+                    />
                   )}
                 </div>
-              )}
-            </div>
-            <div className="header-datetime">
-              <label className={`checkbox-label header-screensaver-toggle${screensaverEnabled ? ' is-active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={screensaverEnabled}
-                  onChange={(e) => onScreensaverToggle(e.target.checked)}
-                />
-                Screensaver
-              </label>
-              <span className="datetime-time">{timeString}</span>
-              <span className="datetime-date">{dateString}</span>
-            </div>
+
+                <div className="header-menu-section">
+                  <div className="header-menu-title">Azioni reparto</div>
+                  <div className="header-menu-row">
+                    <button
+                      onClick={() => handleMenuAction(() => onDepartmentChange(null))}
+                      className="btn-secondary btn-small"
+                      disabled={!department}
+                    >
+                      Cambia reparto
+                    </button>
+                    <button
+                      onClick={() => handleMenuAction(onEnableLock)}
+                      className="btn-secondary btn-small"
+                      disabled={!department || lockEnabled}
+                    >
+                      Modifica reparto
+                    </button>
+                  </div>
+                  <div className="header-menu-row">
+                    <button
+                      onClick={() => setShowPasswordPanel(prev => !prev)}
+                      className="btn-secondary btn-small"
+                      disabled={!department || readOnlyDepartment}
+                    >
+                      Cambia password
+                    </button>
+                  </div>
+
+                  {showPasswordPanel && (
+                    <div className="header-menu-subpanel">
+                      <div className="form-group">
+                        <label>Vecchia password</label>
+                        <input
+                          type="password"
+                          value={oldPassword}
+                          onChange={(e) => setOldPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Nuova password</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                        />
+                      </div>
+                      {passwordError && <div className="alert-item">{passwordError}</div>}
+                      <div className="header-menu-row">
+                        <button
+                          onClick={handlePasswordSubmit}
+                          className="btn-success btn-small"
+                          disabled={passwordLoading}
+                        >
+                          {passwordLoading ? 'Salvataggio...' : 'Conferma'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowPasswordPanel(false);
+                            setOldPassword('');
+                            setNewPassword('');
+                            setPasswordError('');
+                          }}
+                          className="btn-secondary btn-small"
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="header-menu-row">
+                    <button
+                      onClick={() => handleMenuAction(onExportDepartment)}
+                      className="btn-secondary btn-small"
+                      disabled={!canImportExport}
+                    >
+                      Export
+                    </button>
+                    <label className={`btn-secondary btn-small ${!canImportExport ? 'disabled' : ''}`} style={{ cursor: canImportExport ? 'pointer' : 'not-allowed', margin: 0 }}>
+                      Import
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={(e) => {
+                          if (!canImportExport) return;
+                          const file = e.target.files[0];
+                          if (file) {
+                            onImportDepartment(file);
+                            e.target.value = '';
+                          }
+                        }}
+                        style={{ display: 'none' }}
+                        disabled={!canImportExport}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="header-menu-section">
+                  <div className="header-menu-title">Preferenze</div>
+                  <label className="checkbox-label compact">
+                    <input
+                      type="checkbox"
+                      checked={screensaverEnabled}
+                      onChange={(e) => onScreensaverToggle(e.target.checked)}
+                    />
+                    Screensaver
+                  </label>
+                </div>
+
+                <div className="header-menu-section">
+                  <div className="header-menu-title">Admin</div>
+                  <div className="header-menu-row">
+                    <button
+                      onClick={() => setShowAdmin((prev) => !prev)}
+                      className={adminToken ? 'btn-success btn-small' : 'btn-secondary btn-small'}
+                    >
+                      {adminToken ? 'Admin attivo' : 'Accesso admin'}
+                    </button>
+                    {adminToken && (
+                      <button
+                        onClick={() => handleMenuAction(onAdminLogout)}
+                        className="btn-secondary btn-small"
+                      >
+                        Logout admin
+                      </button>
+                    )}
+                  </div>
+
+                  {showAdmin && (
+                    <div className="header-menu-subpanel">
+                      {adminToken ? (
+                        <span className="badge badge-success">Sessione admin attiva</span>
+                      ) : (
+                        <>
+                          <div className="form-group">
+                            <label>ID Admin</label>
+                            <input
+                              type="text"
+                              value={adminId}
+                              onChange={(e) => setAdminId(e.target.value)}
+                              placeholder="admin"
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label>Password</label>
+                            <input
+                              type="password"
+                              value={adminPassword}
+                              onChange={(e) => setAdminPassword(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleAdminSubmit()}
+                            />
+                          </div>
+                          {adminError && (
+                            <div className="alert-item">{adminError}</div>
+                          )}
+                          <button
+                            onClick={handleAdminSubmit}
+                            className="btn-success btn-small"
+                            disabled={adminLoading}
+                          >
+                            {adminLoading ? 'Accesso...' : 'Entra'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="header-menu-section">
+                      <button onClick={() => handleMenuAction(onUserLogout)} className="btn-secondary btn-small">
+                        Logout
+                      </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
