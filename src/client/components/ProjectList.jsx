@@ -28,18 +28,33 @@
     onFocusHandled
   }) {
     const [expandedProjects, setExpandedProjects] = useState(new Set());
+    const [highlightedProjectId, setHighlightedProjectId] = useState(null);
     const projectRefs = useRef({});
+    const highlightTimerRef = useRef(null);
 
     useEffect(() => {
       if (!focusedProjectId) return;
       const target = projectRefs.current[focusedProjectId];
       if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedProjectId(focusedProjectId);
+        if (highlightTimerRef.current) {
+          clearTimeout(highlightTimerRef.current);
+        }
+        highlightTimerRef.current = setTimeout(() => {
+          setHighlightedProjectId(null);
+        }, 5000);
       }
       if (onFocusHandled) {
         onFocusHandled();
       }
     }, [focusedProjectId, onFocusHandled]);
+
+    useEffect(() => () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    }, []);
 
     const toggleExpand = (projectId) => {
       const newExpanded = new Set(expandedProjects);
@@ -154,7 +169,7 @@
                       projectRefs.current[project.id] = el;
                     }
                   }}
-                  className={`project-item${severityClass}`}
+                  className={`project-item${severityClass}${highlightedProjectId === project.id ? ' project-item-highlight' : ''}`}
                 >
                   <div className="project-header">
                     <div>
