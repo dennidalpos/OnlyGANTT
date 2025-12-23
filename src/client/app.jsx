@@ -64,6 +64,7 @@
     // Department state
     const [department, setDepartment] = useState(null);
     const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
+    const [lockEnabled, setLockEnabled] = useState(false);
 
     // Screensaver state
     const [screensaverEnabled, setScreensaverEnabled] = useState(false);
@@ -98,13 +99,14 @@
     const [isSavingProject, setIsSavingProject] = useState(false);
     const [hasDraftChanges, setHasDraftChanges] = useState(false);
     const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
+    const [focusedPhaseId, setFocusedPhaseId] = useState(null);
 
     // Admin state
     const [adminToken, setAdminToken] = useState(null);
 
     // Lock
     const effectiveUserName = adminToken ? (userName || 'admin') : userName;
-    const shouldUseLock = !!department;
+    const shouldUseLock = !!department && lockEnabled;
     const { lockInfo, isLocked, error: lockError, releaseLock, refreshLock } = useDepartmentLock(
       department,
       effectiveUserName,
@@ -114,12 +116,12 @@
     // Determine if department is read-only
     useEffect(() => {
       if (department) {
-        const isReadOnly = shouldUseLock && !isLocked;
+        const isReadOnly = !lockEnabled || (shouldUseLock && !isLocked);
         setReadOnlyDepartment(isReadOnly);
       } else {
         setReadOnlyDepartment(false);
       }
-    }, [department, shouldUseLock, isLocked]);
+    }, [department, shouldUseLock, isLocked, lockEnabled]);
 
     // Projects data
     const {
@@ -298,10 +300,12 @@
       }
 
       setDepartment(newDepartment);
+      setLockEnabled(false);
       setEditingProject(null);
       setShowProjectForm(false);
       setSelectedProjectIds(new Set());
       setDepartmentValidationErrors([]);
+      setFocusedPhaseId(null);
     };
 
     const getGridFilterDefaults = (mode) => {
@@ -360,6 +364,7 @@
       if (!adminToken) return;
       try {
         await releaseLock();
+        setLockEnabled(false);
       } catch (err) {
         // Ignore release errors
       }
@@ -377,6 +382,31 @@
       } catch (err) {
         alert(`Errore durante lo sblocco: ${err.message}`);
       }
+    };
+
+    const handleEnableLock = () => {
+      if (!department) return;
+      if (!effectiveUserName) {
+        alert('Inserisci il tuo nome');
+        return;
+      }
+      setLockEnabled(true);
+    };
+
+    const handleDisableLock = async () => {
+      try {
+        await releaseLock();
+      } finally {
+        setLockEnabled(false);
+      }
+    };
+
+    const handleGanttPhaseContextMenu = (project, phase) => {
+      if (!project || !phase) return;
+      setEditingProject(project);
+      setProjectDraft(project);
+      setShowProjectForm(true);
+      setFocusedPhaseId(phase.id);
     };
 
     const handleExportPNG = () => {
@@ -406,6 +436,7 @@
       setEditingProject(null);
       setProjectDraft(draft);
       setShowProjectForm(true);
+      setFocusedPhaseId(null);
     };
 
     const handleEditProject = (project) => {
@@ -413,6 +444,7 @@
       setEditingProject(project);
       setProjectDraft(project);
       setShowProjectForm(true);
+      setFocusedPhaseId(null);
     };
 
     const handleSaveProject = async (projectData, { keepEditing } = {}) => {
@@ -473,6 +505,7 @@
       setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
+      setFocusedPhaseId(null);
     };
 
     const handleDeleteProject = async (projectId) => {
@@ -553,10 +586,12 @@
       }
 
       setDepartment(null);
+      setLockEnabled(false);
       setEditingProject(null);
       setShowProjectForm(false);
       setSelectedProjectIds(new Set());
       setUserName('');
+      setFocusedPhaseId(null);
     };
 
     const handleImportJSON = async (file) => {
@@ -680,7 +715,9 @@
           onScreensaverToggle={setScreensaverEnabled}
           lockInfo={lockInfo}
           isLocked={isLocked}
-          onReleaseLock={releaseLock}
+          lockEnabled={lockEnabled}
+          onEnableLock={handleEnableLock}
+          onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
           onExportDepartment={handleExportDepartment}
           onImportDepartment={handleImportDepartment}
@@ -744,6 +781,7 @@
                         filters={filters}
                         scrollToTodayTrigger={scrollToTodayTrigger}
                         refreshTrigger={ganttRefreshTrigger}
+                        onPhaseContextMenu={handleGanttPhaseContextMenu}
                       />
                     )}
                   </div>
@@ -815,6 +853,7 @@
                         readOnly={readOnlyDepartment}
                         isSaving={isSavingProject}
                         onDraftChange={setProjectDraft}
+                        focusedPhaseId={focusedPhaseId}
                       />
                     </div>
                   )}

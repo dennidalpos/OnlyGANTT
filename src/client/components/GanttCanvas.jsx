@@ -18,7 +18,8 @@
     projects,
     filters,
     scrollToTodayTrigger,
-    refreshTrigger
+    refreshTrigger,
+    onPhaseContextMenu
   }) {
     const canvasRef = useRef(null);
     const wrapperRef = useRef(null);
@@ -292,6 +293,24 @@
       setTooltip(null);
     }, []);
 
+    const handleContextMenu = useCallback((e) => {
+      if (!layout) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const hit = gantt.hitTest(mouseX, mouseY, layout);
+
+      if (hit && hit.type === 'phase') {
+        e.preventDefault();
+        if (onPhaseContextMenu) {
+          onPhaseContextMenu(hit.project, hit.phase);
+        }
+      }
+    }, [layout, onPhaseContextMenu]);
+
     const isScrollable = viewMode === '4months';
 
     return (
@@ -315,6 +334,7 @@
               className="gantt-canvas"
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
+              onContextMenu={handleContextMenu}
             />
           </div>
         </div>

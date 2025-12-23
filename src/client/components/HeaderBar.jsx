@@ -18,6 +18,8 @@
     onScreensaverToggle,
     lockInfo,
     isLocked,
+    lockEnabled,
+    onEnableLock,
     onReleaseLock,
     onUserLogout,
     onExportDepartment,
@@ -139,7 +141,22 @@
 
                     <div className="header-user-actions">
                       {readOnlyDepartment ? (
-                        <span className="badge badge-warning">Read-Only</span>
+                        lockEnabled ? (
+                          lockInfo && lockInfo.locked ? (
+                            <span className="badge badge-error">
+                              Locked by {lockInfo.lockedBy}
+                            </span>
+                          ) : (
+                            <span className="badge badge-warning">Read-Only</span>
+                          )
+                        ) : (
+                          <div className="header-lock-group">
+                            <span className="badge badge-secondary">Lock disattivo</span>
+                            <button onClick={onEnableLock} className="btn-small btn-success header-button">
+                              Modifica reparto
+                            </button>
+                          </div>
+                        )
                       ) : isLocked ? (
                         <div className="header-lock-group">
                           <span className="badge badge-success">Lock attivo</span>
