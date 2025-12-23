@@ -62,6 +62,10 @@
     // User state
     const [userName, setUserName] = useState(storage.getCurrentUser() || '');
     const [pendingUserName, setPendingUserName] = useState(storage.getCurrentUser() || '');
+    const [loginMode, setLoginMode] = useState('user');
+    const [loginError, setLoginError] = useState('');
+    const [adminCredentials, setAdminCredentials] = useState({ userId: '', password: '' });
+    const [notifications, setNotifications] = useState([]);
 
     // Department state
     const [department, setDepartment] = useState(null);
@@ -154,6 +158,16 @@
     };
 
     const emptyProjectTemplateRef = useRef(stripProjectIds(logic.createNewProject()));
+
+    const pushNotification = ({ type = 'info', message, title }) => {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      setNotifications(prev => [...prev, { id, type, message, title }]);
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(item => item.id !== id));
+      }, 5000);
+    };
+
+    const isValidUserName = (name) => Boolean(name && name.trim().length >= 2);
 
     // Effect: save userName to localStorage
     useEffect(() => {
@@ -279,7 +293,7 @@
           refreshGantt();
           return true;
         } catch (err) {
-          alert(`Errore durante il salvataggio: ${err.message}`);
+          pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
           return false;
         }
       }
@@ -377,6 +391,7 @@
       setFocusedProjectId(null);
       setAdminToken(nextAdminToken);
       setUserName(nextUserName);
+      setLoginError('');
     };
 
     const handleUserNameChange = async (nextUserName) => {
@@ -395,17 +410,26 @@
 
       await resetSessionState({ nextUserName: '', nextAdminToken: null });
 
-      const result = await api.adminLogin(adminId, password);
-      setAdminToken(result.token);
-      setUserName(adminId);
+      try {
+        const result = await api.adminLogin(adminId, password);
+        setAdminToken(result.token);
+        setUserName(adminId);
+        setLoginMode('user');
+        setAdminCredentials({ userId: '', password: '' });
+        setLoginError('');
+        pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
+      } catch (err) {
+        setLoginError(err.message || 'Credenziali admin non valide');
+        pushNotification({ type: 'error', message: err.message || 'Credenziali admin non valide' });
+      }
     };
 
-    const handleAdminLoginPrompt = async () => {
-      const adminId = prompt('ID Admin');
-      if (adminId === null || !adminId.trim()) return;
-      const password = prompt('Password');
-      if (password === null) return;
-      await handleAdminLogin(adminId, password);
+    const handleAdminLoginSubmit = async () => {
+      if (!adminCredentials.userId.trim() || !adminCredentials.password) {
+        setLoginError('Inserisci credenziali admin valide');
+        return;
+      }
+      await handleAdminLogin(adminCredentials.userId.trim(), adminCredentials.password);
     };
 
     const handleAdminReleaseLock = async () => {
@@ -413,8 +437,9 @@
       try {
         await api.adminReleaseLock(department, adminToken);
         refreshLock();
+        pushNotification({ type: 'success', message: 'Lock rilasciato' });
       } catch (err) {
-        alert(`Errore durante lo sblocco: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante lo sblocco: ${err.message}` });
       }
     };
 
@@ -425,8 +450,9 @@
         if (password) {
           await api.resetPassword(name, password, adminToken);
         }
+        pushNotification({ type: 'success', message: 'Reparto creato con successo' });
       } catch (err) {
-        alert(err.message || 'Creazione reparto fallita');
+        pushNotification({ type: 'error', message: err.message || 'Creazione reparto fallita' });
       }
     };
 
@@ -437,8 +463,9 @@
         if (department === targetDepartment) {
           await handleDepartmentChange(null);
         }
+        pushNotification({ type: 'success', message: 'Reparto eliminato' });
       } catch (err) {
-        alert(err.message || 'Eliminazione reparto fallita');
+        pushNotification({ type: 'error', message: err.message || 'Eliminazione reparto fallita' });
       }
     };
 
@@ -446,9 +473,9 @@
       if (!adminToken || !targetDepartment) return;
       try {
         await api.resetPassword(targetDepartment, newPassword, adminToken);
-        alert('Password reparto aggiornata');
+        pushNotification({ type: 'success', message: 'Password reparto aggiornata' });
       } catch (err) {
-        alert(err.message || 'Reset password fallito');
+        pushNotification({ type: 'error', message: err.message || 'Reset password fallito' });
       }
     };
 
@@ -468,11 +495,11 @@
         if (userName) {
           storage.removePassword(userName, department);
         }
-        alert('Password aggiornata. Effettua nuovamente l’accesso al reparto.');
+        pushNotification({ type: 'success', message: 'Password aggiornata. Effettua nuovamente l’accesso al reparto.' });
         await handleDepartmentChange(null);
         return true;
       } catch (err) {
-        alert(err.message || 'Cambio password fallito');
+        pushNotification({ type: 'error', message: err.message || 'Cambio password fallito' });
         return false;
       }
     };
@@ -480,7 +507,7 @@
     const handleEnableLock = () => {
       if (!department) return;
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
       setLockEnabled(true);
@@ -557,7 +584,7 @@
       if (readOnlyDepartment || isSavingProject) return false;
 
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return false;
       }
 
@@ -587,7 +614,7 @@
         await saveProjects(effectiveUserName, newProjects);
         saveOk = true;
       } catch (err) {
-        alert(`Errore durante il salvataggio: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
       } finally {
         setIsSavingProject(false);
       }
@@ -627,7 +654,7 @@
       if (readOnlyDepartment || isSavingProject) return;
 
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
 
@@ -654,7 +681,7 @@
       try {
         await saveProjects(effectiveUserName, newProjects);
       } catch (err) {
-        alert(`Errore durante l'eliminazione: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante l'eliminazione: ${err.message}` });
         await loadProjects();
       } finally {
         setIsSavingProject(false);
@@ -665,7 +692,7 @@
       if (readOnlyDepartment || isSavingProject) return;
 
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
 
@@ -673,9 +700,9 @@
         setIsSavingProject(true);
         await saveProjects(effectiveUserName, projects);
         refreshGantt();
-        alert('Progetti salvati con successo');
+        pushNotification({ type: 'success', message: 'Progetti salvati con successo' });
       } catch (err) {
-        alert(`Errore durante il salvataggio: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
       } finally {
         setIsSavingProject(false);
       }
@@ -700,19 +727,23 @@
       if (readOnlyDepartment) return;
 
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
 
       try {
+        if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
+          pushNotification({ type: 'error', message: 'Formato file non valido. Carica un file .json' });
+          return;
+        }
         await uploadJSON(file, effectiveUserName);
         setDepartmentValidationErrors([]);
-        alert('Import completato con successo');
+        pushNotification({ type: 'success', message: 'Import completato con successo' });
       } catch (err) {
         if (err.details?.errors) {
           setDepartmentValidationErrors(err.details.errors);
         }
-        alert(`Errore durante l'import: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante l'import: ${err.message}` });
       }
     };
 
@@ -726,6 +757,7 @@
       a.download = `progetti_${department}_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      pushNotification({ type: 'success', message: 'Export progetti completato' });
     };
 
     const readFileAsText = (file) => new Promise((resolve, reject) => {
@@ -751,21 +783,30 @@
         a.download = `reparto_${department}_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
+        pushNotification({ type: 'success', message: 'Export reparto completato' });
       } catch (err) {
-        alert(`Errore durante l'export reparto: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante l'export reparto: ${err.message}` });
       }
     };
 
     const handleImportDepartment = async (file) => {
       if (readOnlyDepartment || !department) return;
       if (!effectiveUserName) {
-        alert('Inserisci il tuo nome');
+        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
 
       try {
+        if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
+          pushNotification({ type: 'error', message: 'Formato file non valido. Carica un file .json' });
+          return;
+        }
         const rawText = await readFileAsText(file);
         const parsed = JSON.parse(rawText);
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
+          pushNotification({ type: 'error', message: 'Struttura file non valida: manca la lista progetti' });
+          return;
+        }
         const { errors, projects: fixedProjects } = logic.validateAndFixProjects(parsed.projects || []);
 
         if (errors.length > 0) {
@@ -773,7 +814,7 @@
             `Import reparto: rilevati ${errors.length} errori nei dati. Vuoi applicare il fix automatico per continuare?`
           );
           if (!confirmFix) {
-            alert('Import annullato: dati non corretti.');
+            pushNotification({ type: 'warning', message: 'Import annullato: dati non corretti.' });
             return;
           }
         }
@@ -786,12 +827,12 @@
         await api.importDepartment(department, payload, effectiveUserName);
         setDepartmentValidationErrors([]);
         await loadProjects();
-        alert('Import reparto completato con successo');
+        pushNotification({ type: 'success', message: 'Import reparto completato con successo' });
       } catch (err) {
         if (err.details?.errors) {
           setDepartmentValidationErrors(err.details.errors);
         }
-        alert(`Errore durante l'import reparto: ${err.message}`);
+        pushNotification({ type: 'error', message: `Errore durante l'import reparto: ${err.message}` });
       }
     };
 
@@ -840,25 +881,102 @@
 
         <main className="main-container">
           {!department ? (
-            <div className="card" style={{ maxWidth: '520px', margin: '0 auto' }}>
+            <div className="card auth-card" style={{ maxWidth: '560px', margin: '0 auto' }}>
               <h2 className="card-title">Accesso reparto</h2>
-              <div className="form-group">
-                <label htmlFor="userNameAccess">Nome utente</label>
-                <input
-                  id="userNameAccess"
-                  type="text"
-                  value={pendingUserName}
-                  onChange={(e) => setPendingUserName(e.target.value)}
-                  onBlur={handleUserNameCommit}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
-                  placeholder="Inserisci nome"
-                />
-              </div>
-              {!adminToken && (
-                <button onClick={handleAdminLoginPrompt} className="btn-secondary btn-small" style={{ marginBottom: '1rem' }}>
-                  Accesso admin
+              <div className="auth-tabs">
+                <button
+                  type="button"
+                  className={`auth-tab ${loginMode === 'user' ? 'active' : ''}`}
+                  onClick={() => {
+                    setLoginMode('user');
+                    setLoginError('');
+                  }}
+                >
+                  Login utente
                 </button>
+                <button
+                  type="button"
+                  className={`auth-tab ${loginMode === 'admin' ? 'active' : ''}`}
+                  onClick={() => {
+                    setLoginMode('admin');
+                    setLoginError('');
+                  }}
+                >
+                  Login admin
+                </button>
+              </div>
+
+              {loginError && (
+                <div className="alert-item" style={{ marginBottom: '1rem' }}>
+                  {loginError}
+                </div>
               )}
+
+              {loginMode === 'user' && (
+                <div className="card-section">
+                  <div className="form-group">
+                    <label htmlFor="userNameAccess">Nome utente</label>
+                    <input
+                      id="userNameAccess"
+                      type="text"
+                      value={pendingUserName}
+                      onChange={(e) => setPendingUserName(e.target.value)}
+                      onBlur={handleUserNameCommit}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
+                      placeholder="Inserisci nome"
+                    />
+                    {!isValidUserName(pendingUserName) && pendingUserName && (
+                      <div className="text-muted text-small" style={{ marginTop: '0.25rem' }}>
+                        Inserisci almeno 2 caratteri.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {loginMode === 'admin' && !adminToken && (
+                <div className="card-section">
+                  <div className="form-group">
+                    <label htmlFor="adminId">ID Admin</label>
+                    <input
+                      id="adminId"
+                      type="text"
+                      value={adminCredentials.userId}
+                      onChange={(e) => setAdminCredentials(prev => ({ ...prev, userId: e.target.value }))}
+                      placeholder="Inserisci ID admin"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="adminPassword">Password Admin</label>
+                    <input
+                      id="adminPassword"
+                      type="password"
+                      value={adminCredentials.password}
+                      onChange={(e) => setAdminCredentials(prev => ({ ...prev, password: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAdminLoginSubmit()}
+                      placeholder="Inserisci password"
+                    />
+                  </div>
+                  <div className="button-group">
+                    <button
+                      type="button"
+                      className="btn-success"
+                      onClick={handleAdminLoginSubmit}
+                    >
+                      Accedi come admin
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {adminToken && (
+                <div className="card-section">
+                  <div className="alert-item info">
+                    Admin autenticato. Seleziona un reparto per procedere.
+                  </div>
+                </div>
+              )}
+
               {DepartmentSelector && (
                 <DepartmentSelector
                   userName={userName}
@@ -1033,6 +1151,25 @@
             </>
           )}
         </main>
+
+        {notifications.length > 0 && (
+          <div className="notification-container" role="status" aria-live="polite">
+            {notifications.map(item => (
+              <div key={item.id} className={`notification notification-${item.type}`}>
+                {item.title && <div className="notification-title">{item.title}</div>}
+                <div>{item.message}</div>
+                <button
+                  type="button"
+                  className="notification-close"
+                  onClick={() => setNotifications(prev => prev.filter(entry => entry.id !== item.id))}
+                  aria-label="Chiudi notifica"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {showScreensaver && (
           <div className="screensaver-overlay">

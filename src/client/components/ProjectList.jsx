@@ -11,7 +11,6 @@
 
   const logic = window.OnlyGantt.logic;
   const config = window.AppConfig;
-  const dateUtils = window.OnlyGantt.dateUtils;
 
   function ProjectList({
     projects,
@@ -123,23 +122,27 @@
           </div>
 
           <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            {!readOnly && (
-              <label className="btn-secondary btn-small" style={{ cursor: 'pointer', margin: 0 }}>
-                Importa progetti
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      onImportJSON(file);
-                      e.target.value = '';
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            )}
+            <label
+              className={`btn-secondary btn-small ${readOnly ? 'btn-disabled' : ''}`}
+              style={{ cursor: readOnly ? 'not-allowed' : 'pointer', margin: 0 }}
+              aria-disabled={readOnly}
+            >
+              Importa progetti
+              <input
+                type="file"
+                accept=".json"
+                onChange={(e) => {
+                  if (readOnly) return;
+                  const file = e.target.files[0];
+                  if (file) {
+                    onImportJSON(file);
+                    e.target.value = '';
+                  }
+                }}
+                style={{ display: 'none' }}
+                disabled={readOnly}
+              />
+            </label>
             <button onClick={onExportJSON} className="btn-secondary btn-small">
               Export Progetti
             </button>

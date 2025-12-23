@@ -65,21 +65,30 @@
       }
     }, [selectedDept, userName]);
 
+    const isUserNameValid = adminToken || (userName && userName.trim().length >= 2);
+    const selectedDeptObj = departments.find(d => d.name === selectedDept);
+    const activeDeptObj = departments.find(d => d.name === department);
+    const hasDepartments = departments.length > 0;
+    const canOpenDepartment = Boolean(selectedDeptObj) && isUserNameValid && !adminActionLoading;
+
     const handleSelectDepartment = async () => {
       if (!selectedDept) {
         setError('Seleziona un reparto');
         return;
       }
 
-      if (!adminToken && !userName) {
-        setError('Inserisci il tuo nome');
+      if (!isUserNameValid) {
+        setError('Inserisci un nome utente valido');
         return;
       }
 
       setError('');
 
-      const dept = departments.find(d => d.name === selectedDept);
-      if (!dept) return;
+      const dept = selectedDeptObj;
+      if (!dept) {
+        setError('Il reparto selezionato non è disponibile');
+        return;
+      }
 
       if (adminToken) {
         onDepartmentChange(selectedDept);
@@ -222,8 +231,6 @@
       }
     };
 
-    const selectedDeptObj = departments.find(d => d.name === selectedDept);
-    const activeDeptObj = departments.find(d => d.name === department);
     const lockStatusLabel = lockInfo?.locked ? 'Bloccato' : 'Sbloccato';
     const lockStatusBadge = lockInfo?.locked ? 'badge-warning' : 'badge-success';
 
@@ -244,6 +251,7 @@
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
+                disabled={!hasDepartments}
               >
                 <option value="">-- Seleziona --</option>
                 {departments.map(d => (
@@ -252,6 +260,11 @@
                   </option>
                 ))}
               </select>
+              {!hasDepartments && (
+                <div className="text-muted text-small" style={{ marginTop: '0.25rem' }}>
+                  Nessun reparto disponibile. Contatta un admin per crearne uno.
+                </div>
+              )}
             </div>
 
             {selectedDeptObj && selectedDeptObj.protected && !adminToken && (
@@ -266,7 +279,11 @@
               </div>
             )}
 
-            <button onClick={handleSelectDepartment} className="btn-success">
+            <button
+              onClick={handleSelectDepartment}
+              className="btn-success"
+              disabled={!canOpenDepartment || !hasDepartments}
+            >
               Apri Reparto
             </button>
 

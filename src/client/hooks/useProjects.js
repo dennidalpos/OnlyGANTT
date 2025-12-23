@@ -133,31 +133,30 @@
         throw new Error('Cannot upload in read-only mode');
       }
 
+      const rawText = await readFileAsText(file);
+      let parsedData;
       try {
-        const rawText = await readFileAsText(file);
-        let parsedData;
-        try {
-          parsedData = JSON.parse(rawText);
-        } catch (err) {
-          throw new Error('JSON non valido');
-        }
-
-        const { projects: fixedProjects, errors: fixErrors } = validateProjects(parsedData.projects || [], 'Import JSON');
-        const payload = {
-          ...parsedData,
-          projects: ensureIds(fixedProjects)
-        };
-
-        const fixedFile = new File([JSON.stringify(payload, null, 2)], file.name, { type: 'application/json' });
-
-        const result = await api.uploadJSON(department, fixedFile, userName);
-        setMeta(result.meta);
-        await loadProjects();
-        setValidationErrors(fixErrors);
-        return result;
+        parsedData = JSON.parse(rawText);
       } catch (err) {
-        throw err;
+        throw new Error('JSON non valido');
       }
+
+      const { projects: fixedProjects, errors: fixErrors } = validateProjects(parsedData.projects || [], 'Import JSON');
+      const payload = {
+        ...parsedData,
+        projects: ensureIds(fixedProjects)
+      };
+
+      const fixedFile = new File([JSON.stringify(payload, null, 2)], file.name, { type: 'application/json' });
+
+      const result = await api.uploadJSON(department, fixedFile, userName);
+      setMeta(result.meta);
+      await loadProjects();
+      setValidationErrors((previousErrors) => {
+        const existing = Array.isArray(previousErrors) ? previousErrors : [];
+        return Array.from(new Set([...existing, ...fixErrors]));
+      });
+      return result;
     }, [department, readOnly, loadProjects]);
 
     // Effect: load projects when department changes
