@@ -19,6 +19,7 @@
   const ProjectForm = window.OnlyGantt.components.ProjectForm;
   const ProjectList = window.OnlyGantt.components.ProjectList;
   const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
+  const DepartmentSelector = window.OnlyGantt.components.DepartmentSelector;
 
   // Hooks
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
@@ -60,6 +61,7 @@
   function App() {
     // User state
     const [userName, setUserName] = useState(storage.getCurrentUser() || '');
+    const [pendingUserName, setPendingUserName] = useState(storage.getCurrentUser() || '');
 
     // Department state
     const [department, setDepartment] = useState(null);
@@ -156,6 +158,10 @@
     // Effect: save userName to localStorage
     useEffect(() => {
       storage.setCurrentUser(userName);
+    }, [userName]);
+
+    useEffect(() => {
+      setPendingUserName(userName);
     }, [userName]);
 
     // Effect: select all projects in Gantt when department changes
@@ -394,18 +400,12 @@
       setUserName(adminId);
     };
 
-    const handleAdminLogout = async () => {
-      if (!adminToken) return;
-      const canProceed = await confirmPendingChanges('uscire');
-      if (!canProceed) return;
-
-      try {
-        await api.adminLogout(adminToken);
-      } catch (err) {
-        // Ignore admin logout errors
-      }
-
-      await resetSessionState({ nextUserName: '', nextAdminToken: null });
+    const handleAdminLoginPrompt = async () => {
+      const adminId = prompt('ID Admin');
+      if (adminId === null || !adminId.trim()) return;
+      const password = prompt('Password');
+      if (password === null) return;
+      await handleAdminLogin(adminId, password);
     };
 
     const handleAdminReleaseLock = async () => {
@@ -415,6 +415,14 @@
         refreshLock();
       } catch (err) {
         alert(`Errore durante lo sblocco: ${err.message}`);
+      }
+    };
+
+    const handleUserNameCommit = async () => {
+      if (pendingUserName === userName) return;
+      const ok = await handleUserNameChange(pendingUserName);
+      if (!ok) {
+        setPendingUserName(userName);
       }
     };
 
@@ -442,14 +450,6 @@
         return;
       }
       setLockEnabled(true);
-    };
-
-    const handleDisableLock = async () => {
-      try {
-        await releaseLock();
-      } finally {
-        setLockEnabled(false);
-      }
     };
 
     const handleGanttPhaseContextMenu = (project) => {
@@ -768,25 +768,16 @@
       <div>
         <HeaderBar
           userName={userName}
-          onUserNameChange={handleUserNameChange}
           department={department}
           onDepartmentChange={handleDepartmentChange}
-          screensaverEnabled={screensaverEnabled}
-          onScreensaverToggle={setScreensaverEnabled}
-          lockInfo={lockInfo}
-          isLocked={isLocked}
           lockEnabled={lockEnabled}
           onEnableLock={handleEnableLock}
-          onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
           onExportDepartment={handleExportDepartment}
           onImportDepartment={handleImportDepartment}
           canImportExport={!!department && (!!adminToken || !readOnlyDepartment)}
           readOnlyDepartment={readOnlyDepartment}
           adminToken={adminToken}
-          onAdminLogin={handleAdminLogin}
-          onAdminLogout={handleAdminLogout}
-          onAdminReleaseLock={handleAdminReleaseLock}
           onChangePassword={handleChangePassword}
         />
 
@@ -800,7 +791,38 @@
         )}
 
         <main className="main-container">
-          {!department ? null : (
+          {!department ? (
+            <div className="card" style={{ maxWidth: '520px', margin: '0 auto' }}>
+              <h2 className="card-title">Accesso reparto</h2>
+              <div className="form-group">
+                <label htmlFor="userNameAccess">Nome utente</label>
+                <input
+                  id="userNameAccess"
+                  type="text"
+                  value={pendingUserName}
+                  onChange={(e) => setPendingUserName(e.target.value)}
+                  onBlur={handleUserNameCommit}
+                  onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
+                  placeholder="Inserisci nome"
+                />
+              </div>
+              {!adminToken && (
+                <button onClick={handleAdminLoginPrompt} className="btn-secondary btn-small" style={{ marginBottom: '1rem' }}>
+                  Accesso admin
+                </button>
+              )}
+              {DepartmentSelector && (
+                <DepartmentSelector
+                  userName={userName}
+                  department={department}
+                  onDepartmentChange={handleDepartmentChange}
+                  adminToken={adminToken}
+                  lockInfo={lockInfo}
+                  onAdminReleaseLock={handleAdminReleaseLock}
+                />
+              )}
+            </div>
+          ) : (
             <>
               {departmentValidationErrors.length > 0 && (
                 <div className="card" style={{ marginBottom: '1rem' }}>
