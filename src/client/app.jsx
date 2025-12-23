@@ -1075,7 +1075,7 @@
                           Elimina progetto
                         </button>
                       )}
-                      {hasDraftChanges && (
+                      {showProjectForm && hasDraftChanges && (
                         <button
                           onClick={handleCancelProjectForm}
                           className="btn-secondary"
