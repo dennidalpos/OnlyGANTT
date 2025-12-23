@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  const { useState } = React;
+  const { useState, useEffect, useRef } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -23,9 +23,38 @@
     onExportJSON,
     validationErrors = [],
     readOnly,
-    isSaving
+    isSaving,
+    focusedProjectId,
+    onFocusHandled
   }) {
     const [expandedProjects, setExpandedProjects] = useState(new Set());
+    const [highlightedProjectId, setHighlightedProjectId] = useState(null);
+    const projectRefs = useRef({});
+    const highlightTimerRef = useRef(null);
+
+    useEffect(() => {
+      if (!focusedProjectId) return;
+      const target = projectRefs.current[focusedProjectId];
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedProjectId(focusedProjectId);
+        if (highlightTimerRef.current) {
+          clearTimeout(highlightTimerRef.current);
+        }
+        highlightTimerRef.current = setTimeout(() => {
+          setHighlightedProjectId(null);
+        }, 5000);
+      }
+      if (onFocusHandled) {
+        onFocusHandled();
+      }
+    }, [focusedProjectId, onFocusHandled]);
+
+    useEffect(() => () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+    }, []);
 
     const toggleExpand = (projectId) => {
       const newExpanded = new Set(expandedProjects);
@@ -133,7 +162,15 @@
               const isSelected = selectedProjectIds.has(project.id);
 
               return (
-                <div key={project.id} className={`project-item${severityClass}`}>
+                <div
+                  key={project.id}
+                  ref={(el) => {
+                    if (el) {
+                      projectRefs.current[project.id] = el;
+                    }
+                  }}
+                  className={`project-item${severityClass}${highlightedProjectId === project.id ? ' project-item-highlight' : ''}`}
+                >
                   <div className="project-header">
                     <div>
                       <h3 className="project-name">

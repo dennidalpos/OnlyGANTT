@@ -39,6 +39,7 @@
       }
     }, [project, onDraftChange]);
 
+
     if (!formData) return null;
 
     const updateFormData = (nextData) => {
