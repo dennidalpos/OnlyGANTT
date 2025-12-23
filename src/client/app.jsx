@@ -601,12 +601,6 @@
       updateProjects(newProjects);
       refreshGantt();
 
-      if (keepEditing) {
-        setEditingProject(projectData);
-        setProjectDraft(projectData);
-        return true;
-      }
-
       setIsSavingProject(true);
 
       let saveOk = false;
@@ -624,6 +618,7 @@
           setShowProjectForm(true);
           setEditingProject(projectData);
           setProjectDraft(projectData);
+          setHasDraftChanges(false);
         } else {
           setShowProjectForm(false);
           setEditingProject(null);
@@ -636,15 +631,12 @@
     };
 
     const handleCancelProjectForm = () => {
-      setShowProjectForm(false);
-    };
-
-    const handleResumeProjectForm = () => {
-      if (!projectDraft) return;
-      setShowProjectForm(true);
-    };
-
-    const handleDiscardProjectDraft = () => {
+      if (hasDraftChanges) {
+        const shouldDiscard = confirm('Vuoi annullare le modifiche apportate?');
+        if (!shouldDiscard) {
+          return;
+        }
+      }
       setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
@@ -1069,24 +1061,6 @@
                       >
                         Nuovo Progetto
                       </button>
-                      {!showProjectForm && projectDraft && hasDraftChanges && (
-                        <button
-                          onClick={handleResumeProjectForm}
-                          className="btn-secondary"
-                          disabled={readOnlyDepartment || isSavingProject}
-                        >
-                          Riprendi modifica
-                        </button>
-                      )}
-                      {!showProjectForm && projectDraft && hasDraftChanges && (
-                        <button
-                          onClick={handleDiscardProjectDraft}
-                          className="btn-secondary"
-                          disabled={readOnlyDepartment || isSavingProject}
-                        >
-                          Scarta bozza
-                        </button>
-                      )}
                       {showProjectForm && (
                         <button
                           onClick={() => projectDraft && handleSaveProject(projectDraft)}
@@ -1105,13 +1079,13 @@
                           Elimina progetto
                         </button>
                       )}
-                      {showProjectForm && (
+                      {hasDraftChanges && (
                         <button
                           onClick={handleCancelProjectForm}
                           className="btn-secondary"
                           disabled={isSavingProject}
                         >
-                          Torna indietro
+                          Annulla modifiche
                         </button>
                       )}
                     </div>
