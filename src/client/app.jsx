@@ -418,6 +418,40 @@
       }
     };
 
+    const handleAdminCreateDepartment = async ({ name, password }) => {
+      if (!adminToken) return;
+      try {
+        await api.createDepartment(name, adminToken);
+        if (password) {
+          await api.resetPassword(name, password, adminToken);
+        }
+      } catch (err) {
+        alert(err.message || 'Creazione reparto fallita');
+      }
+    };
+
+    const handleAdminDeleteDepartment = async ({ department: targetDepartment }) => {
+      if (!adminToken || !targetDepartment) return;
+      try {
+        await api.deleteDepartment(targetDepartment, adminToken);
+        if (department === targetDepartment) {
+          await handleDepartmentChange(null);
+        }
+      } catch (err) {
+        alert(err.message || 'Eliminazione reparto fallita');
+      }
+    };
+
+    const handleAdminResetPassword = async ({ department: targetDepartment, newPassword }) => {
+      if (!adminToken || !targetDepartment) return;
+      try {
+        await api.resetPassword(targetDepartment, newPassword, adminToken);
+        alert('Password reparto aggiornata');
+      } catch (err) {
+        alert(err.message || 'Reset password fallito');
+      }
+    };
+
     const handleUserNameCommit = async () => {
       if (pendingUserName === userName) return;
       const ok = await handleUserNameChange(pendingUserName);
@@ -450,6 +484,14 @@
         return;
       }
       setLockEnabled(true);
+    };
+
+    const handleDisableLock = async () => {
+      try {
+        await releaseLock();
+      } finally {
+        setLockEnabled(false);
+      }
     };
 
     const handleGanttPhaseContextMenu = (project) => {
@@ -770,8 +812,11 @@
           userName={userName}
           department={department}
           onDepartmentChange={handleDepartmentChange}
+          lockInfo={lockInfo}
+          isLocked={isLocked}
           lockEnabled={lockEnabled}
           onEnableLock={handleEnableLock}
+          onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
           onExportDepartment={handleExportDepartment}
           onImportDepartment={handleImportDepartment}
@@ -779,6 +824,9 @@
           readOnlyDepartment={readOnlyDepartment}
           adminToken={adminToken}
           onChangePassword={handleChangePassword}
+          onAdminCreateDepartment={handleAdminCreateDepartment}
+          onAdminDeleteDepartment={handleAdminDeleteDepartment}
+          onAdminResetPassword={handleAdminResetPassword}
         />
 
         {lockError && lockError.lockedBy && (

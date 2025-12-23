@@ -223,6 +223,14 @@ body {
   align-items: center;
 }
 
+.header-lock-badge {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+}
+
 @media (min-width: 1920px) {
   .header-compact {
     max-width: 1600px;
