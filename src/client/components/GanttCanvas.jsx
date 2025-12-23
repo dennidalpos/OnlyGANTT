@@ -398,7 +398,7 @@
             role="menu"
           >
             <button type="button" onClick={handleMenuAction} role="menuitem">
-              Vai su Progetto
+              Vai su Progetto: {contextMenu.project?.nome || 'Senza nome'}
             </button>
           </div>
         )}

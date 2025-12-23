@@ -155,6 +155,7 @@ Il server gira su `http://localhost:3000`
   stato: "da_iniziare" | "in_corso" | "in_ritardo" | "completato",
   percentualeCompletamento: number | null,  // null = auto
   milestone: boolean,
+  includeFestivi: boolean,
   note: "string"
 }
 ```
@@ -241,6 +242,7 @@ Il server gira su `http://localhost:3000`
 - **Operazioni reparto**: creazione, modifica e cancellazione reparti senza inserire il nome utente.
 - **Sblocco lock**: pulsante admin per rimuovere lock attivi su un reparto.
 - **Import/Export reparto**: visibili e utilizzabili solo con accesso admin (sezione "Reparto corrente").
+- **Login separato**: tab dedicata nella schermata di accesso per distinguere chiaramente login utente e login admin.
 
 ## Troubleshooting
 
