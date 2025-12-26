@@ -2,8 +2,6 @@
 
 Applicazione Timeline Progetti interattiva con blocco multi‑utente, pensata per Windows Server con Node.js 18+.
 
-> 📋 **Ultime modifiche**: Consulta [CHANGELOG.md](CHANGELOG.md) per dettagli su bug fix e ottimizzazioni recenti.
-
 ## Funzionalità
 
 - **Nessun bundler, nessun build step**: React 18 via CDN con Babel Standalone per la compilazione JSX nel browser
