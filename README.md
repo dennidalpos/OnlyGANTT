@@ -1,11 +1,13 @@
 # OnlyGANTT
 
-Applicazione di diagramma di Gantt interattiva con blocco multi‑utente, pensata per Windows Server con Node.js 18+.
+Applicazione Timeline Progetti interattiva con blocco multi‑utente, pensata per Windows Server con Node.js 18+.
+
+> 📋 **Ultime modifiche**: Consulta [CHANGELOG.md](CHANGELOG.md) per dettagli su bug fix e ottimizzazioni recenti.
 
 ## Funzionalità
 
 - **Nessun bundler, nessun build step**: React 18 via CDN con Babel Standalone per la compilazione JSX nel browser
-- **Diagramma di Gantt interattivo**: rendering Canvas 2D con viste 4 mesi e completa
+- **Timeline Progetti interattiva**: rendering Canvas 2D con viste 3 mesi (ridotta) e completa
 - **Sistema di lock multi‑utente**: blocco a livello di reparto con timeout e heartbeat
 - **Persistenza JSON**: archiviazione su file con scritture atomiche (compatibile Windows)
 - **Gestione reparti**: reparti opzionalmente protetti da password con import/export reparto e import/export progetti
@@ -56,7 +58,7 @@ OnlyGANTT/
 │  │  │  └─ useProjects.js
 │  │  └─ components/
 │  │     ├─ HeaderBar.jsx
-│  │     ├─ DepartmentSelector.jsx
+│  │     ├─ LoginScreen.jsx
 │  │     ├─ GanttControls.jsx
 │  │     ├─ GanttCanvas.jsx
 │  │     ├─ ProjectForm.jsx
@@ -68,8 +70,7 @@ OnlyGANTT/
 │     ├─ utils-logic.js   # Logica di business (ritardi, conflitti, ecc.)
 │     └─ utils-gantt.js   # Rendering canvas
 ├─ data/
-│  ├─ TestCompleto.json   # Reparto con progetti corretti
-│  └─ TestErrori.json     # Reparto con errori di validazione
+│  └─ Demo.json           # Reparto demo con 15 progetti (2025-2030)
 └─ README.md
 ```
 
@@ -126,8 +127,7 @@ Il server gira su `http://localhost:3000`
 ### Credenziali di default
 - **ID Admin**: `admin` (modifica in `server/server.js`)
 - **Password Admin**: `admin123` (modifica in `server/server.js`)
-- **Password TestCompleto**: `test123`
-- **Password TestErrori**: `test123`
+- **Reparto Demo**: password `demo123`
 
 ## Modello dati
 
@@ -212,20 +212,29 @@ Il server gira su `http://localhost:3000`
 - Cambio nome utente: rilascio del lock precedente e ri‑acquisizione con il nuovo utente
 - Logout utente o admin: rilascio automatico del lock
 - Admin può rilasciare lock attivi dal pannello strumenti
-- Stato lock mostrato in header (utente)
+- Stato lock mostrato nella topbar
 
-### Diagramma di Gantt
-- **Vista 4 mesi**: scorrevole, 25px al giorno, tooltip attivi
+### Topbar
+- **Layout essenziale**: titolo "OnlyGANTT" a sinistra, stato lock/admin e menu hamburger a destra
+- **Contesto visibile**: reparto attivo e utente loggato mostrati accanto al titolo
+- **Menu hamburger**: azioni secondarie (cambio reparto, lock, password, import/export, admin, logout)
+- **Responsive**: su schermi piccoli mostra solo icone stato e menu
+
+### Timeline Progetti
+- **Vista 3 mesi (ridotta)**: scorrevole, ~25px al giorno, tooltip attivi
 - **Vista completa**: adatta a tutti i dati, senza scroll, tooltip attivi (per export PNG)
 - **Auto "Vai a Oggi"**: centratura automatica su oggi all'apertura del reparto
-- **Filtri separatori**: giorni, settimane, mesi, anni
-- **Filtri dettaglio**: lettere/numeri giorni, numeri settimane, etichette mesi/anni
-- **Default vista ridotta**: festivi attivi, separatori e dettagli completi
-- **Default vista completa**: separatori mesi/anni, dettaglio anni + ritardi
+- **Pannello filtri organizzato in gruppi**:
+  - **Timeline**: separatori e etichette per anni, mesi, settimane, giorni
+  - **Contenuti**: nomi fasi, percentuali, solo milestone
+  - **Evidenziazioni**: weekend, festivi, ritardi
+- **Toggle gruppo**: attiva/disattiva tutti i filtri di un gruppo con un click
 - **Toggle globale**: attiva/disattiva tutti i filtri
-- **Default viste**: 4 mesi con tutti i filtri separatori/dettaglio attivi, vista completa con soli separatori mesi/anni
-- **Altri filtri**: weekend, festività, solo milestone, evidenzia ritardi
-- **Etichette milestone**: posizionate nell’header sopra il diagramma, con spaziatura verticale per evitare sovrapposizioni
+- **Reset defaults**: ripristina i filtri predefiniti per la vista corrente
+- **Layout responsivo**: 3 colonne su schermi ≥1200px, 2 colonne su tablet, 1 colonna su mobile
+- **Default vista ridotta**: tutti i filtri attivi
+- **Default vista completa**: separatori mesi/anni, dettaglio anni, ritardi, percentuali
+- **Etichette milestone**: posizionate nell'header sopra il diagramma, con spaziatura verticale per evitare sovrapposizioni
 
 ### Gestione Progetto
 - **Salva (nelle fasi)**: salva il progetto corrente senza chiuderlo e forza il refresh del Gantt ad ogni click.
@@ -237,6 +246,15 @@ Il server gira su `http://localhost:3000`
 - **Reparti senza password**: accesso diretto.
 - **Cambio password**: dopo l’aggiornamento è richiesto un nuovo accesso con la nuova password.
 - **Rimozione password**: un reparto protetto può tornare senza password (utente o admin).
+
+### Schermata di Login
+- **Schermata unificata**: login utente e admin in una sola interfaccia con tab dedicati
+- **Tab Reparto**: inserimento nome utente, selezione reparto, password (se richiesta)
+- **Tab Admin**: login con credenziali amministratore
+- **Auto-focus**: focus automatico sui campi input per inserimento rapido
+- **Validazione in tempo reale**: feedback visivo su campi validi/invalidi
+- **Gestione errori chiara**: messaggi di errore dettagliati e visibili
+- **Stati di caricamento**: indicatori visivi durante le operazioni
 
 ### Accesso admin
 - **Operazioni reparto**: creazione, modifica e cancellazione reparti senza inserire il nome utente.
@@ -250,9 +268,6 @@ Il server gira su `http://localhost:3000`
 Se un file `data/<Reparto>.json` è corrotto o contiene JSON invalido, le API che leggono quel reparto rispondono con errore `INVALID_JSON`.
 Controlla il file indicato nel payload di errore, correggi il JSON o ripristina un backup `.bak` valido, quindi riavvia il server se necessario.
 
-### HeaderBar (UI)
-- Pulsanti e controlli con **dimensioni, padding e radius uniformi**.
-- Spaziature coerenti per allineare elementi e badge in tutte le viste.
 
 ### Import/Export
 - **Elenco progetti**: import/export progetti per trasferirli tra reparti diversi
@@ -363,11 +378,41 @@ Il server usa scritture atomiche per compatibilità Windows:
 Le operazioni di salvataggio richiedono `expectedRevision` per evitare conflitti di modifica.
 In caso di mismatch (409), il client ricarica i dati e avvisa l'utente.
 
-## Dati di test
+## Dati di demo
 
-Sono disponibili due reparti di test:
-1. **TestErrori**: include progetti con errori (ritardi, date mancanti, milestone fuori intervallo, fasi in festività, ecc.).
-2. **TestCompleto**: include 10 progetti corretti con fasi prefatte e colori di default dal 2024 al 2030.
+È disponibile un reparto demo completo:
+
+### Reparto Demo
+- **Nome**: Demo
+- **Password**: `demo123`
+- **Progetti**: 15 progetti enterprise realistici
+- **Timeline**: 15 Gennaio 2025 → 30 Giugno 2030 (5.5 anni)
+- **Fasi per progetto**: Tutte le fasi predefinite (Analisi, Progettazione, Sviluppo, Test, Review/Documentazione, Deploy)
+- **Milestone**: Configurate sulle fasi Deploy finali
+- **Stati**: 3 progetti in corso, 12 da iniziare
+
+#### Progetti Inclusi:
+1. **Migrazione Cloud Infrastructure** (2025) - Migrazione AWS/Azure
+2. **Portale Servizi Cittadino** (2025) - Servizi digitali per cittadini
+3. **Sistema Gestione Documentale** (2025-2026) - DMS per digitalizzazione archivi
+4. **App Mobile Dipendenti** (2025) - Gestione presenze e ferie
+5. **Piattaforma E-Learning** (2025-2026) - Sistema formazione online
+6. **Integrazione CRM Salesforce** (2025-2026) - Integrazione CRM
+7. **Sistema Business Intelligence** (2025-2026) - Dashboard analytics
+8. **Modernizzazione ERP** (2025-2027) - Aggiornamento ERP SAP S/4HANA
+9. **Cybersecurity Framework** (2025-2026) - Framework ISO 27001
+10. **Digital Workplace** (2026) - Piattaforma Microsoft 365
+11. **IoT Smart Building** (2026-2027) - Sensori IoT per edifici
+12. **AI Customer Service** (2026-2027) - Chatbot AI assistenza
+13. **Blockchain Supply Chain** (2027-2028) - Tracciabilità blockchain
+14. **Data Lake Enterprise** (2027-2028) - Big data analytics
+15. **Quantum Computing POC** (2028-2030) - Proof of concept quantum
+
+Il dataset Demo è ideale per:
+- ✅ Testing e demo dell'applicazione
+- ✅ Formazione utenti
+- ✅ Verifica funzionalità Gantt
+- ✅ Template per nuovi progetti
 
 ## Troubleshooting
 
@@ -380,7 +425,7 @@ Sono disponibili due reparti di test:
 | Gantt vuoto | Nessun progetto selezionato | Seleziona almeno un progetto dalla lista |
 | Password non riconosciuta | LocalStorage per hostname diverso | La password è salvata per hostname:porta |
 | Export PNG vuoto | Vista non completa | L'export forza automaticamente la vista completa |
-| Tooltip non appare | Vista completa attiva | I tooltip funzionano solo in vista 4 mesi |
+| Tooltip non appare | Mouse fuori dalla barra | Posiziona il mouse sulle barre progetto o fase |
 | Modifiche non salvate | Lock mancante | Verifica di avere il lock attivo (badge verde) |
 | Dati persi dopo refresh | Non salvato | Clicca "Salva Tutto" prima di uscire |
 

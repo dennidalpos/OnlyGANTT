@@ -1,6 +1,3 @@
-// GanttCanvas component
-// Exposed on window.OnlyGantt.components.GanttCanvas
-
 (function() {
   'use strict';
 
@@ -19,7 +16,12 @@
     filters,
     scrollToTodayTrigger,
     refreshTrigger,
-    onPhaseContextMenu
+    onPhaseContextMenu,
+    hoveredProjectId,
+    onProjectHover,
+    verticalScrollTop,
+    onVerticalScrollChange,
+    sidebarCollapsed
   }) {
     const canvasRef = useRef(null);
     const wrapperRef = useRef(null);
@@ -35,6 +37,24 @@
     const scrollbarWidthRef = useRef(0);
     const scrollRafRef = useRef(null);
     const pendingScrollLeftRef = useRef(0);
+    const verticalScrollContainerRef = useRef(null);
+    const isVerticalScrollingRef = useRef(false);
+
+    useEffect(() => {
+      if (verticalScrollContainerRef.current && !isVerticalScrollingRef.current && verticalScrollTop !== undefined) {
+        verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
+      }
+    }, [verticalScrollTop]);
+
+    const handleVerticalScroll = useCallback((e) => {
+      isVerticalScrollingRef.current = true;
+      if (onVerticalScrollChange) {
+        onVerticalScrollChange(e.target.scrollTop);
+      }
+      setTimeout(() => {
+        isVerticalScrollingRef.current = false;
+      }, 50);
+    }, [onVerticalScrollChange]);
 
     const updateScrollbars = useCallback((newLayout) => {
       if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {
@@ -69,7 +89,6 @@
       bottomScrollbarRef.current.scrollLeft = currentScroll;
     }, [viewMode]);
 
-    // Render canvas
     const render = useCallback(() => {
       const canvas = canvasRef.current;
       const wrapper = wrapperRef.current;
@@ -78,48 +97,75 @@
       const ctx = canvas.getContext('2d');
       const containerWidth = wrapper.clientWidth;
 
-      // Build layout
       const newLayout = gantt.getLayout(viewMode, projects, containerWidth, filters);
       setLayout(newLayout);
 
-      // Set canvas size with higher DPI for crisp text
       const dpr = window.devicePixelRatio || 1;
       canvas.width = newLayout.canvasWidth * dpr;
       canvas.height = newLayout.canvasHeight * dpr;
       canvas.style.width = `${newLayout.canvasWidth}px`;
       canvas.style.height = `${newLayout.canvasHeight}px`;
 
-      // Scale context for DPI
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Render
-      gantt.render(ctx, newLayout);
+      const hideProjectLabels = sidebarCollapsed === false;
+      gantt.render(ctx, newLayout, { hoveredProjectId, hideProjectLabels });
 
       updateScrollbars(newLayout);
-    }, [viewMode, projects, filters, updateScrollbars]);
+    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed]);
 
-    // Effect: render on changes
-    useEffect(() => {
-      render();
-    }, [render]);
+    const redraw = useCallback(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || !layout) return;
 
-    // Effect: invalidate cache when projects change
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const hideProjectLabels = sidebarCollapsed === false;
+      gantt.render(ctx, layout, { hoveredProjectId, hideProjectLabels });
+    }, [layout, hoveredProjectId, sidebarCollapsed]);
+
+    const initialRenderDoneRef = useRef(false);
+    const prevSidebarCollapsedRef = useRef(sidebarCollapsed);
+
     useEffect(() => {
-      gantt.invalidateCache();
-      render();
-    }, [projects, render]);
+      redraw();
+    }, [hoveredProjectId]);
+
+    useEffect(() => {
+      const frame = requestAnimationFrame(() => {
+        gantt.invalidateCache();
+        render();
+        initialRenderDoneRef.current = true;
+      });
+      return () => cancelAnimationFrame(frame);
+    }, [projects, viewMode, filters]);
 
     useEffect(() => {
       if (refreshTrigger === 0) return;
       gantt.invalidateCache();
       render();
-    }, [refreshTrigger, render]);
+    }, [refreshTrigger]);
+
+    useEffect(() => {
+      if (prevSidebarCollapsedRef.current === sidebarCollapsed && !initialRenderDoneRef.current) {
+        prevSidebarCollapsedRef.current = sidebarCollapsed;
+        return;
+      }
+      prevSidebarCollapsedRef.current = sidebarCollapsed;
+
+      const timeout = setTimeout(() => {
+        gantt.invalidateCache();
+        render();
+      }, 220);
+      return () => clearTimeout(timeout);
+    }, [sidebarCollapsed]);
 
     useEffect(() => {
       scrollLeftRef.current = scrollLeft;
     }, [scrollLeft]);
 
-    // Effect: store scroll position when changing view mode
     useEffect(() => {
       const previousViewMode = lastViewModeRef.current;
       if (previousViewMode && previousViewMode !== viewMode) {
@@ -164,7 +210,6 @@
       return () => window.cancelAnimationFrame(frame);
     }, [viewMode, layout, updateScrollbars]);
 
-    // Effect: handle resize
     useEffect(() => {
       const handleResize = () => {
         gantt.invalidateCache();
@@ -175,7 +220,6 @@
       return () => window.removeEventListener('resize', handleResize);
     }, [render]);
 
-    // Effect: scroll to today
     useEffect(() => {
       if (scrollToTodayTrigger && layout && topScrollbarRef.current) {
         const today = new Date();
@@ -215,7 +259,6 @@
       updateScrollbars(layout);
     }, [layout, updateScrollbars]);
 
-    // Sync scrollbars
     const handleScroll = useCallback((source) => {
       const left = source.scrollLeft;
       pendingScrollLeftRef.current = left;
@@ -260,10 +303,10 @@
       }
     }, []);
 
-    // Tooltip
     const handleMouseMove = useCallback((e) => {
       if (!layout) {
         setTooltip(null);
+        if (onProjectHover) onProjectHover(null);
         return;
       }
 
@@ -275,6 +318,17 @@
       const mouseY = e.clientY - rect.top;
 
       const hit = gantt.hitTest(mouseX, mouseY, layout);
+
+      let hoveredProject = null;
+      for (const row of layout.rows) {
+        if (mouseY >= row.y && mouseY < row.y + row.height) {
+          hoveredProject = row.project;
+          break;
+        }
+      }
+      if (onProjectHover) {
+        onProjectHover(hoveredProject ? hoveredProject.id : null);
+      }
 
       if (hit) {
         if (hit.type === 'phase') {
@@ -317,11 +371,12 @@
       } else {
         setTooltip(null);
       }
-    }, [layout]);
+    }, [layout, onProjectHover]);
 
     const handleMouseLeave = useCallback(() => {
       setTooltip(null);
-    }, []);
+      if (onProjectHover) onProjectHover(null);
+    }, [onProjectHover]);
 
     const handleContextMenu = useCallback((e) => {
       if (!layout) return;

@@ -1,6 +1,3 @@
-// API client with AbortController support
-// Exposed on window.OnlyGantt.api
-
 (function() {
   'use strict';
 
@@ -8,12 +5,6 @@
 
   const BASE_URL = '';
 
-  /**
-   * Generic fetch wrapper with error handling
-   * @param {string} url
-   * @param {Object} options
-   * @returns {Promise<Object>}
-   */
   async function fetchJSON(url, options = {}) {
     const response = await fetch(BASE_URL + url, {
       ...options,
@@ -41,8 +32,6 @@
 
     return data || {};
   }
-
-  // === Departments ===
 
   async function getDepartments(signal) {
     return fetchJSON('/api/departments', { signal });
@@ -89,8 +78,6 @@
     });
   }
 
-  // === Password ===
-
   async function verifyPassword(department, password, signal) {
     return fetchJSON(`/api/departments/${encodeURIComponent(department)}/verify`, {
       method: 'POST',
@@ -118,8 +105,6 @@
     });
   }
 
-  // === Projects ===
-
   async function getProjects(department, signal) {
     return fetchJSON(`/api/projects/${encodeURIComponent(department)}`, { signal });
   }
@@ -131,8 +116,6 @@
       signal
     });
   }
-
-  // === Upload ===
 
   async function uploadJSON(department, file, userName, signal) {
     const formData = new FormData();
@@ -159,8 +142,6 @@
     return data;
   }
 
-  // === Lock ===
-
   async function acquireLock(department, userName, clientHost, signal) {
     const response = await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/acquire`, {
       method: 'POST',
@@ -174,7 +155,6 @@
     const data = await response.json();
 
     if (response.status === 423) {
-      // Lock conflict
       const error = new Error('Department is locked by another user');
       error.status = 423;
       error.lockInfo = data;
@@ -192,7 +172,6 @@
   }
 
   async function releaseLock(department, userName) {
-    // No signal for release (should always complete)
     await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/release`, {
       method: 'POST',
       headers: {
@@ -227,8 +206,6 @@
     });
   }
 
-  // === Admin ===
-
   async function adminLogin(userId, password, signal) {
     return fetchJSON('/api/admin/login', {
       method: 'POST',
@@ -256,7 +233,25 @@
     });
   }
 
-  // Expose on namespace
+  async function adminResetPassword(resetCode, newPassword, signal) {
+    return fetchJSON('/api/admin/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ resetCode, newPassword }),
+      signal
+    });
+  }
+
+  async function adminChangePassword(oldPassword, newPassword, adminToken, signal) {
+    return fetchJSON('/api/admin/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ oldPassword, newPassword }),
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      },
+      signal
+    });
+  }
+
   window.OnlyGantt.api = {
     getDepartments,
     createDepartment,
@@ -276,6 +271,8 @@
     adminReleaseLock,
     adminLogin,
     adminLogout,
-    getAdminDepartments
+    getAdminDepartments,
+    adminResetPassword,
+    adminChangePassword
   };
 })();

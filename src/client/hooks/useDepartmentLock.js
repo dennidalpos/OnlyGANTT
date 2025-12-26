@@ -1,6 +1,3 @@
-// Custom hook for department lock lifecycle
-// Exposed on window.OnlyGantt.hooks.useDepartmentLock
-
 (function() {
   'use strict';
 
@@ -29,7 +26,6 @@
       }
     }, []);
 
-    // Heartbeat
     const startHeartbeat = useCallback(() => {
       stopHeartbeat();
 
@@ -48,7 +44,6 @@
             await api.heartbeatLock(department, userName);
             scheduleHeartbeat();
           } catch (err) {
-            // If heartbeat fails, consider lock lost
             setIsLocked(false);
             setError({ message: 'Lost lock connection' });
             stopHeartbeat();
@@ -59,16 +54,13 @@
       scheduleHeartbeat();
     }, [department, userName, stopHeartbeat]);
 
-    // Acquire lock with debounce
     const acquireLock = useCallback(() => {
       if (!department || !userName || !enabled) return;
 
-      // Clear existing debounce
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
 
-      // Abort previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -82,14 +74,11 @@
           setLockInfo(result);
           setIsLocked(true);
           setError(null);
-
-          // Start heartbeat
           startHeartbeat();
         } catch (err) {
           if (err.name === 'AbortError') return;
 
           if (err.status === 423) {
-            // Lock conflict
             setLockInfo(err.lockInfo);
             setIsLocked(false);
             setError(err.lockInfo);
@@ -103,32 +92,23 @@
 
     const releaseLockFor = useCallback(async (targetDepartment, targetUserName) => {
       if (!targetDepartment || !targetUserName) return;
-
       stopHeartbeat();
-
       try {
         await api.releaseLock(targetDepartment, targetUserName);
-      } catch (err) {
-        // Ignore errors on release
-      }
+      } catch (err) {}
     }, [stopHeartbeat]);
 
-    // Release lock
     const releaseLock = useCallback(async () => {
       if (!department || !userName) return;
-
       try {
         await releaseLockFor(department, userName);
         previousLockRef.current = null;
         setLockInfo(null);
         setIsLocked(false);
         setError(null);
-      } catch (err) {
-        // Ignore errors on release
-      }
+      } catch (err) {}
     }, [department, userName, releaseLockFor]);
 
-    // Effect: acquire lock when department/user changes
     useEffect(() => {
       const previous = previousLockRef.current;
       const hasChanged = previous && (previous.department !== department || previous.userName !== userName || !enabled);
@@ -150,7 +130,6 @@
         releaseLock();
       }
 
-      // Cleanup
       return () => {
         if (debounceTimerRef.current) {
           clearTimeout(debounceTimerRef.current);
@@ -162,7 +141,6 @@
       };
     }, [department, userName, enabled, acquireLock, releaseLock, releaseLockFor, stopHeartbeat]);
 
-    // Effect: release lock on unload (sendBeacon)
     useEffect(() => {
       const handleUnload = () => {
         if (isLocked && department && userName) {

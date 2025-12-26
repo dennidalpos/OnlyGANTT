@@ -1,6 +1,3 @@
-// LocalStorage utilities
-// Exposed on window.OnlyGantt.storage
-
 (function() {
   'use strict';
 
@@ -8,25 +5,14 @@
 
   const USER_KEY = 'currentUser';
 
-  /**
-   * Get hostname key for password storage (includes port, lowercase)
-   * @returns {string}
-   */
   function getHostnameKey() {
     return window.location.host.toLowerCase();
   }
 
-  /**
-   * Get passwords key for current user and hostname
-   * @param {string} userName
-   * @returns {string}
-   */
   function getPasswordsKey(userName) {
     const hostname = getHostnameKey();
     return `passwords_${userName}_${hostname}`;
   }
-
-  // === User ===
 
   function getCurrentUser() {
     return localStorage.getItem(USER_KEY) || '';
@@ -39,8 +25,6 @@
       localStorage.removeItem(USER_KEY);
     }
   }
-
-  // === Passwords ===
 
   function getPasswords(userName) {
     if (!userName) return {};
@@ -81,19 +65,11 @@
     savePasswords(userName, passwords);
   }
 
-  function clearAllPasswords(userName) {
-    if (!userName) return;
-    const key = getPasswordsKey(userName);
-    localStorage.removeItem(key);
-  }
-
-  // Expose on namespace
   window.OnlyGantt.storage = {
     getCurrentUser,
     setCurrentUser,
     getPassword,
     setPassword,
-    removePassword,
-    clearAllPasswords
+    removePassword
   };
 })();

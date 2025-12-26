@@ -1,6 +1,3 @@
-// AlertsPanel component
-// Exposed on window.OnlyGantt.components.AlertsPanel
-
 (function() {
   'use strict';
 
@@ -67,7 +64,6 @@
       );
     };
 
-    // Collect all alerts from all projects
     const allAlerts = {
       projectsDelayed: [],
       phasesDelayed: [],

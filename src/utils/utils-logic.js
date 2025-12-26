@@ -1,6 +1,3 @@
-// Business logic utilities
-// Exposed on window.OnlyGantt.logic
-
 (function() {
   'use strict';
 
@@ -11,13 +8,6 @@
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const dateUtils = window.OnlyGantt.dateUtils;
 
-  /**
-   * Calculate project percentage
-   * If project has manual override (number), use it
-   * Otherwise, calculate as average of phases
-   * @param {Object} project - Project object
-   * @returns {number} Percentage 0-100
-   */
   function calculateProjectPercentage(project) {
     if (project.percentualeCompletamento !== null && typeof project.percentualeCompletamento === 'number') {
       return project.percentualeCompletamento;
@@ -41,12 +31,6 @@
     return typeof value === 'string' && UUID_REGEX.test(value);
   }
 
-  /**
-   * Check if project/phase is delayed
-   * Delayed if dataFine < today and stato !== 'completato'
-   * @param {Object} item - Project or phase
-   * @returns {boolean} True if delayed
-   */
   function isDelayed(item) {
     if (!item.dataFine) return false;
     if (item.stato === 'completato') return false;
@@ -58,12 +42,6 @@
     return dateUtils.compareDates(endDate, today) < 0;
   }
 
-  /**
-   * Check if phase is outside project date range
-   * @param {Object} phase - Phase object
-   * @param {Object} project - Project object
-   * @returns {boolean} True if conflict
-   */
   function isPhaseOutsideProjectRange(phase, project) {
     if (!phase.dataInizio && !phase.dataFine) return false;
     if (!project.dataInizio && !project.dataFine) return false;
@@ -84,12 +62,6 @@
     return false;
   }
 
-  /**
-   * Check if milestone is outside project range
-   * @param {Object} phase - Phase object (milestone)
-   * @param {Object} project - Project object
-   * @returns {boolean} True if outside
-   */
   function isMilestoneOutsideProject(phase, project) {
     if (!phase.milestone) return false;
     if (!phase.dataFine) return false;
@@ -110,11 +82,6 @@
     return false;
   }
 
-  /**
-   * Check if phase is on a holiday
-   * @param {Object} phase - Phase object
-   * @returns {boolean} True if any date in phase range is a holiday
-   */
   function isPhaseOnHoliday(phase) {
     if (!phase.dataInizio || !phase.dataFine) return false;
     if (phase.includeFestivi) return false;
@@ -127,22 +94,12 @@
     return dates.some(date => dateUtils.isItalianHoliday(date) || dateUtils.isWeekend(date));
   }
 
-  /**
-   * Check if percentage is 100 but status is not 'completato'
-   * @param {Object} item - Project or phase
-   * @returns {boolean} True if inconsistent
-   */
   function hasPercentage100NotCompleted(item) {
     const percentage = item.percentualeCompletamento;
     if (percentage !== 100) return false;
     return item.stato !== 'completato';
   }
 
-  /**
-   * Auto-fix percentage 100 to completed status (if enabled in config)
-   * @param {Object} item - Project or phase (will be mutated)
-   * @returns {boolean} True if fixed
-   */
   function autoFixPercentage100(item) {
     if (!config.logic.enableAutoFixPercent100ToCompleted) return false;
     if (!hasPercentage100NotCompleted(item)) return false;
@@ -151,11 +108,6 @@
     return true;
   }
 
-  /**
-   * Get all alerts for a project
-   * @param {Object} project - Project object
-   * @returns {Object} Object with arrays of different alert types
-   */
   function getProjectAlerts(project) {
     const alerts = {
       projectDelayed: false,
@@ -169,51 +121,41 @@
       percentage100NotCompleted: false
     };
 
-    // Project delayed
     if (isDelayed(project)) {
       alerts.projectDelayed = true;
     }
 
-    // Project missing dates
     if (!project.dataInizio || !project.dataFine) {
       alerts.projectMissingDates = true;
     }
 
-    // No phases
     if (!Array.isArray(project.fasi) || project.fasi.length === 0) {
       alerts.noPhases = true;
     }
 
-    // Project percentage 100 but not completed
     const projectPercentage = calculateProjectPercentage(project);
     if (projectPercentage === 100 && project.stato !== 'completato') {
       alerts.percentage100NotCompleted = true;
     }
 
-    // Phase-level checks
     if (Array.isArray(project.fasi)) {
       project.fasi.forEach(fase => {
-        // Phase delayed
         if (isDelayed(fase)) {
           alerts.phasesDelayed.push(fase);
         }
 
-        // Phase outside range
         if (isPhaseOutsideProjectRange(fase, project)) {
           alerts.phasesOutsideRange.push(fase);
         }
 
-        // Milestone outside range
         if (fase.milestone && isMilestoneOutsideProject(fase, project)) {
           alerts.milestonesOutsideRange.push(fase);
         }
 
-        // Phase on holiday
         if (isPhaseOnHoliday(fase)) {
           alerts.phasesOnHoliday.push(fase);
         }
 
-        // Phase missing dates
         if (!fase.dataInizio || !fase.dataFine) {
           alerts.phasesMissingDates.push(fase);
         }
@@ -293,7 +235,7 @@
     }
 
     if (!Object.prototype.hasOwnProperty.call(safePhase, 'includeFestivi') || typeof safePhase.includeFestivi !== 'boolean') {
-      safePhase.includeFestivi = true;
+      safePhase.includeFestivi = false;
       errors.push(`Fase ${projectIndex + 1}.${phaseIndex + 1}: includeFestivi non valido`);
     }
 
@@ -385,11 +327,6 @@
     };
   }
 
-  /**
-   * Get summary of phases for a project
-   * @param {Object} project - Project object
-   * @returns {Object} Summary object
-   */
   function getPhasesSummary(project) {
     if (!Array.isArray(project.fasi)) {
       return {
@@ -406,10 +343,6 @@
     return { total, completed, delayed };
   }
 
-  /**
-   * Generate a new UUID v4
-   * @returns {string} UUID
-   */
   function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0;
@@ -418,10 +351,6 @@
     });
   }
 
-  /**
-   * Create a new empty project
-   * @returns {Object} New project
-   */
   function createNewProject() {
     return {
       id: generateUUID(),
@@ -435,22 +364,14 @@
     };
   }
 
-  /**
-   * Get color for a phase based on its name
-   * @param {string} phaseName - Phase name
-   * @param {Array} allPhaseNames - All phase names used in the system (for custom color assignment)
-   * @returns {string} Hex color
-   */
   function getPhaseColor(phaseName, allPhaseNames = []) {
-    if (!phaseName) return '#64748b'; // Default gray
+    if (!phaseName) return '#64748b';
 
-    // Check if it's a preset phase
     const preset = config.phasePresets.find(p => p.nome === phaseName);
     if (preset) {
       return preset.colore || null;
     }
 
-    // For custom phases, assign a color based on their position in the sorted list
     const customPhases = allPhaseNames
       .filter(name => !config.phasePresets.some(p => p.nome === name))
       .sort();
@@ -461,14 +382,9 @@
       return config.customPhaseColors[colorIndex];
     }
 
-    return '#64748b'; // Fallback gray
+    return '#64748b';
   }
 
-  /**
-   * Get all unique phase names from projects
-   * @param {Array} projects - Array of projects
-   * @returns {Array} Array of unique phase names
-   */
   function getAllPhaseNames(projects) {
     const names = new Set();
     projects.forEach(project => {
@@ -481,11 +397,6 @@
     return Array.from(names);
   }
 
-  /**
-   * Create a new empty phase
-   * @param {string} name - Optional phase name (for preset color assignment)
-   * @returns {Object} New phase
-   */
   function createNewPhase(name = '', options = {}) {
     const resolvedColor = Object.prototype.hasOwnProperty.call(options, 'colore')
       ? options.colore
@@ -500,12 +411,11 @@
       stato: 'da_iniziare',
       percentualeCompletamento: null,
       milestone: false,
-      includeFestivi: true,
+      includeFestivi: false,
       note: ''
     };
   }
 
-  // Expose on namespace
   window.OnlyGantt.logic = {
     calculateProjectPercentage,
     isDelayed,

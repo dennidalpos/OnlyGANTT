@@ -1,5 +1,3 @@
-// Schema validation for departments and projects
-
 const crypto = require('crypto');
 
 const VALID_STATES = ['da_iniziare', 'in_corso', 'in_ritardo', 'completato'];
@@ -39,17 +37,14 @@ function validatePhase(phase, index) {
     return errors;
   }
 
-  // ID validation (optional, will be generated if missing)
   if (phase.id !== undefined && !isValidUUID(phase.id)) {
     errors.push(`Phase ${index}: invalid id format`);
   }
 
-  // Nome
   if (!phase.nome || typeof phase.nome !== 'string' || !phase.nome.trim()) {
     errors.push(`Phase ${index}: nome is required and must be a non-empty string`);
   }
 
-  // Date (nullable)
   if (phase.dataInizio !== null && !isValidDateString(phase.dataInizio)) {
     errors.push(`Phase ${index}: dataInizio must be null or valid YYYY-MM-DD date`);
   }
@@ -57,12 +52,10 @@ function validatePhase(phase, index) {
     errors.push(`Phase ${index}: dataFine must be null or valid YYYY-MM-DD date`);
   }
 
-  // Stato
   if (!VALID_STATES.includes(phase.stato)) {
     errors.push(`Phase ${index}: stato must be one of ${VALID_STATES.join(', ')}`);
   }
 
-  // Percentuale (nullable)
   if (phase.percentualeCompletamento !== null) {
     if (typeof phase.percentualeCompletamento !== 'number' ||
         phase.percentualeCompletamento < 0 ||
@@ -71,17 +64,14 @@ function validatePhase(phase, index) {
     }
   }
 
-  // Milestone
   if (typeof phase.milestone !== 'boolean') {
     errors.push(`Phase ${index}: milestone must be a boolean`);
   }
 
-  // Festivi/Weekend include
   if (typeof phase.includeFestivi !== 'boolean') {
     errors.push(`Phase ${index}: includeFestivi must be a boolean`);
   }
 
-  // Note (optional)
   if (phase.note !== undefined && typeof phase.note !== 'string') {
     errors.push(`Phase ${index}: note must be a string`);
   }
@@ -97,22 +87,18 @@ function validateProject(project, index) {
     return errors;
   }
 
-  // ID validation (optional, will be generated if missing)
   if (project.id !== undefined && !isValidUUID(project.id)) {
     errors.push(`Project ${index}: invalid id format`);
   }
 
-  // Nome
   if (!project.nome || typeof project.nome !== 'string' || !project.nome.trim()) {
     errors.push(`Project ${index}: nome is required and must be a non-empty string`);
   }
 
-  // Colore
   if (!project.colore || typeof project.colore !== 'string') {
     errors.push(`Project ${index}: colore is required and must be a string`);
   }
 
-  // Date (nullable)
   if (project.dataInizio !== null && !isValidDateString(project.dataInizio)) {
     errors.push(`Project ${index}: dataInizio must be null or valid YYYY-MM-DD date`);
   }
@@ -120,12 +106,10 @@ function validateProject(project, index) {
     errors.push(`Project ${index}: dataFine must be null or valid YYYY-MM-DD date`);
   }
 
-  // Stato
   if (!VALID_STATES.includes(project.stato)) {
     errors.push(`Project ${index}: stato must be one of ${VALID_STATES.join(', ')}`);
   }
 
-  // Percentuale (nullable)
   if (project.percentualeCompletamento !== null) {
     if (typeof project.percentualeCompletamento !== 'number' ||
         project.percentualeCompletamento < 0 ||
@@ -134,7 +118,6 @@ function validateProject(project, index) {
     }
   }
 
-  // Fasi
   if (!Array.isArray(project.fasi)) {
     errors.push(`Project ${index}: fasi must be an array`);
   } else {
@@ -154,12 +137,10 @@ function validateDepartmentData(data) {
     return ['Data must be an object'];
   }
 
-  // Password (nullable)
   if (data.password !== null && data.password !== undefined && typeof data.password !== 'string') {
     errors.push('password must be null or a string');
   }
 
-  // Projects
   if (!Array.isArray(data.projects)) {
     errors.push('projects must be an array');
   } else {
@@ -169,7 +150,6 @@ function validateDepartmentData(data) {
     });
   }
 
-  // Meta (optional for validation, will be added by server)
   if (data.meta && typeof data.meta !== 'object') {
     errors.push('meta must be an object');
   }
@@ -182,7 +162,6 @@ function generateUUID() {
 }
 
 function ensureIDs(data) {
-  // Ensure all projects and phases have IDs
   if (Array.isArray(data.projects)) {
     data.projects.forEach(project => {
       if (!project.id || !isValidUUID(project.id)) {

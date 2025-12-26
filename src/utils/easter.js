@@ -1,16 +1,8 @@
-// Easter calculation using Meeus/Jones/Butcher algorithm (Gregorian calendar)
-// Exposed on window.OnlyGantt.easter
-
 (function() {
   'use strict';
 
   window.OnlyGantt = window.OnlyGantt || {};
 
-  /**
-   * Calculate Easter Sunday for a given year (Gregorian calendar)
-   * @param {number} year - The year
-   * @returns {Date} Easter Sunday date
-   */
   function calculateEaster(year) {
     const a = year % 19;
     const b = Math.floor(year / 100);
@@ -30,11 +22,6 @@
     return new Date(year, month - 1, day);
   }
 
-  /**
-   * Calculate Easter Monday (Pasquetta)
-   * @param {number} year - The year
-   * @returns {Date} Easter Monday date
-   */
   function calculateEasterMonday(year) {
     const easter = calculateEaster(year);
     const easterMonday = new Date(easter);
@@ -42,7 +29,6 @@
     return easterMonday;
   }
 
-  // Expose on namespace
   window.OnlyGantt.easter = {
     calculateEaster,
     calculateEasterMonday

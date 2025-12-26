@@ -1,8 +1,4 @@
-// OnlyGANTT - Centralized Configuration
-// This is the ONLY source of truth for all constants
-
 window.AppConfig = {
-  // Server configuration
   server: {
     port: 3000,
     dataDir: 'data',
@@ -12,12 +8,10 @@ window.AppConfig = {
     maxUploadBytes: 2000000
   },
 
-  // Gantt rendering
   gantt: {
     MARGIN_DAYS: 7,
-    PIXELS_PER_DAY_4MONTHS: 25,
     CANVAS_TOP_MARGIN: 130,
-    CANVAS_LEFT_MARGIN: 260,
+    CANVAS_LEFT_MARGIN: 20,
     CANVAS_RIGHT_MARGIN: 30,
     CANVAS_BOTTOM_MARGIN: 60,
     ROW_HEIGHT: 40,
@@ -32,27 +26,30 @@ window.AppConfig = {
     HOLIDAY_COLOR: 'rgba(239, 68, 68, 0.1)',
     TEXT_COLOR: '#f8fafc',
     TEXT_SMALL_COLOR: '#cbd5e1',
-    BACKGROUND_COLOR: '#1e293b'
+    BACKGROUND_COLOR: '#1e293b',
+    FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    PHASE_FONT_SIZE: 12,
+    PHASE_FONT_WEIGHT: '600',
+    PHASE_TEXT_PADDING: 6,
+    HEADER_FONT_SIZE: 14,
+    HEADER_SMALL_FONT_SIZE: 10,
+    HEADER_TINY_FONT_SIZE: 9
   },
 
-  // Screensaver
   screensaver: {
     idleMs: 15000
   },
 
-  // Lock
   lock: {
     heartbeatMinutes: 5,
     heartbeatJitterMs: 30000,
     acquireDebounceMs: 300
   },
 
-  // Logic features
   logic: {
     enableAutoFixPercent100ToCompleted: false
   },
 
-  // Italian holidays (fixed dates)
   holidays: {
     fixed: [
       { month: 1, day: 1, name: 'Capodanno' },
@@ -68,10 +65,8 @@ window.AppConfig = {
     ]
   },
 
-  // Valid project/phase states
   states: ['da_iniziare', 'in_corso', 'in_ritardo', 'completato'],
 
-  // State labels (Italian)
   stateLabels: {
     'da_iniziare': 'Da iniziare',
     'in_corso': 'In corso',
@@ -79,7 +74,6 @@ window.AppConfig = {
     'completato': 'Completato'
   },
 
-  // Phase presets (default phases with colors)
   phasePresets: [
     { nome: 'Analisi', colore: '#3b82f6' },
     { nome: 'Progettazione', colore: '#8b5cf6' },
@@ -88,10 +82,17 @@ window.AppConfig = {
     { nome: 'Deploy', colore: '#ef4444' },
     { nome: 'Documentazione', colore: '#06b6d4' },
     { nome: 'Review', colore: '#ec4899' },
+    { nome: 'Pianificazione', colore: '#6366f1' },
+    { nome: 'Prototipazione', colore: '#14b8a6' },
+    { nome: 'Integrazione', colore: '#84cc16' },
+    { nome: 'Validazione', colore: '#eab308' },
+    { nome: 'Formazione', colore: '#f97316' },
+    { nome: 'Manutenzione', colore: '#a855f7' },
+    { nome: 'Migrazione', colore: '#0ea5e9' },
+    { nome: 'Ottimizzazione', colore: '#22c55e' },
     { nome: 'Personalizzata', colore: null }
   ],
 
-  // Color pool for custom phases
   customPhaseColors: [
     '#14b8a6', '#84cc16', '#eab308', '#f97316', '#f43f5e',
     '#d946ef', '#a855f7', '#6366f1', '#0ea5e9', '#22c55e',

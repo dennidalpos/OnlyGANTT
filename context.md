@@ -29,8 +29,8 @@ Questo progetto è pensato per un'esecuzione "no build": React 18 viene caricato
 ## Note operative
 
 - **Caricamento script**: ordine rigoroso definito in `public/index.html` (nessun bundler).
-- **Dati di esempio**: `data/TestErrori.json` e `data/TestCompleto.json` contengono progetti di test.
-- **Credenziali demo**: admin `admin` / `admin123`, reparti `TestErrori` e `TestCompleto` con password `test123`.
+- **Dati di esempio**: `data/Demo.json` contiene 15 progetti di esempio (timeline 2025-2030).
+- **Credenziali demo**: admin `admin` / `admin123`, reparto `Demo` con password `demo123`.
 - **Windows Server (NSSM)**: puoi installare il server come servizio configurando `node.exe` e `server\\server.js` con NSSM (vedi README).
 
 ---
@@ -73,7 +73,7 @@ window.OnlyGantt.hooks
 ## Struttura Cartelle
 
 ```
-OnlyGANTT-V2/
+OnlyGANTT/
 ├── data/                    # Dati persistenti (JSON per reparto)
 ├── public/                  # File statici serviti direttamente
 │   ├── index.html          # Entry point HTML
@@ -87,8 +87,15 @@ OnlyGANTT-V2/
 │   │   ├── api.js          # Client HTTP
 │   │   ├── storage.js      # LocalStorage wrapper
 │   │   ├── app.jsx         # Entry point React
-│   │   ├── hooks/          # Custom hooks
-│   │   └── components/     # Componenti React
+│   │   ├── hooks/          # Custom hooks (useDepartmentLock, useProjects)
+│   │   └── components/     # Componenti React:
+│   │       ├── HeaderBar.jsx      # Topbar essenziale con menu hamburger
+│   │       ├── LoginScreen.jsx    # Schermata login unificata
+│   │       ├── GanttControls.jsx  # Toolbar + pannello filtri
+│   │       ├── GanttCanvas.jsx    # Canvas Gantt interattivo
+│   │       ├── ProjectForm.jsx    # Form creazione/modifica progetto
+│   │       ├── ProjectList.jsx    # Lista progetti selezionabili
+│   │       └── AlertsPanel.jsx    # Pannello avvisi e anomalie
 │   └── utils/              # Utility pure (no React)
 ├── README.md               # Documentazione principale
 ├── context.md              # Questo file
@@ -102,8 +109,19 @@ OnlyGANTT-V2/
 ### 1. Login Reparto
 
 ```
-Utente → Seleziona reparto → Inserisce password (se protetto)
+Utente → LoginScreen (Tab Reparto)
+      → Inserisce nome utente → Seleziona reparto dal dropdown
+      → Inserisce password (se richiesta)
       → Server verifica → Acquisisce lock → Carica progetti
+```
+
+### 1b. Login Admin
+
+```
+Utente → LoginScreen (Tab Admin)
+      → Inserisce ID admin + Password
+      → Server verifica → Rilascia token JWT
+      → UI mostra badge "Admin attivo"
 ```
 
 ### 2. Modifica Progetto

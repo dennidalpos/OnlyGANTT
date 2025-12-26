@@ -1,5 +1,6 @@
-// HeaderBar component
-// Exposed on window.OnlyGantt.components.HeaderBar
+
+
+
 
 (function() {
   'use strict';
@@ -27,21 +28,12 @@
     onChangePassword,
     onAdminCreateDepartment,
     onAdminDeleteDepartment,
-    onAdminResetPassword
+    onAdminResetPassword,
+    onAdminChangePassword
   }) {
-    const [currentTime, setCurrentTime] = useState(new Date());
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
     const menuButtonRef = useRef(null);
-
-    // Update clock every second
-    useEffect(() => {
-      const interval = setInterval(() => {
-        setCurrentTime(new Date());
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, []);
 
     useEffect(() => {
       if (!menuOpen) return;
@@ -65,8 +57,6 @@
         document.removeEventListener('keydown', handleEscape);
       };
     }, [menuOpen]);
-
-    const timeString = currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
     const handleMenuAction = (action) => {
       if (action) {
@@ -108,145 +98,183 @@
       await onAdminDeleteDepartment({ department });
     };
 
-    const lockBadge = lockEnabled && isLocked
-      ? { label: 'Lock attivo', className: 'badge-success' }
+    const handleAdminChangePassword = async () => {
+      if (!adminToken) return;
+      const oldPasswordInput = prompt('Password admin attuale');
+      if (oldPasswordInput === null) return;
+      const newPasswordInput = prompt('Nuova password admin (minimo 6 caratteri)');
+      if (newPasswordInput === null) return;
+      if (!newPasswordInput.trim() || newPasswordInput.trim().length < 6) {
+        alert('La password deve essere di almeno 6 caratteri');
+        return;
+      }
+      await onAdminChangePassword({ oldPassword: oldPasswordInput, newPassword: newPasswordInput.trim() });
+    };
+
+    
+    const lockStatus = lockEnabled && isLocked
+      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active' }
       : lockInfo?.locked
-        ? { label: `Lock: ${lockInfo.lockedBy}`, className: 'badge-warning' }
-        : { label: 'Lock disattivo', className: 'badge-secondary' };
+        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other' }
+        : { icon: '🔓', label: 'Libero', className: 'status-lock--free' };
 
     return (
-      <header className="app-header">
-        <div className="header-compact">
-          <div className="header-left">
-            <div className="header-summary">
-              <span>
-                <strong>Reparto:</strong> {department || '—'}
+      <header className="topbar">
+        {}
+        <div className="topbar__left">
+          <h1 className="topbar__title">OnlyGANTT</h1>
+          {department && (
+            <div className="topbar__context">
+              <span className="topbar__context-item">
+                <span className="topbar__context-label">Reparto:</span>
+                <span className="topbar__context-value">{department}</span>
               </span>
-              <span className="header-summary-sep">|</span>
-              <span>
-                <strong>Utente:</strong> {userName || '—'}
+              <span className="topbar__context-sep">|</span>
+              <span className="topbar__context-item">
+                <span className="topbar__context-label">Utente:</span>
+                <span className="topbar__context-value">{userName || '—'}</span>
               </span>
             </div>
-          </div>
+          )}
+        </div>
 
-          <div className="header-center" />
-
-          <div className="header-right header-actions">
-            {adminToken && <span className="badge badge-success header-admin-badge">Admin attivo</span>}
+        {}
+        <div className="topbar__right">
+          {}
+          <div className="topbar__status">
             {department && (
-              <span className={`badge header-lock-badge ${lockBadge.className}`}>
-                {lockBadge.label}
+              <span className={`topbar__status-item ${lockStatus.className}`} title={`Lock: ${lockStatus.label}`}>
+                <span className="topbar__status-icon">{lockStatus.icon}</span>
+                <span className="topbar__status-text">{lockStatus.label}</span>
               </span>
             )}
-            <span className="header-time">⏱ {timeString}</span>
-            <button
-              ref={menuButtonRef}
-              className="header-menu-button"
-              onClick={() => setMenuOpen(prev => !prev)}
-              aria-label="Apri menu"
-            >
-              ☰
-            </button>
-
-            {menuOpen && (
-              <div ref={menuRef} className="header-menu-panel">
-                <div className="header-menu-section">
-                  <div className="header-menu-title">Gestione reparto</div>
-                  <button
-                    className="header-menu-item"
-                    onClick={() => handleMenuAction(() => onDepartmentChange(null))}
-                    disabled={!department}
-                  >
-                    Cambia reparto
-                  </button>
-                  <button
-                    className="header-menu-item"
-                    onClick={() => handleMenuAction(onEnableLock)}
-                    disabled={!department || lockEnabled}
-                  >
-                    Modifica reparto
-                  </button>
-                  <button
-                    className="header-menu-item"
-                    onClick={() => handleMenuAction(onReleaseLock)}
-                    disabled={!department || !lockEnabled}
-                  >
-                    Libera reparto
-                  </button>
-                  <button
-                    className={`header-menu-item ${adminToken ? 'disabled' : ''}`}
-                    onClick={() => handleMenuAction(handlePasswordChange)}
-                    disabled={!department || readOnlyDepartment || adminToken}
-                  >
-                    Cambia password
-                  </button>
-                </div>
-
-                {adminToken && (
-                  <div className="header-menu-section">
-                    <div className="header-menu-title">Dati</div>
-                    <button
-                      className="header-menu-item"
-                      onClick={() => handleMenuAction(onExportDepartment)}
-                      disabled={!canImportExport}
-                    >
-                      Export reparto
-                    </button>
-                    <label className={`header-menu-item ${!canImportExport ? 'disabled' : ''}`} style={{ cursor: canImportExport ? 'pointer' : 'not-allowed' }}>
-                      Import reparto
-                      <input
-                        type="file"
-                        accept=".json"
-                        onChange={(e) => {
-                          if (!canImportExport) return;
-                          const file = e.target.files[0];
-                          if (file) {
-                            onImportDepartment(file);
-                            e.target.value = '';
-                          }
-                        }}
-                        style={{ display: 'none' }}
-                        disabled={!canImportExport}
-                      />
-                    </label>
-                  </div>
-                )}
-
-                {adminToken && (
-                  <div className="header-menu-section">
-                    <div className="header-menu-title">Admin</div>
-                    <button className="header-menu-item" onClick={() => handleMenuAction(handleAdminCreate)}>
-                      Crea reparto
-                    </button>
-                    <button
-                      className="header-menu-item"
-                      onClick={() => handleMenuAction(handleAdminPasswordReset)}
-                      disabled={!department}
-                    >
-                      Imposta password reparto
-                    </button>
-                    <button
-                      className="header-menu-item"
-                      onClick={() => handleMenuAction(handleAdminDelete)}
-                      disabled={!department}
-                    >
-                      Cancella reparto corrente
-                    </button>
-                  </div>
-                )}
-
-                <div className="header-menu-section">
-                  <div className="header-menu-title">Sessione</div>
-                  <button
-                    className="header-menu-item"
-                    onClick={() => handleMenuAction(onUserLogout)}
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
+            {adminToken && (
+              <span className="topbar__status-item status-admin" title="Modalità amministratore">
+                <span className="topbar__status-icon">⚙</span>
+                <span className="topbar__status-text">Admin</span>
+              </span>
             )}
           </div>
+
+          {}
+          <button
+            ref={menuButtonRef}
+            className="topbar__menu-btn"
+            onClick={() => setMenuOpen(prev => !prev)}
+            aria-label="Apri menu"
+            aria-expanded={menuOpen}
+          >
+            <span className="topbar__menu-icon">☰</span>
+          </button>
+
+          {}
+          {menuOpen && (
+            <div ref={menuRef} className="topbar__dropdown">
+              {}
+              <div className="topbar__dropdown-section">
+                <div className="topbar__dropdown-title">Reparto</div>
+                <button
+                  className="topbar__dropdown-item"
+                  onClick={() => handleMenuAction(() => onDepartmentChange(null))}
+                  disabled={!department}
+                >
+                  Cambia reparto
+                </button>
+                <button
+                  className="topbar__dropdown-item"
+                  onClick={() => handleMenuAction(onEnableLock)}
+                  disabled={!department || lockEnabled}
+                >
+                  Modifica reparto
+                </button>
+                <button
+                  className="topbar__dropdown-item"
+                  onClick={() => handleMenuAction(onReleaseLock)}
+                  disabled={!department || !lockEnabled}
+                >
+                  Libera reparto
+                </button>
+                <button
+                  className="topbar__dropdown-item"
+                  onClick={() => handleMenuAction(handlePasswordChange)}
+                  disabled={!department || readOnlyDepartment || adminToken}
+                >
+                  Cambia password
+                </button>
+              </div>
+
+              {}
+              {canImportExport && (
+                <div className="topbar__dropdown-section">
+                  <div className="topbar__dropdown-title">Dati</div>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(onExportDepartment)}
+                  >
+                    Export reparto
+                  </button>
+                  <label className="topbar__dropdown-item topbar__dropdown-item--file">
+                    Import reparto
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          handleMenuAction(() => onImportDepartment(file));
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+
+              {}
+              {adminToken && (
+                <div className="topbar__dropdown-section">
+                  <div className="topbar__dropdown-title">Admin</div>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(handleAdminCreate)}
+                  >
+                    Crea reparto
+                  </button>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(handleAdminPasswordReset)}
+                    disabled={!department}
+                  >
+                    Imposta password reparto
+                  </button>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(handleAdminChangePassword)}
+                  >
+                    Cambia password admin
+                  </button>
+                  <button
+                    className="topbar__dropdown-item topbar__dropdown-item--danger"
+                    onClick={() => handleMenuAction(handleAdminDelete)}
+                    disabled={!department}
+                  >
+                    Elimina reparto
+                  </button>
+                </div>
+              )}
+
+              {}
+              <div className="topbar__dropdown-section">
+                <div className="topbar__dropdown-title">Sessione</div>
+                <button
+                  className="topbar__dropdown-item"
+                  onClick={() => handleMenuAction(onUserLogout)}
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
     );

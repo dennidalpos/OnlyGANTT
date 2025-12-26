@@ -1,6 +1,3 @@
-// ProjectForm component
-// Exposed on window.OnlyGantt.components.ProjectForm
-
 (function() {
   'use strict';
 
@@ -39,7 +36,6 @@
       }
     }, [project, onDraftChange]);
 
-
     if (!formData) return null;
 
     const updateFormData = (nextData) => {
@@ -63,7 +59,6 @@
         [field]: value
       };
 
-      // Auto-update color when name changes
       if (field === 'nome') {
         const allPhaseNames = logic.getAllPhaseNames([formData]);
         newFasi[index].colore = logic.getPhaseColor(value, allPhaseNames);

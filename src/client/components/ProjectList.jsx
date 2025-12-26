@@ -1,6 +1,3 @@
-// ProjectList component
-// Exposed on window.OnlyGantt.components.ProjectList
-
 (function() {
   'use strict';
 
@@ -253,7 +250,7 @@
                   {isExpanded && (
                     <div className="phase-list">
                       {project.fasi && project.fasi.length > 0 ? (
-                        project.fasi.map((fase, index) => (
+                        project.fasi.map((fase) => (
                           <div key={fase.id} className={`phase-item state-${fase.stato} ${fase.milestone ? 'milestone' : ''}`}>
                             <div className="phase-name">
                               <span

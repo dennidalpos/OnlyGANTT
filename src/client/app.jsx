@@ -1,6 +1,3 @@
-// Main App component
-// This is the entry point for the React application
-
 (function() {
   'use strict';
 
@@ -12,16 +9,15 @@
   const api = window.OnlyGantt.api;
   const logic = window.OnlyGantt.logic;
 
-  // Components
   const HeaderBar = window.OnlyGantt.components.HeaderBar;
   const GanttControls = window.OnlyGantt.components.GanttControls;
   const GanttCanvas = window.OnlyGantt.components.GanttCanvas;
   const ProjectForm = window.OnlyGantt.components.ProjectForm;
   const ProjectList = window.OnlyGantt.components.ProjectList;
+  const ProjectSidebar = window.OnlyGantt.components.ProjectSidebar;
   const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
-  const DepartmentSelector = window.OnlyGantt.components.DepartmentSelector;
+  const LoginScreen = window.OnlyGantt.components.LoginScreen;
 
-  // Hooks
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
   const useProjects = window.OnlyGantt.hooks.useProjects;
 
@@ -59,26 +55,18 @@
   }
 
   function App() {
-    // User state
     const [userName, setUserName] = useState(storage.getCurrentUser() || '');
-    const [pendingUserName, setPendingUserName] = useState(storage.getCurrentUser() || '');
-    const [loginMode, setLoginMode] = useState('user');
-    const [loginError, setLoginError] = useState('');
-    const [adminCredentials, setAdminCredentials] = useState({ userId: '', password: '' });
     const [notifications, setNotifications] = useState([]);
 
-    // Department state
     const [department, setDepartment] = useState(null);
     const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
     const [lockEnabled, setLockEnabled] = useState(false);
 
-    // Screensaver state
     const [screensaverEnabled, setScreensaverEnabled] = useState(false);
     const [showScreensaver, setShowScreensaver] = useState(false);
     const lastActivityRef = useRef(Date.now());
     const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
 
-    // Gantt view state
     const [viewMode, setViewMode] = useState('4months');
     const [selectedProjectIds, setSelectedProjectIds] = useState(new Set());
     const [scrollToTodayTrigger, setScrollToTodayTrigger] = useState(0);
@@ -95,10 +83,11 @@
       showWeekends: false,
       showHolidays: true,
       showOnlyMilestones: false,
-      highlightDelays: true
+      highlightDelays: true,
+      showPhaseLabels: true,
+      showPhasePercentages: true
     });
 
-    // Project editing state
     const [editingProject, setEditingProject] = useState(null);
     const [showProjectForm, setShowProjectForm] = useState(false);
     const [projectDraft, setProjectDraft] = useState(null);
@@ -107,10 +96,19 @@
     const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
     const [focusedProjectId, setFocusedProjectId] = useState(null);
 
-    // Admin state
-    const [adminToken, setAdminToken] = useState(null);
+    const [hoveredProjectId, setHoveredProjectId] = useState(null);
+    const [verticalScrollTop, setVerticalScrollTop] = useState(0);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+      try {
+        return localStorage.getItem('onlygantt_sidebar_collapsed') === 'true';
+      } catch {
+        return false;
+      }
+    });
 
-    // Lock
+    const [adminToken, setAdminToken] = useState(null);
+    const [loginError, setLoginError] = useState('');
+
     const effectiveUserName = adminToken ? (userName || 'admin') : userName;
     const shouldUseLock = !!department && lockEnabled;
     const { lockInfo, isLocked, error: lockError, releaseLock, refreshLock } = useDepartmentLock(
@@ -119,7 +117,6 @@
       shouldUseLock
     );
 
-    // Determine if department is read-only
     useEffect(() => {
       if (department) {
         const isReadOnly = !lockEnabled || (shouldUseLock && !isLocked);
@@ -129,7 +126,6 @@
       }
     }, [department, shouldUseLock, isLocked, lockEnabled]);
 
-    // Projects data
     const {
       projects,
       meta,
@@ -167,31 +163,31 @@
       }, 5000);
     };
 
-    const isValidUserName = (name) => Boolean(name && name.trim().length >= 2);
-
-    // Effect: save userName to localStorage
     useEffect(() => {
       storage.setCurrentUser(userName);
     }, [userName]);
 
-    useEffect(() => {
-      setPendingUserName(userName);
-    }, [userName]);
+    const initialScrollDoneRef = useRef(null);
 
-    // Effect: select all projects in Gantt when department changes
     useEffect(() => {
-      if (!department) return;
-
+      if (!department || projects.length === 0) return;
       const allIds = new Set(projects.map(p => p.id));
       setSelectedProjectIds(allIds);
+    }, [department, projects]);
 
-      if (projects.length > 0) {
-        // Trigger "Go to Today" automatically
+    useEffect(() => {
+      if (!department) {
+        initialScrollDoneRef.current = null;
+        return;
+      }
+
+      if (initialScrollDoneRef.current !== department && projects.length > 0) {
+        initialScrollDoneRef.current = department;
         setTimeout(() => {
           setScrollToTodayTrigger(prev => prev + 1);
-        }, 100);
+        }, 150);
       }
-    }, [department, projects]);
+    }, [department]);
 
     useEffect(() => {
       if (!projectDraft) {
@@ -207,7 +203,6 @@
       setHasDraftChanges(hasChanges);
     }, [projectDraft, editingProject]);
 
-    // Effect: screensaver activity tracking
     useEffect(() => {
       const handleActivity = () => {
         lastActivityRef.current = Date.now();
@@ -226,7 +221,6 @@
       };
     }, []);
 
-    // Effect: screensaver timer
     useEffect(() => {
       if (!screensaverEnabled) {
         setShowScreensaver(false);
@@ -243,7 +237,6 @@
       return () => clearInterval(interval);
     }, [screensaverEnabled]);
 
-    // Effect: invalidate Gantt cache when filters change
     useEffect(() => {
       gantt.invalidateCache();
     }, [filters, viewMode]);
@@ -272,7 +265,6 @@
       refreshGantt();
     }, [department, projects]);
 
-    // Handlers
     const confirmPendingChanges = async (actionLabel) => {
       if (!hasUnsavedChanges) return true;
 
@@ -343,7 +335,9 @@
           showWeekends: false,
           showHolidays: false,
           showOnlyMilestones: false,
-          highlightDelays: true
+          highlightDelays: true,
+          showPhaseLabels: false,
+          showPhasePercentages: true
         };
       }
 
@@ -358,7 +352,9 @@
         showMonthYearLabels: true,
         showYearLabels: true,
         showHolidays: true,
-        highlightDelays: true
+        highlightDelays: true,
+        showPhaseLabels: true,
+        showPhasePercentages: true
       };
     };
 
@@ -377,9 +373,7 @@
     const resetSessionState = async ({ nextUserName = '', nextAdminToken = null } = {}) => {
       try {
         await releaseLock();
-      } catch (err) {
-        // Ignore release errors
-      }
+      } catch (err) {}
 
       setDepartment(null);
       setLockEnabled(false);
@@ -406,30 +400,14 @@
 
     const handleAdminLogin = async (adminId, password) => {
       const canProceed = await confirmPendingChanges('passare ad admin');
-      if (!canProceed) return;
+      if (!canProceed) throw new Error('Operazione annullata');
 
       await resetSessionState({ nextUserName: '', nextAdminToken: null });
 
-      try {
-        const result = await api.adminLogin(adminId, password);
-        setAdminToken(result.token);
-        setUserName(adminId);
-        setLoginMode('user');
-        setAdminCredentials({ userId: '', password: '' });
-        setLoginError('');
-        pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
-      } catch (err) {
-        setLoginError(err.message || 'Credenziali admin non valide');
-        pushNotification({ type: 'error', message: err.message || 'Credenziali admin non valide' });
-      }
-    };
-
-    const handleAdminLoginSubmit = async () => {
-      if (!adminCredentials.userId.trim() || !adminCredentials.password) {
-        setLoginError('Inserisci credenziali admin valide');
-        return;
-      }
-      await handleAdminLogin(adminCredentials.userId.trim(), adminCredentials.password);
+      const result = await api.adminLogin(adminId, password);
+      setAdminToken(result.token);
+      setUserName(adminId);
+      pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
     };
 
     const handleAdminReleaseLock = async () => {
@@ -479,11 +457,13 @@
       }
     };
 
-    const handleUserNameCommit = async () => {
-      if (pendingUserName === userName) return;
-      const ok = await handleUserNameChange(pendingUserName);
-      if (!ok) {
-        setPendingUserName(userName);
+    const handleAdminChangePassword = async ({ oldPassword, newPassword }) => {
+      if (!adminToken) return;
+      try {
+        await api.adminChangePassword(oldPassword, newPassword, adminToken);
+        pushNotification({ type: 'success', message: 'Password admin aggiornata' });
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Reset password fallito' });
       }
     };
 
@@ -495,7 +475,7 @@
         if (userName) {
           storage.removePassword(userName, department);
         }
-        pushNotification({ type: 'success', message: 'Password aggiornata. Effettua nuovamente l’accesso al reparto.' });
+        pushNotification({ type: 'success', message: 'Password aggiornata. Effettua nuovamente l\'accesso al reparto.' });
         await handleDepartmentChange(null);
         return true;
       } catch (err) {
@@ -531,11 +511,9 @@
     };
 
     const handleExportPNG = () => {
-      // Switch to full view temporarily
       const previousViewMode = viewMode;
       setViewMode('full');
 
-      // Wait for render, then export
       setTimeout(() => {
         const canvas = document.querySelector('.gantt-canvas');
         if (canvas) {
@@ -546,7 +524,6 @@
           a.click();
         }
 
-        // Restore previous view mode
         setViewMode(previousViewMode);
       }, 100);
     };
@@ -587,10 +564,8 @@
       let newProjects;
 
       if (editingProject) {
-        // Update existing
         newProjects = projects.map(p => p.id === projectData.id ? projectData : p);
       } else {
-        // Add new
         newProjects = [...projects, projectData];
       }
 
@@ -655,7 +630,6 @@
       updateProjects(newProjects);
       refreshGantt();
 
-      // Remove from selected
       const newSelected = new Set(selectedProjectIds);
       newSelected.delete(projectId);
       setSelectedProjectIds(newSelected);
@@ -704,9 +678,7 @@
       if (adminToken) {
         try {
           await api.adminLogout(adminToken);
-        } catch (err) {
-          // Ignore admin logout errors
-        }
+        } catch (err) {}
       }
 
       await resetSessionState({ nextUserName: '', nextAdminToken: null });
@@ -749,12 +721,7 @@
       pushNotification({ type: 'success', message: 'Export progetti completato' });
     };
 
-    const readFileAsText = (file) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('Impossibile leggere il file'));
-      reader.readAsText(file);
-    });
+    const handleExportJSON = handleExportProjects;
 
     const handleExportDepartment = async () => {
       if (!department) return;
@@ -784,6 +751,13 @@
         pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
         return;
       }
+
+      const readFileAsText = (f) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Impossibile leggere il file'));
+        reader.readAsText(f);
+      });
 
       try {
         if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
@@ -825,13 +799,11 @@
       }
     };
 
-    // Filter projects for Gantt display
     const visibleProjects = useMemo(
       () => projects.filter(p => selectedProjectIds.has(p.id)),
       [projects, selectedProjectIds]
     );
 
-    // Apply "only milestones" filter
     const ganttProjects = useMemo(
       () => (filters.showOnlyMilestones
         ? visibleProjects.map(p => ({
@@ -863,6 +835,7 @@
           onAdminCreateDepartment={handleAdminCreateDepartment}
           onAdminDeleteDepartment={handleAdminDeleteDepartment}
           onAdminResetPassword={handleAdminResetPassword}
+          onAdminChangePassword={handleAdminChangePassword}
         />
 
         {lockError && lockError.lockedBy && (
@@ -876,113 +849,16 @@
 
         <main className="main-container">
           {!department ? (
-            <div className="card auth-card" style={{ maxWidth: '560px', margin: '0 auto' }}>
-              <h2 className="card-title">Accesso reparto</h2>
-              <div className="auth-tabs">
-                <button
-                  type="button"
-                  className={`auth-tab ${loginMode === 'user' ? 'active' : ''}`}
-                  onClick={() => {
-                    setLoginMode('user');
-                    setLoginError('');
-                  }}
-                >
-                  Login utente
-                </button>
-                <button
-                  type="button"
-                  className={`auth-tab ${loginMode === 'admin' ? 'active' : ''}`}
-                  onClick={() => {
-                    setLoginMode('admin');
-                    setLoginError('');
-                  }}
-                >
-                  Login admin
-                </button>
-              </div>
-
-              {loginError && (
-                <div className="alert-item" style={{ marginBottom: '1rem' }}>
-                  {loginError}
-                </div>
-              )}
-
-              {loginMode === 'user' && (
-                <div className="card-section">
-                  <div className="form-group">
-                    <label htmlFor="userNameAccess">Nome utente</label>
-                    <input
-                      id="userNameAccess"
-                      type="text"
-                      value={pendingUserName}
-                      onChange={(e) => setPendingUserName(e.target.value)}
-                      onBlur={handleUserNameCommit}
-                      onKeyDown={(e) => e.key === 'Enter' && handleUserNameCommit()}
-                      placeholder="Inserisci nome"
-                    />
-                    {!isValidUserName(pendingUserName) && pendingUserName && (
-                      <div className="text-muted text-small" style={{ marginTop: '0.25rem' }}>
-                        Inserisci almeno 2 caratteri.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {loginMode === 'admin' && !adminToken && (
-                <div className="card-section">
-                  <div className="form-group">
-                    <label htmlFor="adminId">ID Admin</label>
-                    <input
-                      id="adminId"
-                      type="text"
-                      value={adminCredentials.userId}
-                      onChange={(e) => setAdminCredentials(prev => ({ ...prev, userId: e.target.value }))}
-                      placeholder="Inserisci ID admin"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="adminPassword">Password Admin</label>
-                    <input
-                      id="adminPassword"
-                      type="password"
-                      value={adminCredentials.password}
-                      onChange={(e) => setAdminCredentials(prev => ({ ...prev, password: e.target.value }))}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAdminLoginSubmit()}
-                      placeholder="Inserisci password"
-                    />
-                  </div>
-                  <div className="button-group">
-                    <button
-                      type="button"
-                      className="btn-success"
-                      onClick={handleAdminLoginSubmit}
-                    >
-                      Accedi come admin
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {adminToken && (
-                <div className="card-section">
-                  <div className="alert-item info">
-                    Admin autenticato. Seleziona un reparto per procedere.
-                  </div>
-                </div>
-              )}
-
-              {DepartmentSelector && (
-                <DepartmentSelector
-                  userName={userName}
-                  department={department}
-                  onDepartmentChange={handleDepartmentChange}
-                  adminToken={adminToken}
-                  lockInfo={lockInfo}
-                  onAdminReleaseLock={handleAdminReleaseLock}
-                />
-              )}
-            </div>
+            <LoginScreen
+              userName={userName}
+              onUserNameChange={handleUserNameChange}
+              onDepartmentChange={handleDepartmentChange}
+              adminToken={adminToken}
+              onAdminLogin={handleAdminLogin}
+              onAdminLogout={handleUserLogout}
+              loginError={loginError}
+              setLoginError={setLoginError}
+            />
           ) : (
             <>
               {departmentValidationErrors.length > 0 && (
@@ -1000,16 +876,16 @@
               )}
               <div className="gantt-section">
                 <div className="card">
-                  <h2 className="card-title">Diagramma di Gantt</h2>
+                  <h2 className="card-title">Timeline Progetti</h2>
 
-          <GanttControls
-            viewMode={viewMode}
-            onViewModeChange={handleViewModeChange}
-            onGoToToday={handleGoToToday}
-            onExportPNG={handleExportPNG}
-            filters={filters}
-            onFiltersChange={setFilters}
-          />
+                  <GanttControls
+                    viewMode={viewMode}
+                    onViewModeChange={handleViewModeChange}
+                    onGoToToday={handleGoToToday}
+                    onExportPNG={handleExportPNG}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                  />
 
                   <div className="card-section">
                     {isLoading ? (
@@ -1019,21 +895,45 @@
                     ) : projectsError ? (
                       <div className="alert-item">Errore: {projectsError}</div>
                     ) : (
-                      <GanttCanvas
-                        viewMode={viewMode}
-                        projects={ganttProjects}
-                        filters={filters}
-                        scrollToTodayTrigger={scrollToTodayTrigger}
-                        refreshTrigger={ganttRefreshTrigger}
-                        onPhaseContextMenu={handleGanttPhaseContextMenu}
-                      />
+                      <div className={`gantt-with-sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
+                        <ProjectSidebar
+                          projects={ganttProjects}
+                          selectedProjectIds={selectedProjectIds}
+                          onSelectedProjectIdsChange={setSelectedProjectIds}
+                          onEditProject={handleEditProject}
+                          onDeleteProject={handleDeleteProject}
+                          readOnly={readOnlyDepartment}
+                          isSaving={isSavingProject}
+                          hoveredProjectId={hoveredProjectId}
+                          onProjectHover={setHoveredProjectId}
+                          scrollTop={verticalScrollTop}
+                          onScrollChange={setVerticalScrollTop}
+                          ganttHeaderHeight={config.gantt.CANVAS_TOP_MARGIN}
+                          onCollapsedChange={setSidebarCollapsed}
+                          viewMode={viewMode}
+                        />
+                        <div className="gantt-main-area">
+                          <GanttCanvas
+                            viewMode={viewMode}
+                            projects={ganttProjects}
+                            filters={filters}
+                            scrollToTodayTrigger={scrollToTodayTrigger}
+                            refreshTrigger={ganttRefreshTrigger}
+                            onPhaseContextMenu={handleGanttPhaseContextMenu}
+                            hoveredProjectId={hoveredProjectId}
+                            onProjectHover={setHoveredProjectId}
+                            verticalScrollTop={verticalScrollTop}
+                            onVerticalScrollChange={setVerticalScrollTop}
+                            sidebarCollapsed={sidebarCollapsed}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
 
               <div className="bottom-layout">
-                {/* Left: Project Form */}
                 <div>
                   <div className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1102,7 +1002,6 @@
                   )}
                 </div>
 
-                {/* Center: Project List */}
                 <div>
                       <ProjectList
                         projects={projects}
@@ -1110,7 +1009,7 @@
                         onSelectedProjectIdsChange={setSelectedProjectIds}
                         onEditProject={handleEditProject}
                         onDeleteProject={handleDeleteProject}
-                        onExportJSON={handleExportProjects}
+                        onExportJSON={handleExportJSON}
                         onImportJSON={handleImportJSON}
                         validationErrors={validationErrors}
                         readOnly={readOnlyDepartment}
@@ -1120,7 +1019,6 @@
                       />
                 </div>
 
-                {/* Right: Alerts */}
                 <div>
                   <AlertsPanel projects={projects} />
                 </div>
@@ -1160,7 +1058,6 @@
     );
   }
 
-  // Mount app
   const root = ReactDOM.createRoot(document.getElementById('root'));
   root.render(
     <ErrorBoundary>

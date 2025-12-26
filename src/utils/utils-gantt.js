@@ -1,6 +1,3 @@
-// Gantt canvas rendering utilities
-// Exposed on window.OnlyGantt.gantt
-
 (function() {
   'use strict';
 
@@ -10,19 +7,12 @@
   const dateUtils = window.OnlyGantt.dateUtils;
   const logic = window.OnlyGantt.logic;
 
-  // Cache for layout calculations
   let layoutCache = null;
 
-  /**
-   * Invalidate layout cache
-   */
   function invalidateCache() {
     layoutCache = null;
   }
 
-  /**
-   * Calculate timeline range based on view mode
-   */
   function getProjectsDateRange(projects) {
     let minDate = null;
     let maxDate = null;
@@ -56,43 +46,35 @@
 
   function calculateTimelineRange(viewMode, projects) {
     const { minDate, maxDate } = getProjectsDateRange(projects);
-
     const hasRange = minDate && maxDate;
 
     if (viewMode === '4months') {
       if (!hasRange) {
         const today = new Date();
         const startDate = dateUtils.getMonthStart(today);
-        const endDate = dateUtils.getMonthEnd(dateUtils.addMonths(startDate, 3));
+        const endDate = dateUtils.getMonthEnd(dateUtils.addMonths(startDate, 2));
         return { startDate, endDate };
       }
-
       const startDate = dateUtils.addDays(minDate, -config.gantt.MARGIN_DAYS);
       const endDate = dateUtils.addDays(maxDate, config.gantt.MARGIN_DAYS);
       return { startDate, endDate };
     }
 
-    // If no dates found, use 4 months range as fallback
     if (!hasRange) {
       const today = new Date();
       const startDate = dateUtils.getMonthStart(today);
-      const endDate = dateUtils.getMonthEnd(dateUtils.addMonths(startDate, 3));
+      const endDate = dateUtils.getMonthEnd(dateUtils.addMonths(startDate, 2));
       return { startDate, endDate };
     }
 
-    // Add margin days (1 week before and after)
     const startDate = dateUtils.addDays(minDate, -config.gantt.MARGIN_DAYS);
     const endDate = dateUtils.addDays(maxDate, config.gantt.MARGIN_DAYS);
-
     return { startDate, endDate };
   }
 
-  /**
-   * Calculate pixels per day
-   */
   function calculatePixelsPerDay(viewMode, totalDays, containerWidth) {
     if (viewMode === '4months') {
-      const visibleDays = 120;
+      const visibleDays = 90;
       const availableWidth = containerWidth - config.gantt.CANVAS_LEFT_MARGIN - config.gantt.CANVAS_RIGHT_MARGIN;
       const pixelsPerDay = availableWidth / visibleDays;
       return Math.max(1, pixelsPerDay);
@@ -102,9 +84,6 @@
     return Math.max(0.2, availableWidth / totalDays);
   }
 
-  /**
-   * Build layout for rendering
-   */
   function buildLayout(viewMode, projects, containerWidth, filters) {
     const { startDate, endDate } = calculateTimelineRange(viewMode, projects);
     const totalDays = dateUtils.daysDiff(startDate, endDate) + 1;
@@ -112,7 +91,6 @@
 
     const canvasWidth = config.gantt.CANVAS_LEFT_MARGIN + (totalDays * pixelsPerDay) + config.gantt.CANVAS_RIGHT_MARGIN;
 
-    // One row per project
     const rows = [];
     let currentY = config.gantt.CANVAS_TOP_MARGIN;
 
@@ -121,14 +99,13 @@
         type: 'project',
         project,
         y: currentY,
-        height: config.gantt.PROJECT_BAR_HEIGHT
+        height: config.gantt.ROW_HEIGHT
       });
       currentY += config.gantt.ROW_HEIGHT;
     });
 
     const canvasHeight = currentY + config.gantt.CANVAS_BOTTOM_MARGIN;
 
-    // Build date-to-X map
     const dateToX = {};
     for (let i = 0; i < totalDays; i++) {
       const date = dateUtils.addDays(startDate, i);
@@ -136,7 +113,6 @@
       dateToX[dateStr] = config.gantt.CANVAS_LEFT_MARGIN + (i * pixelsPerDay);
     }
 
-    // Build month spans
     const months = [];
     let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
     while (currentMonth <= endDate) {
@@ -156,7 +132,6 @@
       currentMonth = dateUtils.addMonths(currentMonth, 1);
     }
 
-    // Build year spans
     const years = [];
     let currentYear = new Date(startDate.getFullYear(), 0, 1);
     while (currentYear <= endDate) {
@@ -176,7 +151,6 @@
       currentYear = new Date(currentYear.getFullYear() + 1, 0, 1);
     }
 
-    // Build week spans
     const weeks = [];
     const allDates = dateUtils.getDateRange(startDate, endDate);
     let currentWeekStart = null;
@@ -237,9 +211,6 @@
     };
   }
 
-  /**
-   * Get or build layout
-   */
   function getLayout(viewMode, projects, containerWidth, filters) {
     const projectsKey = JSON.stringify(projects);
     if (layoutCache &&
@@ -276,11 +247,9 @@
     return truncated ? truncated + ellipsis : ellipsis;
   }
 
-  /**
-   * Render Gantt chart
-   */
-  function render(ctx, layout) {
+  function render(ctx, layout, options = {}) {
     const { canvasWidth, canvasHeight, months, years, weeks, rows, dateToX, pixelsPerDay, startDate, endDate, filters } = layout;
+    const { hoveredProjectId } = options;
 
     ctx.imageSmoothingEnabled = false;
 
@@ -288,32 +257,29 @@
     const headerDayNumberY = headerBaseY - 14;
     const headerDayLetterY = headerBaseY - 30;
     const headerWeekY = headerBaseY - 50;
-    const headerMsY = headerBaseY - 68;
-    const headerTodayY = headerBaseY - 86;
-    const headerMonthY = headerBaseY - 102;
-    const headerMonthLabelY = headerBaseY - 114;
-    const headerYearY = headerBaseY - 124;
+    const headerTodayY = headerBaseY - 4;
+    const headerMsY = headerBaseY - 72;
+    const headerMonthY = headerBaseY - 94;
+    const headerYearY = headerBaseY - 118;
 
-    // Background
     ctx.fillStyle = config.gantt.BACKGROUND_COLOR;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Header
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvasWidth, headerDayNumberY + 8);
 
-    ctx.font = 'bold 14px sans-serif';
+    const fontFamily = config.gantt.FONT_FAMILY;
+    const headerFontSize = config.gantt.HEADER_FONT_SIZE;
+    const headerSmallFontSize = config.gantt.HEADER_SMALL_FONT_SIZE;
+    const headerTinyFontSize = config.gantt.HEADER_TINY_FONT_SIZE;
+
+    ctx.font = `bold ${headerFontSize}px ${fontFamily}`;
     ctx.fillStyle = config.gantt.TEXT_COLOR;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     if (filters.showYearLabels) {
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillStyle = config.gantt.TEXT_SMALL_COLOR;
-      ctx.textAlign = 'left';
-      ctx.fillText('Anni', config.gantt.CANVAS_LEFT_MARGIN, headerYearY);
-
-      ctx.font = 'bold 12px sans-serif';
+      ctx.font = `bold 12px ${fontFamily}`;
       ctx.fillStyle = config.gantt.TEXT_COLOR;
       ctx.textAlign = 'center';
       years.forEach(year => {
@@ -322,18 +288,13 @@
     }
 
     if (filters.showMonthYearLabels) {
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillStyle = config.gantt.TEXT_SMALL_COLOR;
-      ctx.textAlign = 'left';
-      ctx.fillText('Mesi', config.gantt.CANVAS_LEFT_MARGIN, headerMonthLabelY);
-
       months.forEach(month => {
         const monthName = month.date.toLocaleDateString('it-IT', {
           month: 'long',
           year: layout.viewMode === '4months' ? 'numeric' : undefined
         });
         const capitalizedName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        ctx.font = 'bold 14px sans-serif';
+        ctx.font = `bold ${headerFontSize}px ${fontFamily}`;
         ctx.textAlign = 'center';
         ctx.fillStyle = config.gantt.TEXT_COLOR;
         ctx.fillText(capitalizedName, month.x + month.width / 2, headerMonthY);
@@ -345,11 +306,9 @@
     const projectAreaLeft = config.gantt.CANVAS_LEFT_MARGIN;
     const projectAreaRight = canvasWidth - config.gantt.CANVAS_RIGHT_MARGIN;
 
-    // Weeks grid
     if (filters.showWeekSeparators) {
       ctx.strokeStyle = config.gantt.GRID_COLOR;
       ctx.lineWidth = 1;
-
       weeks.forEach(week => {
         ctx.beginPath();
         ctx.moveTo(week.x, projectAreaTop);
@@ -358,11 +317,9 @@
       });
     }
 
-    // Days grid
     if (filters.showDaySeparators) {
       ctx.strokeStyle = config.gantt.GRID_LIGHT_COLOR;
       ctx.lineWidth = 0.5;
-
       const allDates = dateUtils.getDateRange(startDate, endDate);
       allDates.forEach(date => {
         const x = dateToX[dateUtils.formatDate(date)];
@@ -373,23 +330,19 @@
       });
     }
 
-    // Week numbers
     if (filters.showWeekNumbers) {
-      ctx.font = '10px sans-serif';
+      ctx.font = `${headerSmallFontSize}px ${fontFamily}`;
       ctx.fillStyle = config.gantt.TEXT_SMALL_COLOR;
       ctx.textAlign = 'center';
-
       weeks.forEach(week => {
         ctx.fillText(`W${week.weekNumber}`, week.x + week.width / 2, headerWeekY);
       });
     }
 
-    // Day letters/numbers
     if (filters.showDayLetters || filters.showDayNumbers) {
-      ctx.font = '9px sans-serif';
+      ctx.font = `${headerTinyFontSize}px ${fontFamily}`;
       ctx.fillStyle = config.gantt.TEXT_SMALL_COLOR;
       ctx.textAlign = 'center';
-
       const allDates = dateUtils.getDateRange(startDate, endDate);
       allDates.forEach(date => {
         const x = dateToX[dateUtils.formatDate(date)] + pixelsPerDay / 2;
@@ -403,7 +356,6 @@
       });
     }
 
-    // Month separators
     if (filters.showMonthSeparators) {
       ctx.strokeStyle = config.gantt.GRID_COLOR;
       ctx.lineWidth = 2;
@@ -415,7 +367,6 @@
       });
     }
 
-    // Year separators
     if (filters.showYearSeparators) {
       ctx.strokeStyle = config.gantt.GRID_COLOR;
       ctx.lineWidth = 3;
@@ -429,7 +380,6 @@
       });
     }
 
-    // Weekends
     if (filters.showWeekends) {
       const allDates = dateUtils.getDateRange(startDate, endDate);
       allDates.forEach(date => {
@@ -441,7 +391,6 @@
       });
     }
 
-    // Holidays
     if (filters.showHolidays) {
       const allDates = dateUtils.getDateRange(startDate, endDate);
       allDates.forEach(date => {
@@ -453,7 +402,6 @@
       });
     }
 
-    // Collect milestones
     const milestones = [];
     rows.forEach(row => {
       if (Array.isArray(row.project.fasi)) {
@@ -468,21 +416,19 @@
       }
     });
 
-    // Today line and label
     const today = new Date();
     const todayX = dateToX[dateUtils.formatDate(today)];
 
-    if (todayX !== null && todayX !== undefined) {
-      const todayLineTop = headerTodayY + 10;
+    if (todayX !== null && todayX !== undefined && todayX >= projectAreaLeft) {
       ctx.strokeStyle = config.gantt.TODAY_LINE_COLOR;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(todayX, todayLineTop);
+      ctx.moveTo(todayX, projectAreaTop);
       ctx.lineTo(todayX, projectAreaBottom);
       ctx.stroke();
 
       ctx.fillStyle = config.gantt.TODAY_LINE_COLOR;
-      ctx.font = 'bold 11px sans-serif';
+      ctx.font = `bold 11px ${fontFamily}`;
       ctx.textAlign = 'center';
       ctx.fillText('Oggi', todayX, headerTodayY);
     }
@@ -498,27 +444,17 @@
       );
     }
 
-    // Projects
     rows.forEach(row => {
       const project = row.project;
+      const isHovered = hoveredProjectId && project.id === hoveredProjectId;
 
-      // Project label
-      ctx.fillStyle = config.gantt.TEXT_COLOR;
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const labelPadding = 8;
-      const labelMaxWidth = Math.max(0, config.gantt.CANVAS_LEFT_MARGIN - labelPadding * 2);
-      const labelText = ellipsizeText(ctx, project.nome || 'Unnamed', labelMaxWidth);
+      if (isHovered) {
+        const highlightHeight = 32;
+        const highlightY = row.y + (row.height - highlightHeight) / 2;
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+        ctx.fillRect(0, highlightY, canvasWidth, highlightHeight);
+      }
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, row.y, config.gantt.CANVAS_LEFT_MARGIN, row.height);
-      ctx.clip();
-      ctx.fillText(labelText, labelPadding, row.y + row.height / 2);
-      ctx.restore();
-
-      // Project bar
       if (project.dataInizio && project.dataFine) {
         const x1 = dateToX[project.dataInizio];
         const x2 = dateToX[project.dataFine];
@@ -528,7 +464,6 @@
           const barY = row.y;
           const barHeight = row.height;
 
-          // Container bar
           ctx.fillStyle = config.gantt.PROJECT_BAR_COLOR;
           ctx.fillRect(x1, barY, barWidth, barHeight);
 
@@ -536,9 +471,9 @@
           ctx.lineWidth = 1;
           ctx.strokeRect(x1, barY, barWidth, barHeight);
 
-          // Phases inside
           if (Array.isArray(project.fasi)) {
             project.fasi.forEach(fase => {
+              if (filters.showOnlyMilestones && !fase.milestone) return;
               if (!fase.milestone && fase.dataInizio && fase.dataFine) {
                 const fx1 = dateToX[fase.dataInizio];
                 const fx2 = dateToX[fase.dataFine];
@@ -555,7 +490,6 @@
                   ctx.lineWidth = 1;
                   ctx.strokeRect(fx1, faseY, faseWidth, faseHeight);
 
-                  // Alert
                   if (filters.highlightDelays && logic.isDelayed(fase)) {
                     ctx.strokeStyle = config.gantt.TODAY_LINE_COLOR;
                     ctx.lineWidth = 2;
@@ -564,45 +498,64 @@
                     ctx.setLineDash([]);
                   }
 
-                  // Text (left-aligned with ellipsis)
-                  const percentage = fase.percentualeCompletamento || 0;
-                  ctx.fillStyle = '#ffffff';
-                  ctx.font = 'bold 10px sans-serif';
-                  ctx.textAlign = 'left';
-                  ctx.textBaseline = 'middle';
+                  const showLabels = filters.showPhaseLabels;
+                  const showPercent = filters.showPhasePercentages;
 
-                  const padding = 4;
-                  const availableWidth = faseWidth - (padding * 2);
+                  if (showLabels || showPercent) {
+                    const percentage = fase.percentualeCompletamento || 0;
+                    const phaseFontSize = config.gantt.PHASE_FONT_SIZE;
+                    const phaseFontWeight = config.gantt.PHASE_FONT_WEIGHT;
+                    const padding = config.gantt.PHASE_TEXT_PADDING;
 
-                  if (availableWidth > 6) {
-                    const percentText = `${percentage}%`;
-                    const percentWidth = ctx.measureText(percentText).width;
-                    const nameWidthAvailable = availableWidth - percentWidth - 6;
-                    const nameText = fase.nome || '';
-                    let label = percentText;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `${phaseFontWeight} ${phaseFontSize}px ${fontFamily}`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
 
-                    if (nameWidthAvailable > 8) {
-                      const trimmedName = ellipsizeText(ctx, nameText, nameWidthAvailable);
-                      label = `${trimmedName}${trimmedName ? ' ' : ''}${percentText}`;
+                    const availableWidth = faseWidth - (padding * 2);
+
+                    if (availableWidth > 10) {
+                      const percentText = showPercent ? `${percentage}%` : '';
+                      const percentWidth = showPercent ? ctx.measureText(percentText).width : 0;
+                      const nameText = showLabels ? (fase.nome || '') : '';
+                      let label = '';
+
+                      if (showLabels && showPercent) {
+                        const nameWidthAvailable = availableWidth - percentWidth - 8;
+                        if (nameWidthAvailable > 12) {
+                          const trimmedName = ellipsizeText(ctx, nameText, nameWidthAvailable);
+                          label = `${trimmedName}${trimmedName ? ' ' : ''}${percentText}`;
+                        } else {
+                          label = percentText;
+                        }
+                      } else if (showPercent) {
+                        label = percentText;
+                      } else if (showLabels) {
+                        label = ellipsizeText(ctx, nameText, availableWidth);
+                      }
+
+                      if (label) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(fx1 + padding, faseY, availableWidth, faseHeight);
+                        ctx.clip();
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                        ctx.shadowBlur = 2;
+                        ctx.shadowOffsetX = 1;
+                        ctx.shadowOffsetY = 1;
+                        ctx.fillText(label, fx1 + padding, faseY + faseHeight / 2);
+                        ctx.restore();
+                      }
                     }
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(fx1 + padding, faseY, availableWidth, faseHeight);
-                    ctx.clip();
-                    ctx.fillText(label, fx1 + padding, faseY + faseHeight / 2);
-                    ctx.restore();
                   }
                 }
               }
-
             });
           }
         }
       }
     });
 
-    // Milestone vertical lines (upwards only)
     ctx.strokeStyle = config.gantt.MILESTONE_COLOR;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 4]);
@@ -617,39 +570,39 @@
 
     ctx.setLineDash([]);
 
-    // MS labels (in header, staggered to avoid overlap)
     ctx.fillStyle = config.gantt.MILESTONE_COLOR;
-    ctx.font = 'bold 10px sans-serif';
+    ctx.font = `bold ${headerSmallFontSize}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     const msLabelText = 'MS';
     const msLabelPadding = 4;
     const msLabelSpacing = 8;
-    const msLabelRowHeight = 12;
     const msLabelWidth = ctx.measureText(msLabelText).width + (msLabelPadding * 2);
-    const msLabelRows = [];
-    const msLabelPlacements = [];
+    const minDistance = msLabelWidth + msLabelSpacing;
 
-    milestones
-      .slice()
-      .sort((a, b) => a.x - b.x)
-      .forEach(ms => {
-        let targetRow = msLabelRows.findIndex(lastX => ms.x - lastX >= msLabelWidth + msLabelSpacing);
-        if (targetRow === -1) {
-          targetRow = msLabelRows.length;
-          msLabelRows.push(-Infinity);
-        }
-        msLabelRows[targetRow] = ms.x;
-        msLabelPlacements.push({ x: ms.x, rowIndex: targetRow });
-      });
+    const sortedMilestones = milestones.slice().sort((a, b) => a.x - b.x);
+    const msGroups = [];
 
-    msLabelPlacements.forEach(label => {
-      const y = headerMsY - (label.rowIndex * msLabelRowHeight);
-      ctx.fillText(msLabelText, label.x, y);
+    sortedMilestones.forEach(ms => {
+      const lastGroup = msGroups[msGroups.length - 1];
+      if (lastGroup && ms.x - lastGroup.maxX < minDistance) {
+        lastGroup.items.push(ms);
+        lastGroup.maxX = ms.x;
+      } else {
+        msGroups.push({
+          items: [ms],
+          minX: ms.x,
+          maxX: ms.x
+        });
+      }
     });
 
-    // Milestones (diamonds)
+    msGroups.forEach(group => {
+      const centerX = (group.minX + group.maxX) / 2;
+      ctx.fillText(msLabelText, centerX, headerMsY);
+    });
+
     milestones.forEach(ms => {
       const mx = ms.x;
       const centerY = ms.row.y + ms.row.height / 2;
@@ -670,15 +623,10 @@
     });
   }
 
-  /**
-   * Hit test
-   */
   function hitTest(mouseX, mouseY, layout) {
     for (const row of layout.rows) {
-      // Check phases first (higher priority)
       if (Array.isArray(row.project.fasi)) {
         for (const fase of row.project.fasi) {
-          // Milestone
           if (fase.milestone && fase.dataFine) {
             const x = layout.dateToX[fase.dataFine];
             if (x !== null) {
@@ -692,7 +640,6 @@
             }
           }
 
-          // Phase bar
           if (!fase.milestone && fase.dataInizio && fase.dataFine) {
             const x1 = layout.dateToX[fase.dataInizio];
             const x2 = layout.dateToX[fase.dataFine];
@@ -711,7 +658,6 @@
         }
       }
 
-      // Check project bar (lower priority, only if not over a phase)
       const project = row.project;
       if (project.dataInizio && project.dataFine) {
         const x1 = layout.dateToX[project.dataInizio];
@@ -730,7 +676,6 @@
       }
     }
 
-    // Empty space
     if (mouseX >= config.gantt.CANVAS_LEFT_MARGIN) {
       const dayOffset = Math.floor((mouseX - config.gantt.CANVAS_LEFT_MARGIN) / layout.pixelsPerDay);
       const date = dateUtils.addDays(layout.startDate, dayOffset);

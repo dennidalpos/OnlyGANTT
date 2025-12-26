@@ -1,13 +1,54 @@
-// GanttControls component
-// Exposed on window.OnlyGantt.components.GanttControls
+
+
 
 (function() {
   'use strict';
 
-  const { useState } = React;
+  const { useState, useMemo } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
+
+  
+  const FILTER_GROUPS = {
+    timeline: {
+      title: 'Timeline',
+      icon: '📅',
+      filters: [
+        { key: 'showYearLabels', label: 'Anni' },
+        { key: 'showYearSeparators', label: 'Sep. anni' },
+        { key: 'showMonthYearLabels', label: 'Mesi' },
+        { key: 'showMonthSeparators', label: 'Sep. mesi' },
+        { key: 'showWeekNumbers', label: 'N° sett.' },
+        { key: 'showWeekSeparators', label: 'Sep. sett.' },
+        { key: 'showDayNumbers', label: 'N° giorni' },
+        { key: 'showDayLetters', label: 'Lett. giorni' },
+        { key: 'showDaySeparators', label: 'Sep. giorni' }
+      ]
+    },
+    content: {
+      title: 'Contenuti',
+      icon: '📋',
+      filters: [
+        { key: 'showPhaseLabels', label: 'Nomi fasi' },
+        { key: 'showPhasePercentages', label: 'Percentuali' },
+        { key: 'showOnlyMilestones', label: 'Solo milestone' }
+      ]
+    },
+    highlights: {
+      title: 'Evidenziazioni',
+      icon: '🎨',
+      filters: [
+        { key: 'showWeekends', label: 'Weekend' },
+        { key: 'showHolidays', label: 'Festivi' },
+        { key: 'highlightDelays', label: 'Ritardi' }
+      ]
+    }
+  };
+
+  
+  const ALL_FILTER_KEYS = Object.values(FILTER_GROUPS)
+    .flatMap(group => group.filters.map(f => f.key));
 
   function GanttControls({
     viewMode,
@@ -23,207 +64,167 @@
       onFiltersChange({ ...filters, [key]: value });
     };
 
-    const toggleableFilterKeys = [
-      'showDaySeparators',
-      'showWeekSeparators',
-      'showMonthSeparators',
-      'showYearSeparators',
-      'showDayLetters',
-      'showDayNumbers',
-      'showWeekNumbers',
-      'showMonthYearLabels',
-      'showYearLabels',
-      'showWeekends',
-      'showHolidays',
-      'highlightDelays',
-      'showOnlyMilestones'
-    ];
+    
+    const groupStats = useMemo(() => {
+      const stats = {};
+      Object.entries(FILTER_GROUPS).forEach(([groupKey, group]) => {
+        const activeCount = group.filters.filter(f => filters[f.key]).length;
+        stats[groupKey] = {
+          active: activeCount,
+          total: group.filters.length
+        };
+      });
+      return stats;
+    }, [filters]);
 
-    const allFiltersEnabled = toggleableFilterKeys.every(key => filters[key]);
+    const allFiltersEnabled = ALL_FILTER_KEYS.every(key => filters[key]);
+    const activeFilterCount = ALL_FILTER_KEYS.filter(key => filters[key]).length;
 
     const handleToggleAllFilters = () => {
       const nextValue = !allFiltersEnabled;
-      const nextFilters = toggleableFilterKeys.reduce((acc, key) => {
+      const nextFilters = ALL_FILTER_KEYS.reduce((acc, key) => {
         acc[key] = nextValue;
         return acc;
       }, {});
       onFiltersChange({ ...filters, ...nextFilters });
     };
 
+    const handleToggleGroup = (groupKey) => {
+      const group = FILTER_GROUPS[groupKey];
+      const allActive = group.filters.every(f => filters[f.key]);
+      const nextValue = !allActive;
+      const nextFilters = group.filters.reduce((acc, f) => {
+        acc[f.key] = nextValue;
+        return acc;
+      }, {});
+      onFiltersChange({ ...filters, ...nextFilters });
+    };
+
+    const handleResetToDefaults = () => {
+      
+      const defaults = viewMode === 'full' ? {
+        showDaySeparators: false,
+        showWeekSeparators: false,
+        showMonthSeparators: true,
+        showYearSeparators: true,
+        showDayLetters: false,
+        showDayNumbers: false,
+        showWeekNumbers: false,
+        showMonthYearLabels: false,
+        showYearLabels: true,
+        showWeekends: false,
+        showHolidays: false,
+        showOnlyMilestones: false,
+        highlightDelays: true,
+        showPhaseLabels: false,
+        showPhasePercentages: true
+      } : {
+        showDaySeparators: true,
+        showWeekSeparators: true,
+        showMonthSeparators: true,
+        showYearSeparators: true,
+        showDayLetters: true,
+        showDayNumbers: true,
+        showWeekNumbers: true,
+        showMonthYearLabels: true,
+        showYearLabels: true,
+        showWeekends: false,
+        showHolidays: true,
+        showOnlyMilestones: false,
+        highlightDelays: true,
+        showPhaseLabels: true,
+        showPhasePercentages: true
+      };
+      onFiltersChange({ ...filters, ...defaults });
+    };
+
     return (
       <div className="card-section">
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={onGoToToday} className="btn-secondary">
+        <div className="gantt-toolbar">
+          <button onClick={onGoToToday} className="btn-secondary btn-small">
             Vai a Oggi
           </button>
 
           <div className="button-group">
             <button
               onClick={() => onViewModeChange('4months')}
-              className={viewMode === '4months' ? 'btn-success' : 'btn-secondary'}
+              className={`btn-small ${viewMode === '4months' ? 'btn-success' : 'btn-secondary'}`}
             >
-              Vista Ridotta
+              Ridotta
             </button>
             <button
               onClick={() => onViewModeChange('full')}
-              className={viewMode === 'full' ? 'btn-success' : 'btn-secondary'}
+              className={`btn-small ${viewMode === 'full' ? 'btn-success' : 'btn-secondary'}`}
             >
-              Vista Completa
+              Completa
             </button>
           </div>
 
-          <button onClick={onExportPNG} className="btn-secondary">
-            Esporta PNG
+          <button onClick={onExportPNG} className="btn-secondary btn-small">
+            PNG
           </button>
 
           <button
             onClick={() => setShowOptions(!showOptions)}
-            className="btn-secondary"
+            className={`btn-small ${showOptions ? 'btn-success' : 'btn-secondary'}`}
           >
-            {showOptions ? 'Nascondi' : 'Mostra'} Opzioni
+            {showOptions ? '▲' : '▼'} Filtri
+            <span className="filter-count">{activeFilterCount}/{ALL_FILTER_KEYS.length}</span>
           </button>
         </div>
 
         {showOptions && (
-          <div className="gantt-options-panel">
-            <div className="gantt-options-title">Filtri</div>
-            <div className="gantt-options-sections">
-              <div className="gantt-options-toolbar">
-                <button
-                  onClick={handleToggleAllFilters}
-                  className="btn-secondary btn-small"
-                >
-                  {allFiltersEnabled ? 'Disattiva tutti i filtri' : 'Attiva tutti i filtri'}
-                </button>
-              </div>
+          <div className="filters-panel">
+            {}
+            <div className="filters-actions">
+              <button
+                onClick={handleToggleAllFilters}
+                className="btn-secondary btn-small"
+              >
+                {allFiltersEnabled ? 'Disattiva tutti' : 'Attiva tutti'}
+              </button>
+              <button
+                onClick={handleResetToDefaults}
+                className="btn-secondary btn-small"
+              >
+                Default {viewMode === 'full' ? 'completa' : 'ridotta'}
+              </button>
+            </div>
 
-              <div className="gantt-options-section">
-                <span className="gantt-options-section-title">Filtri separatori</span>
-                <div className="gantt-options-row">
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showDaySeparators}
-                      onChange={(e) => handleFilterChange('showDaySeparators', e.target.checked)}
-                    />
-                    Giorni
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showWeekSeparators}
-                      onChange={(e) => handleFilterChange('showWeekSeparators', e.target.checked)}
-                    />
-                    Settimane
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showMonthSeparators}
-                      onChange={(e) => handleFilterChange('showMonthSeparators', e.target.checked)}
-                    />
-                    Mesi
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showYearSeparators}
-                      onChange={(e) => handleFilterChange('showYearSeparators', e.target.checked)}
-                    />
-                    Anni
-                  </label>
-                </div>
-              </div>
+            {}
+            <div className="filters-grid">
+              {Object.entries(FILTER_GROUPS).map(([groupKey, group]) => {
+                const stats = groupStats[groupKey];
+                const allActive = stats.active === stats.total;
 
-              <div className="gantt-options-section">
-                <span className="gantt-options-section-title">Filtri dettaglio</span>
-                <div className="gantt-options-row">
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showDayLetters}
-                      onChange={(e) => handleFilterChange('showDayLetters', e.target.checked)}
-                    />
-                    Lettere giorni
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showDayNumbers}
-                      onChange={(e) => handleFilterChange('showDayNumbers', e.target.checked)}
-                    />
-                    Numeri giorni
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showWeekNumbers}
-                      onChange={(e) => handleFilterChange('showWeekNumbers', e.target.checked)}
-                    />
-                    N° Sett.
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showMonthYearLabels}
-                      onChange={(e) => handleFilterChange('showMonthYearLabels', e.target.checked)}
-                    />
-                    Mesi
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showYearLabels}
-                      onChange={(e) => handleFilterChange('showYearLabels', e.target.checked)}
-                    />
-                    Anni
-                  </label>
-                </div>
-              </div>
-
-              <div className="gantt-options-section">
-                <span className="gantt-options-section-title">Evidenziazioni</span>
-                <div className="gantt-options-row">
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showWeekends}
-                      onChange={(e) => handleFilterChange('showWeekends', e.target.checked)}
-                    />
-                    Weekend
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showHolidays}
-                      onChange={(e) => handleFilterChange('showHolidays', e.target.checked)}
-                    />
-                    Festivi
-                  </label>
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.highlightDelays}
-                      onChange={(e) => handleFilterChange('highlightDelays', e.target.checked)}
-                    />
-                    Ritardi
-                  </label>
-                </div>
-              </div>
-
-              <div className="gantt-options-section">
-                <span className="gantt-options-section-title">Filtri</span>
-                <div className="gantt-options-row">
-                  <label className="checkbox-label compact">
-                    <input
-                      type="checkbox"
-                      checked={filters.showOnlyMilestones}
-                      onChange={(e) => handleFilterChange('showOnlyMilestones', e.target.checked)}
-                    />
-                    Solo Milestone
-                  </label>
-                </div>
-              </div>
+                return (
+                  <div key={groupKey} className="filter-group">
+                    <div className="filter-group-header">
+                      <span className="filter-group-icon">{group.icon}</span>
+                      <span className="filter-group-title">{group.title}</span>
+                      <button
+                        className="filter-group-toggle"
+                        onClick={() => handleToggleGroup(groupKey)}
+                        title={allActive ? 'Disattiva gruppo' : 'Attiva gruppo'}
+                      >
+                        {stats.active}/{stats.total}
+                      </button>
+                    </div>
+                    <div className="filter-group-items">
+                      {group.filters.map(filter => (
+                        <label key={filter.key} className="filter-item">
+                          <input
+                            type="checkbox"
+                            checked={!!filters[filter.key]}
+                            onChange={(e) => handleFilterChange(filter.key, e.target.checked)}
+                          />
+                          <span className="filter-item-label">{filter.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

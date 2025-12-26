@@ -134,6 +134,25 @@ style: compact Gantt options panel layout
 --info: #06b6d4;           /* Ciano info */
 ```
 
+### 3.1b Font (app-config.js)
+
+Il Gantt canvas usa configurazioni centralizzate in `window.AppConfig.gantt`:
+
+```javascript
+FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+PHASE_FONT_SIZE: 12,        // Dimensione testo nelle barre fasi
+PHASE_FONT_WEIGHT: '600',   // Peso font fasi (semibold)
+PHASE_TEXT_PADDING: 6,      // Padding testo nelle barre
+HEADER_FONT_SIZE: 14,       // Mesi e titoli header
+HEADER_SMALL_FONT_SIZE: 10, // Numeri settimana e MS
+HEADER_TINY_FONT_SIZE: 9    // Numeri e lettere giorni
+```
+
+**Note rendering testo fasi**:
+- Il testo usa ombreggiatura per migliorare la leggibilità su sfondi colorati
+- Il testo viene troncato automaticamente con ellipsis se non entra nella barra
+- La percentuale viene sempre mostrata se c'è spazio sufficiente
+
 ### 3.2 Spaziature
 
 ```css
@@ -165,17 +184,79 @@ style: compact Gantt options panel layout
 | Form group | `.form-group` |
 | Checkbox | `.checkbox-label` |
 
-### 3.5 Regole Header
+### 3.5 Regole Topbar
 
-- **Nessun separatore visivo superfluo** tra elementi
-- **Data e ora** in un unico blocco fisso (`header-datetime`)
-- **Elementi allineati** verticalmente al centro
+La topbar (HeaderBar.jsx) segue un design essenziale:
 
-### 3.6 Regole Gantt Options
+**Layout**:
+- **Sinistra**: titolo "OnlyGANTT" + contesto (reparto, utente)
+- **Destra**: indicatori stato (lock, admin) + menu hamburger
 
-- **Organizzazione in sezioni** con titoli (Griglia, Evidenziazioni, Filtri)
-- **Checkbox compatti** (`.checkbox-label.compact`)
-- **Layout orizzontale** per opzioni correlate
+**Classi CSS** (BEM):
+- `.topbar` - Container principale sticky
+- `.topbar__left` / `.topbar__right` - Sezioni
+- `.topbar__title` - Titolo applicazione
+- `.topbar__context` - Reparto e utente
+- `.topbar__status` / `.topbar__status-item` - Indicatori stato
+- `.topbar__menu-btn` - Pulsante hamburger
+- `.topbar__dropdown` - Menu dropdown
+- `.topbar__dropdown-section` / `.topbar__dropdown-item` - Sezioni e voci menu
+
+**Responsive**:
+- < 768px: solo titolo + icone stato + menu
+- 769-1024px: titolo + valori contesto + stato completo
+- > 1024px: layout completo con etichette
+
+### 3.6 Regole LoginScreen
+
+La schermata di login (LoginScreen.jsx) segue questi principi:
+
+**Struttura**:
+- Card centrata con max-width 420px
+- Header con titolo e sottotitolo
+- Tab bar per switch Reparto/Admin
+- Form con sezioni numerate
+- Footer con info applicazione
+
+**UX**:
+- Auto-focus sul primo campo vuoto
+- Validazione in tempo reale con hint colorati
+- Stati disabled durante caricamento
+- Messaggi errore prominenti con icona
+
+**Classi CSS**:
+- `.login-screen` - Container fullscreen centrato
+- `.login-card` - Card principale
+- `.login-tabs` / `.login-tab` - Tab bar
+- `.login-form` - Form container
+- `.login-section` / `.login-section-header` - Sezioni numerate
+- `.login-error` - Box errore
+- `.input-hint` - Hint sotto input (`.warning`, `.success`)
+
+### 3.7 Regole Pannello Filtri
+
+Il pannello filtri (GanttControls) è organizzato in gruppi logici:
+
+| Gruppo | Icona | Filtri |
+|--------|-------|--------|
+| **Timeline** | 📅 | Anni, Sep. anni, Mesi, Sep. mesi, N° sett., Sep. sett., N° giorni, Lett. giorni, Sep. giorni |
+| **Contenuti** | 📋 | Nomi fasi, Percentuali, Solo milestone |
+| **Evidenziazioni** | 🎨 | Weekend, Festivi, Ritardi |
+
+**Componenti UI**:
+- **Toolbar**: bottone "Filtri" con badge contatore attivi/totali
+- **Azioni globali**: "Attiva/Disattiva tutti", "Default vista"
+- **Toggle gruppo**: ogni gruppo ha un bottone per attivare/disattivare tutti i suoi filtri
+- **Layout responsivo**: 3 colonne (≥1200px), 2 colonne (768-1199px), 1 colonna (<768px)
+
+**Classi CSS**:
+- `.filters-panel` - Container principale
+- `.filters-actions` - Riga azioni globali
+- `.filters-grid` - Griglia gruppi (responsive)
+- `.filter-group` - Singolo gruppo
+- `.filter-group-header` - Header con icona, titolo e toggle
+- `.filter-item` - Singolo checkbox filtro
+- `.filter-count` - Badge contatore nel bottone toolbar
 
 ---
 
