@@ -16,14 +16,20 @@
       icon: '📅',
       filters: [
         { key: 'showYearLabels', label: 'Anni' },
-        { key: 'showYearSeparators', label: 'Sep. anni' },
         { key: 'showMonthYearLabels', label: 'Mesi' },
-        { key: 'showMonthSeparators', label: 'Sep. mesi' },
         { key: 'showWeekNumbers', label: 'N° sett.' },
-        { key: 'showWeekSeparators', label: 'Sep. sett.' },
         { key: 'showDayNumbers', label: 'N° giorni' },
-        { key: 'showDayLetters', label: 'Lett. giorni' },
-        { key: 'showDaySeparators', label: 'Sep. giorni' }
+        { key: 'showDayLetters', label: 'Lett. giorni' }
+      ]
+    },
+    separators: {
+      title: 'Divisorie',
+      icon: '📏',
+      filters: [
+        { key: 'showYearSeparators', label: 'Anni' },
+        { key: 'showMonthSeparators', label: 'Mesi' },
+        { key: 'showWeekSeparators', label: 'Settimane' },
+        { key: 'showDaySeparators', label: 'Giorni' }
       ]
     },
     content: {

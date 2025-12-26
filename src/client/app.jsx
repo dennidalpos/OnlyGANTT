@@ -61,10 +61,12 @@
     const [department, setDepartment] = useState(null);
     const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
     const [lockEnabled, setLockEnabled] = useState(false);
+    const [isDepartmentProtected, setIsDepartmentProtected] = useState(false);
 
     const [screensaverEnabled, setScreensaverEnabled] = useState(false);
     const [showScreensaver, setShowScreensaver] = useState(false);
     const lastActivityRef = useRef(Date.now());
+    const isVerifyingPasswordRef = useRef(false);
     const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
 
     const [viewMode, setViewMode] = useState('4months');
@@ -204,22 +206,71 @@
     }, [projectDraft, editingProject]);
 
     useEffect(() => {
-      const handleActivity = () => {
+      const handleActivity = async (event) => {
         lastActivityRef.current = Date.now();
+
+        if (showScreensaver && isDepartmentProtected && department && !adminToken) {
+          if (isVerifyingPasswordRef.current) {
+            return;
+          }
+
+          isVerifyingPasswordRef.current = true;
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+
+          const password = prompt('Inserisci la password del reparto per continuare:');
+
+          if (password === null || password === '') {
+            isVerifyingPasswordRef.current = false;
+            return;
+          }
+
+          try {
+            const result = await api.verifyPassword(department, password);
+            if (!result.ok) {
+              alert('Password errata');
+              isVerifyingPasswordRef.current = false;
+              return;
+            }
+            storage.setPassword(userName, department, password);
+            setShowScreensaver(false);
+          } catch (err) {
+            alert('Errore durante la verifica della password');
+          } finally {
+            isVerifyingPasswordRef.current = false;
+          }
+          return;
+        }
+
         setShowScreensaver(false);
       };
 
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-      events.forEach(event => {
+      const handleNonPasswordActivity = (event) => {
+        if (!showScreensaver) {
+          lastActivityRef.current = Date.now();
+        }
+      };
+
+      const passwordEvents = ['mousedown', 'keypress', 'touchstart'];
+      const activityOnlyEvents = ['mousemove', 'scroll'];
+
+      passwordEvents.forEach(event => {
         document.addEventListener(event, handleActivity, true);
       });
 
+      activityOnlyEvents.forEach(event => {
+        document.addEventListener(event, handleNonPasswordActivity, true);
+      });
+
       return () => {
-        events.forEach(event => {
+        passwordEvents.forEach(event => {
           document.removeEventListener(event, handleActivity, true);
         });
+        activityOnlyEvents.forEach(event => {
+          document.removeEventListener(event, handleNonPasswordActivity, true);
+        });
       };
-    }, []);
+    }, [showScreensaver, isDepartmentProtected, department, adminToken, userName]);
 
     useEffect(() => {
       if (!screensaverEnabled) {
@@ -318,6 +369,18 @@
       setSelectedProjectIds(new Set());
       setDepartmentValidationErrors([]);
       setFocusedProjectId(null);
+
+      if (newDepartment && !adminToken) {
+        try {
+          const depts = await api.getDepartments();
+          const deptInfo = depts.departments?.find(d => d.name === newDepartment);
+          setIsDepartmentProtected(deptInfo?.protected || false);
+        } catch (err) {
+          setIsDepartmentProtected(false);
+        }
+      } else {
+        setIsDepartmentProtected(false);
+      }
     };
 
     const getGridFilterDefaults = (mode) => {
@@ -464,6 +527,61 @@
         pushNotification({ type: 'success', message: 'Password admin aggiornata' });
       } catch (err) {
         pushNotification({ type: 'error', message: err.message || 'Reset password fallito' });
+      }
+    };
+
+    const handleAdminServerBackup = async () => {
+      if (!adminToken) return;
+      try {
+        const backup = await api.adminServerBackup(adminToken);
+        const dataStr = JSON.stringify(backup, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `onlygantt-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        pushNotification({
+          type: 'success',
+          message: `Backup completato: ${backup.departments.length} reparti esportati`
+        });
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Backup fallito' });
+      }
+    };
+
+    const handleAdminServerRestore = async ({ backup, overwriteExisting }) => {
+      if (!adminToken) return;
+      try {
+        const result = await api.adminServerRestore(backup, overwriteExisting, adminToken);
+        const { summary } = result;
+
+        let message = `Ripristino completato:\n` +
+          `- Importati: ${summary.imported}\n` +
+          `- Saltati: ${summary.skipped}\n` +
+          `- Errori: ${summary.errors}`;
+
+        if (summary.errors > 0 && result.results.errors.length > 0) {
+          message += `\n\nErrori:\n${result.results.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
+        }
+
+        alert(message);
+
+        if (summary.imported > 0) {
+          pushNotification({
+            type: 'success',
+            message: `Ripristino completato: ${summary.imported} reparti importati`
+          });
+
+          if (department) {
+            await handleDepartmentChange(null);
+          }
+        }
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Ripristino fallito' });
       }
     };
 
@@ -836,6 +954,10 @@
           onAdminDeleteDepartment={handleAdminDeleteDepartment}
           onAdminResetPassword={handleAdminResetPassword}
           onAdminChangePassword={handleAdminChangePassword}
+          onAdminServerBackup={handleAdminServerBackup}
+          onAdminServerRestore={handleAdminServerRestore}
+          screensaverEnabled={screensaverEnabled}
+          onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
         />
 
         {lockError && lockError.lockedBy && (

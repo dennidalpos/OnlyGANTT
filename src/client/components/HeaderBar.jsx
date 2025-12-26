@@ -29,7 +29,11 @@
     onAdminCreateDepartment,
     onAdminDeleteDepartment,
     onAdminResetPassword,
-    onAdminChangePassword
+    onAdminChangePassword,
+    onAdminServerBackup,
+    onAdminServerRestore,
+    screensaverEnabled,
+    onToggleScreensaver
   }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
@@ -111,12 +115,58 @@
       await onAdminChangePassword({ oldPassword: oldPasswordInput, newPassword: newPasswordInput.trim() });
     };
 
-    
+    const handleAdminServerBackup = async () => {
+      if (!adminToken) return;
+      handleMenuAction(onAdminServerBackup);
+    };
+
+    const handleAdminServerRestore = async () => {
+      if (!adminToken) return;
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json';
+      fileInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          const text = await file.text();
+          const backup = JSON.parse(text);
+
+          const overwrite = confirm(
+            `Ripristinare il backup del server?\n\n` +
+            `Reparti nel backup: ${backup.departments?.length || 0}\n` +
+            `Data export: ${backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('it-IT') : 'N/A'}\n\n` +
+            `ATTENZIONE: I reparti esistenti verranno sovrascritti!\n\n` +
+            `Confermi il ripristino?`
+          );
+
+          if (overwrite) {
+            await onAdminServerRestore({ backup, overwriteExisting: true });
+          }
+        } catch (err) {
+          alert(`Errore nella lettura del file: ${err.message}`);
+        }
+      };
+      fileInput.click();
+      setMenuOpen(false);
+    };
+
+    const handleLockClick = () => {
+      if (!department || readOnlyDepartment) return;
+
+      if (!lockEnabled) {
+        handleMenuAction(onEnableLock);
+      } else {
+        handleMenuAction(onReleaseLock);
+      }
+    };
+
     const lockStatus = lockEnabled && isLocked
-      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active' }
+      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active', clickable: true }
       : lockInfo?.locked
-        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other' }
-        : { icon: '🔓', label: 'Libero', className: 'status-lock--free' };
+        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other', clickable: false }
+        : { icon: '🔓', label: 'Libero', className: 'status-lock--free', clickable: true };
 
     return (
       <header className="topbar">
@@ -143,10 +193,16 @@
           {}
           <div className="topbar__status">
             {department && (
-              <span className={`topbar__status-item ${lockStatus.className}`} title={`Lock: ${lockStatus.label}`}>
+              <button
+                className={`topbar__status-item ${lockStatus.className} ${lockStatus.clickable ? 'clickable' : ''}`}
+                title={lockStatus.clickable ? (lockEnabled ? 'Clicca per liberare' : 'Clicca per modificare') : `Lock: ${lockStatus.label}`}
+                onClick={lockStatus.clickable ? handleLockClick : undefined}
+                disabled={!lockStatus.clickable || readOnlyDepartment}
+                style={{ border: 'none', background: 'transparent', padding: '0.25rem 0.75rem', cursor: lockStatus.clickable && !readOnlyDepartment ? 'pointer' : 'default' }}
+              >
                 <span className="topbar__status-icon">{lockStatus.icon}</span>
                 <span className="topbar__status-text">{lockStatus.label}</span>
-              </span>
+              </button>
             )}
             {adminToken && (
               <span className="topbar__status-item status-admin" title="Modalità amministratore">
@@ -154,6 +210,14 @@
                 <span className="topbar__status-text">Admin</span>
               </span>
             )}
+            <button
+              className={`topbar__icon-btn ${screensaverEnabled ? 'active' : ''}`}
+              onClick={onToggleScreensaver}
+              title={screensaverEnabled ? 'Screensaver: ON (15s inattività)' : 'Screensaver: OFF'}
+              aria-label={screensaverEnabled ? 'Disattiva screensaver' : 'Attiva screensaver'}
+            >
+              {screensaverEnabled ? '🌙' : '☀️'}
+            </button>
           </div>
 
           {}
@@ -259,6 +323,24 @@
                     disabled={!department}
                   >
                     Elimina reparto
+                  </button>
+                </div>
+              )}
+
+              {adminToken && (
+                <div className="topbar__dropdown-section">
+                  <div className="topbar__dropdown-title">Backup Server</div>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={handleAdminServerBackup}
+                  >
+                    Esporta backup completo
+                  </button>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={handleAdminServerRestore}
+                  >
+                    Ripristina backup
                   </button>
                 </div>
               )}

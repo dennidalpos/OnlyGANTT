@@ -200,6 +200,8 @@ Il server gira su `http://localhost:3000`
 - `POST /api/admin/login` - Login (restituisce Bearer token)
 - `POST /api/admin/logout` - Logout
 - `GET /api/admin/departments` - Elenco reparti con dettagli
+- `GET /api/admin/server-backup` - Backup completo del server (tutti i reparti + configurazione)
+- `POST /api/admin/server-restore` - Ripristino completo del server da file backup
 
 ## Dettaglio funzionalità
 
@@ -223,7 +225,8 @@ Il server gira su `http://localhost:3000`
 ### Timeline Progetti
 - **Vista 3 mesi (ridotta)**: scorrevole, ~25px al giorno, tooltip attivi
 - **Vista completa**: adatta a tutti i dati, senza scroll, tooltip attivi (per export PNG)
-- **Auto "Vai a Oggi"**: centratura automatica su oggi all'apertura del reparto
+- **Auto "Vai a Oggi"**: centratura automatica su oggi all'apertura/cambio reparto o tramite pulsante dedicato
+- **Scroll persistente**: la posizione di scroll viene mantenuta durante apertura/chiusura sidebar e modifiche progetti
 - **Pannello filtri organizzato in gruppi**:
   - **Timeline**: separatori e etichette per anni, mesi, settimane, giorni
   - **Contenuti**: nomi fasi, percentuali, solo milestone
@@ -234,7 +237,8 @@ Il server gira su `http://localhost:3000`
 - **Layout responsivo**: 3 colonne su schermi ≥1200px, 2 colonne su tablet, 1 colonna su mobile
 - **Default vista ridotta**: tutti i filtri attivi
 - **Default vista completa**: separatori mesi/anni, dettaglio anni, ritardi, percentuali
-- **Etichette milestone**: posizionate nell'header sopra il diagramma, con spaziatura verticale per evitare sovrapposizioni
+- **Header e footer speculari**: tutte le informazioni della timeline (anni, mesi, settimane, giorni, "Oggi", milestone) sono visualizzate sia sopra che sotto il diagramma
+- **Linee milestone attraversanti**: le linee tratteggiate delle milestone attraversano verticalmente tutto il diagramma da header a footer, sempre visibili sopra le fasi
 
 ### Gestione Progetto
 - **Salva (nelle fasi)**: salva il progetto corrente senza chiuderlo e forza il refresh del Gantt ad ogni click.
@@ -260,6 +264,7 @@ Il server gira su `http://localhost:3000`
 - **Operazioni reparto**: creazione, modifica e cancellazione reparti senza inserire il nome utente.
 - **Sblocco lock**: pulsante admin per rimuovere lock attivi su un reparto.
 - **Import/Export reparto**: visibili e utilizzabili solo con accesso admin (sezione "Reparto corrente").
+- **Backup/Ripristino server**: funzionalità per esportare e ripristinare l'intero server inclusi tutti i reparti, credenziali admin e configurazione.
 - **Login separato**: tab dedicata nella schermata di accesso per distinguere chiaramente login utente e login admin.
 
 ## Troubleshooting
@@ -321,6 +326,22 @@ L'applicazione rileva e mostra:
 - **Import JSON**: upload file JSON (sostituisce i progetti, mantiene la password)
 - **Export PNG**: esporta il Gantt come immagine PNG (forza vista completa)
 
+### Backup/Ripristino Server (Solo Admin)
+- **Backup completo server**: esporta tutti i reparti, configurazione server e credenziali admin in un unico file JSON
+  - Accessibile dal menu hamburger → Backup Server → "Esporta backup completo"
+  - Il file include:
+    - Tutti i reparti con progetti e password
+    - Configurazione server (timeout lock, sessioni admin, limiti upload, etc.)
+    - Username admin (la password non viene esportata per sicurezza)
+    - Metadata con versione backup e timestamp export
+- **Ripristino server**: ripristina l'intero server da file backup
+  - Accessibile dal menu hamburger → Backup Server → "Ripristina backup"
+  - Richiede conferma con riepilogo reparti da importare
+  - Modalità sovrascrittura: i reparti esistenti vengono sovrascritti
+  - Report dettagliato: mostra reparti importati, saltati ed errori eventuali
+  - Validazione automatica dei dati prima dell'import
+  - Lock automaticamente rilasciati sui reparti importati
+
 ### Festività/Weekend nelle fasi
 Ogni fase ha la checkbox **"Include festività e weekend"**:
 - **Attiva**: la fase può includere giorni festivi o weekend e non genera alert.
@@ -331,6 +352,10 @@ Ogni fase ha la checkbox **"Include festività e weekend"**:
 Modifica `src/app-config.js` per personalizzare:
 - Impostazioni server (porta, timeout, ecc.)
 - Rendering Gantt (margini, colori, pixel per giorno)
+  - **CANVAS_TOP_MARGIN**: 130px - spazio per header timeline (anni, mesi, milestone, settimane, giorni)
+  - **CANVAS_BOTTOM_MARGIN**: 130px - spazio per footer timeline (speculare all'header)
+  - **CANVAS_LEFT_MARGIN**: 20px
+  - **CANVAS_RIGHT_MARGIN**: 30px
 - Timeout inattività screensaver
 - Impostazioni lock (intervallo heartbeat, debounce)
 - Funzionalità logiche (auto-fix)

@@ -715,6 +715,145 @@ app.get('/api/admin/departments', requireAdmin, (req, res) => {
   }
 });
 
+app.get('/api/admin/server-backup', requireAdmin, (req, res) => {
+  try {
+    ensureDataDir();
+    const files = fs.readdirSync(CONFIG.dataDir);
+    const backup = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      serverConfig: {
+        lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
+        adminSessionTtlHours: CONFIG.adminSessionTtlHours,
+        maxUploadBytes: CONFIG.maxUploadBytes,
+        enableBak: CONFIG.enableBak
+      },
+      adminCredentials: {
+        adminUser: CONFIG.adminUser
+      },
+      departments: []
+    };
+
+    for (const file of files) {
+      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+        const deptName = file.replace('.json', '');
+        const { data, error } = readDepartmentData(deptName);
+        if (error) {
+          console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+          continue;
+        }
+        if (!data) continue;
+        backup.departments.push({
+          name: deptName,
+          data: data
+        });
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="onlygantt-backup-${new Date().toISOString().split('T')[0]}.json"`);
+    res.json(backup);
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/server-restore', requireAdmin, (req, res) => {
+  try {
+    const { backup, overwriteExisting = false } = req.body;
+
+    if (!backup || typeof backup !== 'object') {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'backup data is required');
+    }
+
+    if (!backup.departments || !Array.isArray(backup.departments)) {
+      return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: departments array missing');
+    }
+
+    const results = {
+      imported: [],
+      skipped: [],
+      errors: []
+    };
+
+    ensureDataDir();
+
+    for (const dept of backup.departments) {
+      if (!dept.name || !dept.data) {
+        results.errors.push({
+          department: dept.name || 'unknown',
+          error: 'Missing name or data'
+        });
+        continue;
+      }
+
+      const normalized = normalizeDepartmentName(dept.name);
+      if (!normalized) {
+        results.errors.push({
+          department: dept.name,
+          error: 'Invalid department name'
+        });
+        continue;
+      }
+
+      const filePath = getDepartmentFilePath(normalized);
+      if (fs.existsSync(filePath) && !overwriteExisting) {
+        results.skipped.push({
+          department: normalized,
+          reason: 'Already exists (use overwriteExisting flag to replace)'
+        });
+        continue;
+      }
+
+      try {
+        const errors = validateDepartmentData(dept.data);
+        if (errors.length > 0) {
+          results.errors.push({
+            department: normalized,
+            error: 'Validation failed',
+            details: errors
+          });
+          continue;
+        }
+
+        const dataToWrite = {
+          ...dept.data,
+          meta: {
+            ...dept.data.meta,
+            importedAt: new Date().toISOString(),
+            importedBy: 'admin'
+          }
+        };
+
+        writeDepartmentData(normalized, dataToWrite);
+        results.imported.push(normalized);
+
+        if (locks.has(normalized)) {
+          locks.delete(normalized);
+        }
+      } catch (err) {
+        results.errors.push({
+          department: normalized,
+          error: err.message
+        });
+      }
+    }
+
+    res.json({
+      ok: true,
+      results,
+      summary: {
+        total: backup.departments.length,
+        imported: results.imported.length,
+        skipped: results.skipped.length,
+        errors: results.errors.length
+      }
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
 const PORT = CONFIG.port;
 app.listen(PORT, () => {
   console.log(`OnlyGANTT server running on http://localhost:${PORT}`);

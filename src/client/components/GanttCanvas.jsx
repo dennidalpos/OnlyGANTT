@@ -31,6 +31,7 @@
     const [layout, setLayout] = useState(null);
     const [scrollLeft, setScrollLeft] = useState(0);
     const [contextMenu, setContextMenu] = useState(null);
+    const [scrollLabels, setScrollLabels] = useState([]);
     const scrollPositionsRef = useRef({});
     const lastViewModeRef = useRef(viewMode);
     const scrollLeftRef = useRef(0);
@@ -46,12 +47,20 @@
       }
     }, [verticalScrollTop]);
 
+    const scrollTimeoutRef = useRef(null);
+
     const handleVerticalScroll = useCallback((e) => {
       isVerticalScrollingRef.current = true;
+
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
       if (onVerticalScrollChange) {
         onVerticalScrollChange(e.target.scrollTop);
       }
-      setTimeout(() => {
+
+      scrollTimeoutRef.current = setTimeout(() => {
         isVerticalScrollingRef.current = false;
       }, 50);
     }, [onVerticalScrollChange]);
@@ -92,6 +101,7 @@
     const render = useCallback(() => {
       const canvas = canvasRef.current;
       const wrapper = wrapperRef.current;
+      const verticalContainer = verticalScrollContainerRef.current;
       if (!canvas || !wrapper) return;
 
       const ctx = canvas.getContext('2d');
@@ -108,22 +118,36 @@
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      const viewport = verticalContainer ? {
+        top: verticalContainer.scrollTop,
+        bottom: verticalContainer.scrollTop + verticalContainer.clientHeight
+      } : null;
+
       const hideProjectLabels = sidebarCollapsed === false;
-      gantt.render(ctx, newLayout, { hoveredProjectId, hideProjectLabels });
+      gantt.render(ctx, newLayout, { hoveredProjectId, hideProjectLabels, viewport });
 
       updateScrollbars(newLayout);
-    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed]);
+    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed, hoveredProjectId]);
+
+    const prevHoveredProjectIdRef = useRef(null);
 
     const redraw = useCallback(() => {
       const canvas = canvasRef.current;
+      const verticalContainer = verticalScrollContainerRef.current;
       if (!canvas || !layout) return;
 
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      const viewport = verticalContainer ? {
+        top: verticalContainer.scrollTop,
+        bottom: verticalContainer.scrollTop + verticalContainer.clientHeight
+      } : null;
+
       const hideProjectLabels = sidebarCollapsed === false;
-      gantt.render(ctx, layout, { hoveredProjectId, hideProjectLabels });
+      gantt.render(ctx, layout, { hoveredProjectId, hideProjectLabels, viewport });
+      prevHoveredProjectIdRef.current = hoveredProjectId;
     }, [layout, hoveredProjectId, sidebarCollapsed]);
 
     const initialRenderDoneRef = useRef(false);
@@ -199,8 +223,10 @@
       }
       if (!layout) return;
       const savedScroll = scrollPositionsRef.current[viewMode] || 0;
-      restoreScrollPosition(savedScroll);
-    }, [viewMode, layout, restoreScrollPosition]);
+      if (savedScroll > 0) {
+        restoreScrollPosition(savedScroll);
+      }
+    }, [viewMode, restoreScrollPosition]);
 
     useEffect(() => {
       if (viewMode !== '4months' || !layout) return;
@@ -259,6 +285,53 @@
       updateScrollbars(layout);
     }, [layout, updateScrollbars]);
 
+    const updateScrollLabels = useCallback(() => {
+      if (!layout || !wrapperRef.current || viewMode !== '4months') {
+        setScrollLabels([]);
+        return;
+      }
+
+      const containerWidth = wrapperRef.current.clientWidth;
+      const viewportLeft = scrollLeftRef.current;
+      const viewportRight = viewportLeft + containerWidth;
+      const labels = [];
+
+      const topScrollbarHeight = topScrollbarRef.current ? topScrollbarRef.current.offsetHeight : 0;
+
+      layout.rows.forEach(row => {
+        const project = row.project;
+        if (Array.isArray(project.fasi)) {
+          project.fasi.forEach(fase => {
+            if (!fase.milestone && fase.dataInizio && fase.dataFine && fase.nome) {
+              const fx1 = layout.dateToX[fase.dataInizio];
+              const fx2 = layout.dateToX[fase.dataFine];
+
+              if (fx1 !== null && fx2 !== null) {
+                const faseWidth = fx2 - fx1 + layout.pixelsPerDay;
+                const faseRight = fx1 + faseWidth;
+
+                if (fx1 < viewportLeft && faseRight > viewportLeft) {
+                  const faseY = row.y + 4;
+                  const faseHeight = row.height - 8;
+                  const percentage = fase.percentualeCompletamento || 0;
+                  const showPercent = filters.showPhasePercentages;
+                  const labelText = showPercent ? `${fase.nome} ${percentage}%` : fase.nome;
+                  labels.push({
+                    text: labelText,
+                    y: faseY + topScrollbarHeight,
+                    height: faseHeight,
+                    color: fase.colore || project.colore || '#3b82f6'
+                  });
+                }
+              }
+            }
+          });
+        }
+      });
+
+      setScrollLabels(labels);
+    }, [layout, viewMode, filters.showPhasePercentages]);
+
     const handleScroll = useCallback((source) => {
       const left = source.scrollLeft;
       pendingScrollLeftRef.current = left;
@@ -267,6 +340,7 @@
         scrollRafRef.current = window.requestAnimationFrame(() => {
           scrollRafRef.current = null;
           setScrollLeft(pendingScrollLeftRef.current);
+          updateScrollLabels();
         });
       }
 
@@ -276,7 +350,7 @@
       if (source !== bottomScrollbarRef.current && bottomScrollbarRef.current) {
         bottomScrollbarRef.current.scrollLeft = left;
       }
-    }, []);
+    }, [updateScrollLabels]);
 
     useEffect(() => {
       const topScrollbar = topScrollbarRef.current;
@@ -302,6 +376,10 @@
         scrollRafRef.current = null;
       }
     }, []);
+
+    useEffect(() => {
+      updateScrollLabels();
+    }, [layout, scrollLeft, viewMode, filters, updateScrollLabels]);
 
     const handleMouseMove = useCallback((e) => {
       if (!layout) {
@@ -456,6 +534,34 @@
             <div className="gantt-scrollbar-content"></div>
           </div>
         )}
+
+        {scrollLabels.map((label, i) => (
+          <div
+            key={i}
+            className="gantt-scroll-label"
+            style={{
+              top: `${label.y}px`,
+              left: '24px',
+              height: `${label.height}px`,
+              backgroundColor: label.color,
+              position: 'absolute',
+              padding: '0 8px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(30, 41, 59, 0.5)'
+            }}
+          >
+            {label.text}
+          </div>
+        ))}
 
         {tooltip && (
           <div
