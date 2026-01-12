@@ -155,13 +155,17 @@ function getLockInfo(department) {
   cleanExpiredLocks();
   const lock = locks.get(department);
   if (!lock) {
-    return { locked: false };
+    return { locked: false, department };
   }
   return {
     locked: true,
-    lockedBy: lock.userName,
+    department,
+    lockedBy: lock.ownerUserName,
+    ownerUserName: lock.ownerUserName,
+    ownerType: lock.ownerType,
     lockedAt: lock.lockedAt,
     expiresAt: lock.expiresAt,
+    lastHeartbeatAt: lock.lastHeartbeatAt,
     clientHost: lock.clientHost || null
   };
 }
@@ -169,7 +173,7 @@ function getLockInfo(department) {
 function isLockOwner(department, userName) {
   const lock = locks.get(department);
   if (!lock) return false;
-  return lock.userName === userName;
+  return lock.ownerUserName === userName;
 }
 
 ensureDataDir();
@@ -198,6 +202,11 @@ function validateExistingDepartments() {
 }
 
 validateExistingDepartments();
+
+const lockCleanupInterval = setInterval(cleanExpiredLocks, 60 * 1000);
+if (typeof lockCleanupInterval.unref === 'function') {
+  lockCleanupInterval.unref();
+}
 
 app.get('/api/departments', (req, res) => {
   try {
@@ -382,11 +391,7 @@ app.post('/api/departments/:name/import', (req, res) => {
     if (!isLockOwner(name, userName)) {
       const lockInfo = getLockInfo(name);
       if (lockInfo.locked) {
-        return res.status(423).json({
-          lockedBy: lockInfo.lockedBy,
-          lockedAt: lockInfo.lockedAt,
-          expiresAt: lockInfo.expiresAt
-        });
+        return res.status(423).json(lockInfo);
       } else {
         return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to import');
       }
@@ -418,11 +423,7 @@ app.post('/api/projects/:department', (req, res) => {
     if (!isLockOwner(department, userName)) {
       const lockInfo = getLockInfo(department);
       if (lockInfo.locked) {
-        return res.status(423).json({
-          lockedBy: lockInfo.lockedBy,
-          lockedAt: lockInfo.lockedAt,
-          expiresAt: lockInfo.expiresAt
-        });
+        return res.status(423).json(lockInfo);
       } else {
         return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to save');
       }
@@ -479,11 +480,7 @@ app.post('/api/upload/:department', upload.single('file'), (req, res) => {
     if (!isLockOwner(department, userName)) {
       const lockInfo = getLockInfo(department);
       if (lockInfo.locked) {
-        return res.status(423).json({
-          lockedBy: lockInfo.lockedBy,
-          lockedAt: lockInfo.lockedAt,
-          expiresAt: lockInfo.expiresAt
-        });
+        return res.status(423).json(lockInfo);
       } else {
         return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to upload');
       }
@@ -528,28 +525,31 @@ app.post('/api/lock/:department/acquire', (req, res) => {
     }
     cleanExpiredLocks();
     const existing = locks.get(department);
-    if (existing && existing.userName !== userName) {
-      return res.status(423).json({
-        lockedBy: existing.userName,
-        lockedAt: existing.lockedAt,
-        expiresAt: existing.expiresAt,
-        clientHost: existing.clientHost || null
-      });
+    if (existing && existing.ownerUserName !== userName) {
+      const lockInfo = getLockInfo(department);
+      return res.status(423).json(lockInfo);
     }
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CONFIG.lockTimeoutMinutes * 60 * 1000);
     locks.set(department, {
-      userName,
+      department,
+      ownerUserName: userName,
+      ownerType: req.body.ownerType || 'user',
       clientHost: clientHost || null,
       lockedAt: existing ? existing.lockedAt : now.toISOString(),
-      expiresAt: expiresAt.toISOString()
+      expiresAt: expiresAt.toISOString(),
+      lastHeartbeatAt: now.toISOString()
     });
     res.json({
       locked: true,
+      department,
       lockedBy: userName,
+      ownerUserName: locks.get(department).ownerUserName,
+      ownerType: locks.get(department).ownerType,
       lockedAt: locks.get(department).lockedAt,
       expiresAt: expiresAt.toISOString(),
-      clientHost: locks.get(department).clientHost
+      clientHost: locks.get(department).clientHost,
+      lastHeartbeatAt: locks.get(department).lastHeartbeatAt
     });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
@@ -561,7 +561,7 @@ app.post('/api/lock/:department/release', (req, res) => {
     const { department } = req.params;
     const { userName } = req.body;
     const lock = locks.get(department);
-    if (lock && lock.userName === userName) {
+    if (lock && lock.ownerUserName === userName) {
       locks.delete(department);
     }
     res.status(204).send();
@@ -586,11 +586,12 @@ app.post('/api/lock/:department/heartbeat', (req, res) => {
     const { userName } = req.body;
     cleanExpiredLocks();
     const lock = locks.get(department);
-    if (!lock || lock.userName !== userName) {
+    if (!lock || lock.ownerUserName !== userName) {
       return errorResponse(res, 409, 'LOCK_NOT_OWNED', 'Lock not owned by user');
     }
     const expiresAt = new Date(Date.now() + CONFIG.lockTimeoutMinutes * 60 * 1000);
     lock.expiresAt = expiresAt.toISOString();
+    lock.lastHeartbeatAt = new Date().toISOString();
     res.status(204).send();
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);

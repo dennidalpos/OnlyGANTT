@@ -941,6 +941,7 @@
           lockInfo={lockInfo}
           isLocked={isLocked}
           lockEnabled={lockEnabled}
+          onRefreshLock={refreshLock}
           onEnableLock={handleEnableLock}
           onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
@@ -954,6 +955,7 @@
           onAdminDeleteDepartment={handleAdminDeleteDepartment}
           onAdminResetPassword={handleAdminResetPassword}
           onAdminChangePassword={handleAdminChangePassword}
+          onAdminReleaseLock={handleAdminReleaseLock}
           onAdminServerBackup={handleAdminServerBackup}
           onAdminServerRestore={handleAdminServerRestore}
           screensaverEnabled={screensaverEnabled}

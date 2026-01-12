@@ -17,6 +17,8 @@
     const abortControllerRef = useRef(null);
     const debounceTimerRef = useRef(null);
     const heartbeatTimeoutRef = useRef(null);
+    const statusPollTimeoutRef = useRef(null);
+    const statusAbortControllerRef = useRef(null);
     const previousLockRef = useRef(null);
 
     const stopHeartbeat = useCallback(() => {
@@ -54,8 +56,8 @@
       scheduleHeartbeat();
     }, [department, userName, stopHeartbeat]);
 
-    const acquireLock = useCallback(() => {
-      if (!department || !userName || !enabled) return;
+    const acquireLock = useCallback((force = false) => {
+      if (!department || !userName || (!enabled && !force)) return;
 
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -142,6 +144,60 @@
     }, [department, userName, enabled, acquireLock, releaseLock, releaseLockFor, stopHeartbeat]);
 
     useEffect(() => {
+      if (!department) {
+        setLockInfo(null);
+        return;
+      }
+
+      let isActive = true;
+
+      const pollStatus = async () => {
+        if (!isActive) return;
+
+        if (statusAbortControllerRef.current) {
+          statusAbortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        statusAbortControllerRef.current = controller;
+
+        try {
+          const status = await api.getLockStatus(department, controller.signal);
+          if (!isActive) return;
+          setLockInfo(status);
+          setError(null);
+          if (enabled) {
+            setIsLocked(status.locked && status.lockedBy === userName);
+          } else {
+            setIsLocked(false);
+          }
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            setError({ message: 'Impossibile sincronizzare lo stato del lock' });
+          }
+        } finally {
+          if (isActive) {
+            statusPollTimeoutRef.current = setTimeout(pollStatus, config.lock.statusPollMs);
+          }
+        }
+      };
+
+      pollStatus();
+
+      return () => {
+        isActive = false;
+        if (statusPollTimeoutRef.current) {
+          clearTimeout(statusPollTimeoutRef.current);
+          statusPollTimeoutRef.current = null;
+        }
+        if (statusAbortControllerRef.current) {
+          statusAbortControllerRef.current.abort();
+          statusAbortControllerRef.current = null;
+        }
+      };
+    }, [department, userName, enabled]);
+
+    useEffect(() => {
       const handleUnload = () => {
         if (isLocked && department && userName) {
           const url = `/api/lock/${encodeURIComponent(department)}/release`;
@@ -164,7 +220,7 @@
       isLocked,
       error,
       releaseLock,
-      refreshLock: acquireLock
+      refreshLock: () => acquireLock(true)
     };
   }
 

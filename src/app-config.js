@@ -43,7 +43,8 @@ window.AppConfig = {
   lock: {
     heartbeatMinutes: 5,
     heartbeatJitterMs: 30000,
-    acquireDebounceMs: 300
+    acquireDebounceMs: 300,
+    statusPollMs: 15000
   },
 
   logic: {
