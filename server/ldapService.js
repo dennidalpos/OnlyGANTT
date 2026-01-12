@@ -89,27 +89,31 @@ async function withClient(config, callback) {
   }
 }
 
-async function fetchRequiredGroupRid(client, groupDn, groupSearchBase) {
-  if (!groupDn) return null;
-  if (groupSearchBase) {
-    const filter = `(distinguishedName=${escapeLdapFilterValue(groupDn)})`;
-    const { searchEntries } = await client.search(groupSearchBase, {
-      scope: 'sub',
-      filter,
-      attributes: ['objectSid']
-    });
-    const entry = searchEntries[0];
-    if (entry) {
-      return extractRidFromSid(pickAttribute(entry, 'objectSid'));
-    }
+async function resolveRequiredGroup(client, groupNameOrDn, groupSearchBase, baseDn) {
+  if (!groupNameOrDn) return { dn: null, rid: null };
+  const isDn = groupNameOrDn.includes('=');
+  const safeValue = escapeLdapFilterValue(groupNameOrDn);
+  const searchBase = groupSearchBase || baseDn;
+  if (!searchBase) {
+    return { dn: isDn ? groupNameOrDn : null, rid: null };
   }
-  const { searchEntries } = await client.search(groupDn, {
-    scope: 'base',
-    attributes: ['objectSid']
+
+  const filter = isDn
+    ? `(|(distinguishedName=${safeValue})(cn=${safeValue})(sAMAccountName=${safeValue}))`
+    : `(|(cn=${safeValue})(sAMAccountName=${safeValue}))`;
+
+  const { searchEntries } = await client.search(searchBase, {
+    scope: 'sub',
+    filter,
+    attributes: ['distinguishedName', 'dn', 'objectSid']
   });
   const entry = searchEntries[0];
-  if (!entry) return null;
-  return extractRidFromSid(pickAttribute(entry, 'objectSid'));
+  if (!entry) {
+    return { dn: isDn ? groupNameOrDn : null, rid: null };
+  }
+  const dn = entry.dn || entry.distinguishedName || groupNameOrDn;
+  const rid = extractRidFromSid(pickAttribute(entry, 'objectSid'));
+  return { dn, rid };
 }
 
 function userInRequiredGroup(entry, requiredGroupDn, requiredGroupRid) {
@@ -172,13 +176,22 @@ async function authenticateLdapUser(credentials, configOverride = {}) {
     const userDn = entry.dn || entry.distinguishedName;
 
     let requiredGroupRid = null;
+    let requiredGroupDn = null;
     if (config.requiredGroupDn) {
       try {
-        requiredGroupRid = await fetchRequiredGroupRid(client, config.requiredGroupDn, config.groupSearchBase);
+        const resolved = await resolveRequiredGroup(
+          client,
+          config.requiredGroupDn,
+          config.groupSearchBase,
+          config.baseDn
+        );
+        requiredGroupDn = resolved.dn;
+        requiredGroupRid = resolved.rid;
       } catch (err) {
         logIfEnabled(config, 'Failed to read required group RID', err.message);
       }
-      if (!userInRequiredGroup(entry, config.requiredGroupDn, requiredGroupRid)) {
+      const groupToCheck = requiredGroupDn || config.requiredGroupDn;
+      if (!userInRequiredGroup(entry, groupToCheck, requiredGroupRid)) {
         return { ok: false, code: 'GROUP_REQUIRED', message: 'User not in required group' };
       }
     }
@@ -241,22 +254,31 @@ async function testLdapConnection({ configOverride = {}, testUserId } = {}) {
 
     const entry = searchEntries[0];
     let requiredGroupRid = null;
+    let requiredGroupDn = null;
     if (config.requiredGroupDn) {
       try {
-        requiredGroupRid = await fetchRequiredGroupRid(client, config.requiredGroupDn, config.groupSearchBase);
+        const resolved = await resolveRequiredGroup(
+          client,
+          config.requiredGroupDn,
+          config.groupSearchBase,
+          config.baseDn
+        );
+        requiredGroupDn = resolved.dn;
+        requiredGroupRid = resolved.rid;
       } catch (err) {
         logIfEnabled(config, 'Failed to read required group RID', err.message);
       }
     }
 
-    const groupOk = userInRequiredGroup(entry, config.requiredGroupDn, requiredGroupRid);
+    const groupToCheck = requiredGroupDn || config.requiredGroupDn;
+    const groupOk = userInRequiredGroup(entry, groupToCheck, requiredGroupRid);
     return {
       ok: groupOk,
       message: groupOk ? 'Bind/search OK' : 'User not in required group',
       details: {
         dn: entry.dn,
         groupCheck: groupOk,
-        requiredGroupDn: config.requiredGroupDn || null
+        requiredGroupDn: groupToCheck || null
       },
       code: groupOk ? null : 'GROUP_REQUIRED'
     };
