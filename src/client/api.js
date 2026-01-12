@@ -283,6 +283,28 @@
     });
   }
 
+  async function adminExportModules(modules, adminToken, signal) {
+    return fetchJSON('/api/admin/export', {
+      method: 'POST',
+      body: JSON.stringify({ modules }),
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      },
+      signal
+    });
+  }
+
+  async function adminImportModules(backup, modules, overwriteExisting, adminToken, signal) {
+    return fetchJSON('/api/admin/import', {
+      method: 'POST',
+      body: JSON.stringify({ backup, modules, overwriteExisting }),
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      },
+      signal
+    });
+  }
+
   window.OnlyGantt.api = {
     getDepartments,
     createDepartment,
@@ -306,6 +328,8 @@
     adminResetPassword,
     adminChangePassword,
     adminServerBackup,
-    adminServerRestore
+    adminServerRestore,
+    adminExportModules,
+    adminImportModules
   };
 })();

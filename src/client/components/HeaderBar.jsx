@@ -21,9 +21,6 @@
     onEnableLock,
     onReleaseLock,
     onUserLogout,
-    onExportDepartment,
-    onImportDepartment,
-    canImportExport,
     readOnlyDepartment,
     adminToken,
     onChangePassword,
@@ -32,8 +29,6 @@
     onAdminResetPassword,
     onAdminChangePassword,
     onAdminReleaseLock,
-    onAdminServerBackup,
-    onAdminServerRestore,
     screensaverEnabled,
     onToggleScreensaver,
     onNavigateSystemSettings
@@ -116,43 +111,6 @@
         return;
       }
       await onAdminChangePassword({ oldPassword: oldPasswordInput, newPassword: newPasswordInput.trim() });
-    };
-
-    const handleAdminServerBackup = async () => {
-      if (!adminToken) return;
-      handleMenuAction(onAdminServerBackup);
-    };
-
-    const handleAdminServerRestore = async () => {
-      if (!adminToken) return;
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = '.json';
-      fileInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-          const text = await file.text();
-          const backup = JSON.parse(text);
-
-          const overwrite = confirm(
-            `Ripristinare il backup del server?\n\n` +
-            `Reparti nel backup: ${backup.departments?.length || 0}\n` +
-            `Data export: ${backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('it-IT') : 'N/A'}\n\n` +
-            `ATTENZIONE: I reparti esistenti verranno sovrascritti!\n\n` +
-            `Confermi il ripristino?`
-          );
-
-          if (overwrite) {
-            await onAdminServerRestore({ backup, overwriteExisting: true });
-          }
-        } catch (err) {
-          alert(`Errore nella lettura del file: ${err.message}`);
-        }
-      };
-      fileInput.click();
-      setMenuOpen(false);
     };
 
     const isLockedByOther = !!(lockInfo?.locked && !isLocked);
@@ -292,32 +250,6 @@
               </div>
 
               {}
-              {canImportExport && (
-                <div className="topbar__dropdown-section">
-                  <div className="topbar__dropdown-title">Dati</div>
-                  <button
-                    className="topbar__dropdown-item"
-                    onClick={() => handleMenuAction(onExportDepartment)}
-                  >
-                    Export reparto
-                  </button>
-                  <label className="topbar__dropdown-item topbar__dropdown-item--file">
-                    Import reparto
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          handleMenuAction(() => onImportDepartment(file));
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
-
               {}
               {adminToken && (
                 <div className="topbar__dropdown-section">
@@ -360,24 +292,6 @@
                     disabled={!department || !lockInfo?.locked || isLocked}
                   >
                     Sblocca reparto
-                  </button>
-                </div>
-              )}
-
-              {adminToken && (
-                <div className="topbar__dropdown-section">
-                  <div className="topbar__dropdown-title">Backup Server</div>
-                  <button
-                    className="topbar__dropdown-item"
-                    onClick={handleAdminServerBackup}
-                  >
-                    Esporta backup completo
-                  </button>
-                  <button
-                    className="topbar__dropdown-item"
-                    onClick={handleAdminServerRestore}
-                  >
-                    Ripristina backup
                   </button>
                 </div>
               )}
