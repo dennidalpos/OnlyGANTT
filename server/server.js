@@ -4,8 +4,16 @@ const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 const { validateDepartmentData, ensureIDs } = require('./schema');
+const { createUserStore } = require('./userStore');
+const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection } = require('./ldapService');
 
 const app = express();
+
+function parseBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (!value) return false;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
 
 const CONFIG = {
   port: 3000,
@@ -16,7 +24,17 @@ const CONFIG = {
   maxUploadBytes: 2000000,
   adminUser: process.env.ONLYGANTT_ADMIN_USER || 'admin',
   adminPassword: process.env.ONLYGANTT_ADMIN_PASSWORD || 'admin123',
-  adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null
+  adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null,
+  ldapEnabled: parseBoolean(process.env.LDAP_ENABLED),
+  logLdap: parseBoolean(process.env.LOG_LDAP),
+  ldapUrl: process.env.LDAP_URL || '',
+  ldapBindDn: process.env.LDAP_BIND_DN || '',
+  ldapBindPassword: process.env.LDAP_BIND_PASSWORD || '',
+  ldapBaseDn: process.env.LDAP_BASE_DN || '',
+  ldapUserFilter: process.env.LDAP_USER_FILTER || '(sAMAccountName={{username}})',
+  ldapRequiredGroup: process.env.LDAP_REQUIRED_GROUP || '',
+  ldapGroupSearchBase: process.env.LDAP_GROUP_SEARCH_BASE || '',
+  ldapLocalFallback: parseBoolean(process.env.LDAP_LOCAL_FALLBACK)
 };
 
 app.use(express.json());
@@ -25,8 +43,10 @@ app.use('/src', express.static('src'));
 
 const locks = new Map();
 const adminTokens = new Map();
+const userStore = createUserStore({ dataDir: CONFIG.dataDir, enableBak: CONFIG.enableBak });
 
 const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+const USER_STORE_FILE = 'users.json';
 
 function normalizeDepartmentName(name) {
   if (!name || typeof name !== 'string') return null;
@@ -36,6 +56,10 @@ function normalizeDepartmentName(name) {
   if (trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\')) return null;
   if (RESERVED_NAMES.includes(trimmed.toUpperCase())) return null;
   return trimmed;
+}
+
+function isDepartmentFile(fileName) {
+  return fileName.endsWith('.json') && !fileName.endsWith('.bak') && !fileName.endsWith('.tmp') && fileName !== USER_STORE_FILE;
 }
 
 function getDepartmentFilePath(department) {
@@ -119,6 +143,20 @@ function errorResponse(res, statusCode, code, message, details = null) {
   res.status(statusCode).json(payload);
 }
 
+function getLdapConfigSnapshot() {
+  return {
+    enabled: CONFIG.ldapEnabled,
+    log: CONFIG.logLdap,
+    url: CONFIG.ldapUrl,
+    bindDn: CONFIG.ldapBindDn,
+    baseDn: CONFIG.ldapBaseDn,
+    userFilter: CONFIG.ldapUserFilter,
+    requiredGroupDn: CONFIG.ldapRequiredGroup,
+    groupSearchBase: CONFIG.ldapGroupSearchBase,
+    localFallback: CONFIG.ldapLocalFallback
+  };
+}
+
 function isValidAdminToken(token) {
   if (!token) return false;
   const session = adminTokens.get(token);
@@ -177,23 +215,23 @@ function isLockOwner(department, userName) {
 }
 
 ensureDataDir();
+userStore.ensureStore();
 
 function validateExistingDepartments() {
   try {
     const files = fs.readdirSync(CONFIG.dataDir);
     files.forEach(file => {
-      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-        const deptName = file.replace('.json', '');
-        const { data, error } = readDepartmentData(deptName);
-        if (error) {
-          console.warn(`Invalid JSON for department ${deptName}:`, error.message);
-          return;
-        }
-        if (!data) return;
-        const errors = validateDepartmentData(data);
-        if (errors.length > 0) {
-          console.warn(`Validation errors in department ${deptName}:`, errors);
-        }
+      if (!isDepartmentFile(file)) return;
+      const deptName = file.replace('.json', '');
+      const { data, error } = readDepartmentData(deptName);
+      if (error) {
+        console.warn(`Invalid JSON for department ${deptName}:`, error.message);
+        return;
+      }
+      if (!data) return;
+      const errors = validateDepartmentData(data);
+      if (errors.length > 0) {
+        console.warn(`Validation errors in department ${deptName}:`, errors);
       }
     });
   } catch (err) {
@@ -226,19 +264,18 @@ function collectDepartmentBackups() {
   const departments = [];
 
   for (const file of files) {
-    if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-      const deptName = file.replace('.json', '');
-      const { data, error } = readDepartmentData(deptName);
-      if (error) {
-        console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
-        continue;
-      }
-      if (!data) continue;
-      departments.push({
-        name: deptName,
-        data
-      });
+    if (!isDepartmentFile(file)) continue;
+    const deptName = file.replace('.json', '');
+    const { data, error } = readDepartmentData(deptName);
+    if (error) {
+      console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+      continue;
     }
+    if (!data) continue;
+    departments.push({
+      name: deptName,
+      data
+    });
   }
 
   return departments;
@@ -370,21 +407,20 @@ app.get('/api/departments', (req, res) => {
     const files = fs.readdirSync(CONFIG.dataDir);
     const departments = [];
     for (const file of files) {
-      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-        const deptName = file.replace('.json', '');
-        const { data, error } = readDepartmentData(deptName);
-        if (error) {
-          console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
-          continue;
-        }
-        if (!data) continue;
-        departments.push({
-          name: deptName,
-          protected: !!(data.password && data.password.trim()),
-          needsPasswordSetup: false,
-          readOnly: false
-        });
+      if (!isDepartmentFile(file)) continue;
+      const deptName = file.replace('.json', '');
+      const { data, error } = readDepartmentData(deptName);
+      if (error) {
+        console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+        continue;
       }
+      if (!data) continue;
+      departments.push({
+        name: deptName,
+        protected: !!(data.password && data.password.trim()),
+        needsPasswordSetup: false,
+        readOnly: false
+      });
     }
     res.json({ departments });
   } catch (err) {
@@ -764,6 +800,102 @@ app.post('/api/lock/:department/admin-release', requireAdmin, (req, res) => {
   }
 });
 
+app.get('/api/auth/config', (req, res) => {
+  try {
+    const snapshot = userStore.getAuthSnapshot();
+    res.json({
+      ldapEnabled: CONFIG.ldapEnabled,
+      localFallback: CONFIG.ldapLocalFallback,
+      localUsers: snapshot.localUsers
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { userId, password, department } = req.body;
+    if (!userId || typeof userId !== 'string') {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'userId is required');
+    }
+    if (userId.trim() === CONFIG.adminUser) {
+      return errorResponse(res, 403, 'ADMIN_LOCAL_ONLY', 'Admin access is local only');
+    }
+
+    const normalizedUserId = userId.trim();
+    const ldapConfig = buildConfigFromEnv();
+
+    if (CONFIG.ldapEnabled) {
+      const ldapResult = await authenticateLdapUser({ userId: normalizedUserId, password }, ldapConfig);
+      if (ldapResult.ok) {
+        const storeResult = userStore.upsertLdapUser(normalizedUserId, {
+          displayName: ldapResult.profile.displayName,
+          mail: ldapResult.profile.mail,
+          department: ldapResult.profile.department || department || null
+        });
+        return res.json({
+          ok: true,
+          authType: 'ldap',
+          user: {
+            userId: normalizedUserId,
+            type: 'ad',
+            displayName: storeResult.user.displayName,
+            mail: storeResult.user.mail,
+            department: storeResult.user.department
+          }
+        });
+      }
+
+      if (ldapResult.code === 'GROUP_REQUIRED') {
+        return errorResponse(res, 403, ldapResult.code, ldapResult.message);
+      }
+
+      if (CONFIG.ldapLocalFallback && ldapResult.code !== 'GROUP_REQUIRED') {
+        const localResult = userStore.verifyLocalUser(normalizedUserId, password);
+        if (localResult.ok) {
+          return res.json({
+            ok: true,
+            authType: 'local',
+            user: {
+              userId: normalizedUserId,
+              type: 'local',
+              displayName: localResult.user.displayName || normalizedUserId,
+              mail: localResult.user.mail || null,
+              department: localResult.user.department || null
+            }
+          });
+        }
+      }
+
+      const statusCode = ldapResult.code === 'LDAP_DOWN'
+        ? 503
+        : ldapResult.code === 'LDAP_CONFIG_ERROR'
+          ? 500
+          : 401;
+      return errorResponse(res, statusCode, ldapResult.code, ldapResult.message);
+    }
+
+    const localResult = userStore.verifyLocalUser(normalizedUserId, password);
+    if (!localResult.ok) {
+      return errorResponse(res, 401, 'INVALID_CREDENTIALS', 'Invalid credentials');
+    }
+    return res.json({
+      ok: true,
+      authType: 'local',
+      user: {
+        userId: normalizedUserId,
+        type: 'local',
+        displayName: localResult.user.displayName || normalizedUserId,
+        mail: localResult.user.mail || null,
+        department: localResult.user.department || null
+      }
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
 app.post('/api/admin/login', (req, res) => {
   try {
     const { userId, password } = req.body;
@@ -838,32 +970,56 @@ app.post('/api/admin/change-password', requireAdmin, (req, res) => {
   }
 });
 
+app.get('/api/admin/ldap/config', requireAdmin, (req, res) => {
+  try {
+    res.json(getLdapConfigSnapshot());
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
+  try {
+    const { config, testUserId } = req.body || {};
+    const result = await testLdapConnection({
+      configOverride: config || {},
+      testUserId: testUserId || null
+    });
+    if (!result.ok) {
+      const statusCode = result.code === 'LDAP_DOWN' ? 503 : 400;
+      return errorResponse(res, statusCode, result.code || 'LDAP_TEST_FAILED', result.message || 'LDAP test failed', result.details || null);
+    }
+    res.json(result);
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
 app.get('/api/admin/departments', requireAdmin, (req, res) => {
   try {
     ensureDataDir();
     const files = fs.readdirSync(CONFIG.dataDir);
     const departments = [];
     for (const file of files) {
-      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-        const deptName = file.replace('.json', '');
-        try {
-          const { data, error } = readDepartmentData(deptName);
-          if (error) {
-            console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
-            continue;
-          }
-          if (!data) continue;
-          departments.push({
-            name: deptName,
-            file: file,
-            protected: !!(data.password && data.password.trim()),
-            needsPasswordSetup: false,
-            meta: data.meta,
-            lock: getLockInfo(deptName)
-          });
-        } catch (err) {
-          console.warn(`Error reading department ${deptName}:`, err.message);
+      if (!isDepartmentFile(file)) continue;
+      const deptName = file.replace('.json', '');
+      try {
+        const { data, error } = readDepartmentData(deptName);
+        if (error) {
+          console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+          continue;
         }
+        if (!data) continue;
+        departments.push({
+          name: deptName,
+          file: file,
+          protected: !!(data.password && data.password.trim()),
+          needsPasswordSetup: false,
+          meta: data.meta,
+          lock: getLockInfo(deptName)
+        });
+      } catch (err) {
+        console.warn(`Error reading department ${deptName}:`, err.message);
       }
     }
     res.json({ departments });

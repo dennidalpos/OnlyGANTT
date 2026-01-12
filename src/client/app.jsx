@@ -1072,6 +1072,7 @@
               onAdminServerRestore={handleAdminServerRestore}
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
+              adminToken={adminToken}
             />
           ) : !department ? (
             <LoginScreen

@@ -37,6 +37,18 @@
     return fetchJSON('/api/departments', { signal });
   }
 
+  async function getAuthConfig(signal) {
+    return fetchJSON('/api/auth/config', { signal });
+  }
+
+  async function authLogin(userId, password, department, signal) {
+    return fetchJSON('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ userId, password, department }),
+      signal
+    });
+  }
+
   async function createDepartment(name, adminToken, signal) {
     return fetchJSON('/api/departments', {
       method: 'POST',
@@ -214,6 +226,26 @@
     });
   }
 
+  async function getLdapConfig(token, signal) {
+    return fetchJSON('/api/admin/ldap/config', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
+  async function testLdapConnection(config, testUserId, token, signal) {
+    return fetchJSON('/api/admin/ldap/test', {
+      method: 'POST',
+      body: JSON.stringify({ config, testUserId }),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
   async function adminLogout(token, signal) {
     await fetch(`${BASE_URL}/api/admin/logout`, {
       method: 'POST',
@@ -322,6 +354,8 @@
     getLockStatus,
     heartbeatLock,
     adminReleaseLock,
+    getAuthConfig,
+    authLogin,
     adminLogin,
     adminLogout,
     getAdminDepartments,
@@ -330,6 +364,8 @@
     adminServerBackup,
     adminServerRestore,
     adminExportModules,
-    adminImportModules
+    adminImportModules,
+    getLdapConfig,
+    testLdapConnection
   };
 })();
