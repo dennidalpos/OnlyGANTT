@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useMemo, useState, useEffect } = React;
+  const { useMemo, useState, useEffect, useRef } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -42,11 +42,16 @@
     const [ldapTestStatus, setLdapTestStatus] = useState(null);
     const [ldapLoading, setLdapLoading] = useState(true);
     const [ldapTesting, setLdapTesting] = useState(false);
+    const [restartStatus, setRestartStatus] = useState(null);
+    const [restartCountdown, setRestartCountdown] = useState(null);
     const [httpsConfig, setHttpsConfig] = useState({
       enabled: false,
       keyPath: '',
       certPath: ''
     });
+    const restartTimeoutRef = useRef(null);
+    const restartIntervalRef = useRef(null);
+    const RESTART_DELAY_SECONDS = 5;
 
     const moduleLabels = {
       departments: 'Reparti',
@@ -101,12 +106,74 @@
       return () => controller.abort();
     }, [adminToken, api]);
 
+    useEffect(() => {
+      return () => {
+        if (restartTimeoutRef.current) {
+          clearTimeout(restartTimeoutRef.current);
+        }
+        if (restartIntervalRef.current) {
+          clearInterval(restartIntervalRef.current);
+        }
+      };
+    }, []);
+
     const handleLdapFieldChange = (field, value) => {
       setLdapConfig((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleHttpsFieldChange = (field, value) => {
       setHttpsConfig((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const clearRestartTimers = () => {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+      if (restartIntervalRef.current) {
+        clearInterval(restartIntervalRef.current);
+        restartIntervalRef.current = null;
+      }
+    };
+
+    const handleServerRestart = async () => {
+      if (!adminToken) return;
+      const confirmed = confirm(
+        'Confermi il riavvio del server? La UI verrà ricaricata automaticamente.'
+      );
+      if (!confirmed) return;
+      clearRestartTimers();
+      setRestartStatus(null);
+      setRestartCountdown(null);
+      try {
+        await api.adminServerRestart(adminToken);
+        setRestartStatus({
+          type: 'info',
+          message: 'Riavvio avviato. La UI si ricaricherà automaticamente.'
+        });
+        setRestartCountdown(RESTART_DELAY_SECONDS);
+        restartIntervalRef.current = setInterval(() => {
+          setRestartCountdown((prev) => {
+            if (prev === null) return prev;
+            if (prev <= 1) {
+              if (restartIntervalRef.current) {
+                clearInterval(restartIntervalRef.current);
+                restartIntervalRef.current = null;
+              }
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        restartTimeoutRef.current = setTimeout(() => {
+          window.location.reload();
+        }, RESTART_DELAY_SECONDS * 1000);
+      } catch (err) {
+        setRestartStatus({
+          type: 'error',
+          message: err.message || 'Errore durante il riavvio del server'
+        });
+      }
     };
 
     const handleLdapTest = async () => {
@@ -397,7 +464,25 @@
                 style={{ display: 'none' }}
               />
             </label>
+            <button
+              className="btn-danger"
+              type="button"
+              onClick={handleServerRestart}
+              disabled={!adminToken || restartCountdown !== null}
+            >
+              Riavvia server
+            </button>
           </div>
+          {restartCountdown !== null && (
+            <div className="alert-item info" style={{ marginTop: '0.75rem' }}>
+              Riavvio in corso: ricarico della UI tra {restartCountdown} secondi.
+            </div>
+          )}
+          {restartStatus && restartCountdown === null && (
+            <div className={`alert-item ${restartStatus.type}`} style={{ marginTop: '0.75rem' }}>
+              {restartStatus.message}
+            </div>
+          )}
         </div>
 
         <div className="card-section">

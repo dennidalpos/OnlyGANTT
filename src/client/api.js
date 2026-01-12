@@ -315,6 +315,16 @@
     });
   }
 
+  async function adminServerRestart(adminToken, signal) {
+    return fetchJSON('/api/admin/server-restart', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      },
+      signal
+    });
+  }
+
   async function adminExportModules(modules, adminToken, signal) {
     return fetchJSON('/api/admin/export', {
       method: 'POST',
@@ -363,6 +373,7 @@
     adminChangePassword,
     adminServerBackup,
     adminServerRestore,
+    adminServerRestart,
     adminExportModules,
     adminImportModules,
     getLdapConfig,

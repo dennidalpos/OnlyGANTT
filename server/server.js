@@ -7,6 +7,8 @@ const { validateDepartmentData, ensureIDs } = require('./schema');
 const { createUserStore } = require('./userStore');
 const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection } = require('./ldapService');
 const { startServer } = require('./httpsService');
+const { logAuditEvent } = require('./auditService');
+const { restartServer } = require('./serverService');
 
 const app = express();
 
@@ -1027,6 +1029,30 @@ app.get('/api/admin/departments', requireAdmin, (req, res) => {
       }
     }
     res.json({ departments });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/server-restart', requireAdmin, (req, res) => {
+  try {
+    logAuditEvent({
+      eventType: 'SERVER_RESTART',
+      actor: CONFIG.adminUser,
+      ip: req.ip,
+      dataDir: CONFIG.dataDir,
+      details: {
+        userAgent: req.headers['user-agent'] || null
+      }
+    });
+    res.json({ ok: true });
+    setTimeout(() => {
+      try {
+        restartServer();
+      } catch (err) {
+        console.error(`Restart failed: ${err.message}`);
+      }
+    }, 250);
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
   }
