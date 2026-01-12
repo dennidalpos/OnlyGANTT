@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { validateDepartmentData, ensureIDs } = require('./schema');
 const { createUserStore } = require('./userStore');
 const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection } = require('./ldapService');
+const { startServer } = require('./httpsService');
 
 const app = express();
 
@@ -34,7 +35,10 @@ const CONFIG = {
   ldapUserFilter: process.env.LDAP_USER_FILTER || '(sAMAccountName={{username}})',
   ldapRequiredGroup: process.env.LDAP_REQUIRED_GROUP || '',
   ldapGroupSearchBase: process.env.LDAP_GROUP_SEARCH_BASE || '',
-  ldapLocalFallback: parseBoolean(process.env.LDAP_LOCAL_FALLBACK)
+  ldapLocalFallback: parseBoolean(process.env.LDAP_LOCAL_FALLBACK),
+  httpsEnabled: parseBoolean(process.env.HTTPS_ENABLED),
+  httpsKeyPath: process.env.HTTPS_KEY_PATH || '',
+  httpsCertPath: process.env.HTTPS_CERT_PATH || ''
 };
 
 app.use(express.json());
@@ -1147,7 +1151,16 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
 });
 
 const PORT = CONFIG.port;
-app.listen(PORT, () => {
-  console.log(`OnlyGANTT server running on http://localhost:${PORT}`);
+try {
+  const { protocol } = startServer(app, {
+    port: PORT,
+    httpsEnabled: CONFIG.httpsEnabled,
+    httpsKeyPath: CONFIG.httpsKeyPath,
+    httpsCertPath: CONFIG.httpsCertPath
+  });
+  console.log(`OnlyGANTT server running on ${protocol}://localhost:${PORT}`);
   console.log(`Data directory: ${path.resolve(CONFIG.dataDir)}`);
-});
+} catch (err) {
+  console.error(`Errore avvio server: ${err.message}`);
+  process.exit(1);
+}
