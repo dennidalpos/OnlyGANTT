@@ -17,6 +17,7 @@
     lockInfo,
     isLocked,
     lockEnabled,
+    onRefreshLock,
     onEnableLock,
     onReleaseLock,
     onUserLogout,
@@ -30,6 +31,7 @@
     onAdminDeleteDepartment,
     onAdminResetPassword,
     onAdminChangePassword,
+    onAdminReleaseLock,
     onAdminServerBackup,
     onAdminServerRestore,
     screensaverEnabled,
@@ -152,21 +154,33 @@
       setMenuOpen(false);
     };
 
+    const isLockedByOther = !!(lockInfo?.locked && !isLocked);
+
     const handleLockClick = () => {
       if (!department || readOnlyDepartment) return;
 
-      if (!lockEnabled) {
-        handleMenuAction(onEnableLock);
-      } else {
+      if (isLocked) {
         handleMenuAction(onReleaseLock);
+        return;
       }
+
+      if (isLockedByOther) {
+        if (lockEnabled) {
+          handleMenuAction(onRefreshLock);
+        } else {
+          handleMenuAction(onEnableLock);
+        }
+        return;
+      }
+
+      handleMenuAction(onEnableLock);
     };
 
-    const lockStatus = lockEnabled && isLocked
-      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active', clickable: true }
-      : lockInfo?.locked
-        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other', clickable: false }
-        : { icon: '🔓', label: 'Libero', className: 'status-lock--free', clickable: true };
+    const lockStatus = isLocked
+      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active', clickable: true, title: 'Clicca per liberare' }
+      : isLockedByOther
+        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other', clickable: true, title: 'Clicca per richiedere modifica' }
+        : { icon: '🔓', label: 'Libero', className: 'status-lock--free', clickable: true, title: 'Clicca per modificare' };
 
     return (
       <header className="topbar">
@@ -195,7 +209,7 @@
             {department && (
               <button
                 className={`topbar__status-item ${lockStatus.className} ${lockStatus.clickable ? 'clickable' : ''}`}
-                title={lockStatus.clickable ? (lockEnabled ? 'Clicca per liberare' : 'Clicca per modificare') : `Lock: ${lockStatus.label}`}
+                title={lockStatus.clickable ? lockStatus.title : `Lock: ${lockStatus.label}`}
                 onClick={lockStatus.clickable ? handleLockClick : undefined}
                 disabled={!lockStatus.clickable || readOnlyDepartment}
                 style={{ border: 'none', background: 'transparent', padding: '0.25rem 0.75rem', cursor: lockStatus.clickable && !readOnlyDepartment ? 'pointer' : 'default' }}
@@ -247,14 +261,23 @@
                 <button
                   className="topbar__dropdown-item"
                   onClick={() => handleMenuAction(onEnableLock)}
-                  disabled={!department || lockEnabled}
+                  disabled={!department || lockEnabled || isLockedByOther}
                 >
                   Modifica reparto
                 </button>
+                {isLockedByOther && (
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(lockEnabled ? onRefreshLock : onEnableLock)}
+                    disabled={!department}
+                  >
+                    Richiedi modifica
+                  </button>
+                )}
                 <button
                   className="topbar__dropdown-item"
                   onClick={() => handleMenuAction(onReleaseLock)}
-                  disabled={!department || !lockEnabled}
+                  disabled={!department || !isLocked}
                 >
                   Libera reparto
                 </button>
@@ -323,6 +346,13 @@
                     disabled={!department}
                   >
                     Elimina reparto
+                  </button>
+                  <button
+                    className="topbar__dropdown-item topbar__dropdown-item--danger"
+                    onClick={() => handleMenuAction(onAdminReleaseLock)}
+                    disabled={!department || !lockInfo?.locked || isLocked}
+                  >
+                    Sblocca reparto
                   </button>
                 </div>
               )}
