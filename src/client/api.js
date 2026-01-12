@@ -265,6 +265,15 @@
     });
   }
 
+  async function getAdminUsers(token, signal) {
+    return fetchJSON('/api/admin/users', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
   async function adminResetPassword(resetCode, newPassword, signal) {
     return fetchJSON('/api/admin/reset-password', {
       method: 'POST',
@@ -369,6 +378,7 @@
     adminLogin,
     adminLogout,
     getAdminDepartments,
+    getAdminUsers,
     adminResetPassword,
     adminChangePassword,
     adminServerBackup,

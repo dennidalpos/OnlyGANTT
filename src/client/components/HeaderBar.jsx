@@ -31,7 +31,8 @@
     onAdminReleaseLock,
     screensaverEnabled,
     onToggleScreensaver,
-    onNavigateSystemSettings
+    onNavigateSystemSettings,
+    onNavigateUserManagement
   }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
@@ -259,6 +260,12 @@
                     onClick={() => handleMenuAction(onNavigateSystemSettings)}
                   >
                     Impostazioni di sistema
+                  </button>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(onNavigateUserManagement)}
+                  >
+                    Gestione utenti
                   </button>
                   <button
                     className="topbar__dropdown-item"

@@ -5,7 +5,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 const { validateDepartmentData, ensureIDs } = require('./schema');
 const { createUserStore } = require('./userStore');
-const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection } = require('./ldapService');
+const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection, listLdapUsers } = require('./ldapService');
 const { startServer } = require('./httpsService');
 const { logAuditEvent } = require('./auditService');
 const { restartServer } = require('./serverService');
@@ -996,6 +996,34 @@ app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
       return errorResponse(res, statusCode, result.code || 'LDAP_TEST_FAILED', result.message || 'LDAP test failed', result.details || null);
     }
     res.json(result);
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const localUsers = userStore.listLocalUsers();
+    let ldapUsers = [];
+    let ldapError = null;
+
+    if (CONFIG.ldapEnabled) {
+      const ldapResult = await listLdapUsers();
+      if (ldapResult.ok) {
+        ldapUsers = ldapResult.users || [];
+      } else {
+        ldapError = {
+          code: ldapResult.code || 'LDAP_ERROR',
+          message: ldapResult.message || 'LDAP search failed'
+        };
+      }
+    }
+
+    res.json({
+      users: [...localUsers, ...ldapUsers],
+      ldapEnabled: CONFIG.ldapEnabled,
+      ldapError
+    });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
   }
