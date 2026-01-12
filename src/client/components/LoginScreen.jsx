@@ -29,6 +29,9 @@
     const [selectedDept, setSelectedDept] = useState('');
     const [deptPassword, setDeptPassword] = useState('');
     const [pendingUserName, setPendingUserName] = useState(userName || '');
+    const [userPassword, setUserPassword] = useState('');
+    const [authConfig, setAuthConfig] = useState({ ldapEnabled: false, localFallback: false, localUsers: 0 });
+    const [authLoading, setAuthLoading] = useState(true);
     const [adminId, setAdminId] = useState('');
     const [adminPassword, setAdminPassword] = useState('');
     const [error, setError] = useState('');
@@ -42,6 +45,7 @@
     const userNameRef = useRef(null);
     const deptSelectRef = useRef(null);
     const deptPasswordRef = useRef(null);
+    const userPasswordRef = useRef(null);
     const adminIdRef = useRef(null);
     const adminPasswordRef = useRef(null);
 
@@ -65,9 +69,32 @@
       return () => controller.abort();
     }, [loadDepartments]);
 
+    useEffect(() => {
+      const controller = new AbortController();
+      const loadAuthConfig = async () => {
+        setAuthLoading(true);
+        try {
+          const data = await api.getAuthConfig(controller.signal);
+          setAuthConfig({
+            ldapEnabled: !!data.ldapEnabled,
+            localFallback: !!data.localFallback,
+            localUsers: data.localUsers || 0
+          });
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          setAuthConfig({ ldapEnabled: false, localFallback: false, localUsers: 0 });
+        } finally {
+          setAuthLoading(false);
+        }
+      };
+      loadAuthConfig();
+      return () => controller.abort();
+    }, []);
+
     
     useEffect(() => {
       setPendingUserName(userName || '');
+      setUserPassword('');
     }, [userName]);
 
     
@@ -99,12 +126,14 @@
     const isUserNameValid = pendingUserName.trim().length >= 2;
     const hasDepartments = departments.length > 0;
     const needsPassword = selectedDeptObj?.protected && !adminToken;
+    const requiresUserPassword = !adminToken && (authConfig.ldapEnabled || authConfig.localUsers > 0 || !authLoading);
 
     
     const canSubmitDept = Boolean(
       selectedDeptObj &&
       (adminToken || isUserNameValid) &&
       (!needsPassword || deptPassword) &&
+      (!requiresUserPassword || userPassword) &&
       !isLoading
     );
 
@@ -147,6 +176,16 @@
       }
     };
 
+    const handleUserPasswordKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        if (selectedDept) {
+          handleDeptLogin();
+        } else {
+          deptSelectRef.current?.focus();
+        }
+      }
+    };
+
     const handleAdminIdKeyDown = (e) => {
       if (e.key === 'Enter') {
         adminPasswordRef.current?.focus();
@@ -172,11 +211,20 @@
         return;
       }
 
+      if (requiresUserPassword && !userPassword) {
+        setError('Inserisci la password utente');
+        userPasswordRef.current?.focus();
+        return;
+      }
+
       setError('');
       setIsLoading(true);
 
       try {
-        
+        if (!adminToken && requiresUserPassword) {
+          await api.authLogin(pendingUserName.trim(), userPassword, selectedDept);
+        }
+
         if (needsPassword) {
           const result = await api.verifyPassword(selectedDept, deptPassword);
           if (!result.ok) {
@@ -195,9 +243,20 @@
           onUserNameChange(pendingUserName.trim());
         }
 
+        setUserPassword('');
         onDepartmentChange(selectedDept);
       } catch (err) {
-        setError(err.message || 'Errore durante l\'accesso');
+        if (err.code === 'LDAP_DOWN') {
+          setError('Server LDAP non disponibile');
+        } else if (err.code === 'INVALID_CREDENTIALS') {
+          setError('Credenziali non valide');
+        } else if (err.code === 'GROUP_REQUIRED') {
+          setError('Utente non presente nel gruppo richiesto');
+        } else if (err.code === 'ADMIN_LOCAL_ONLY') {
+          setError('Accesso admin consentito solo localmente');
+        } else {
+          setError(err.message || 'Errore durante l\'accesso');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -334,6 +393,25 @@
                     <span className="input-hint success">Nome valido</span>
                   )}
                 </div>
+                {requiresUserPassword && (
+                  <div className="form-group">
+                    <label htmlFor="login-user-password">Password utente</label>
+                    <input
+                      ref={userPasswordRef}
+                      id="login-user-password"
+                      type="password"
+                      value={userPassword}
+                      onChange={(e) => setUserPassword(e.target.value)}
+                      onKeyDown={handleUserPasswordKeyDown}
+                      placeholder="Inserisci password utente"
+                      disabled={isLoading}
+                      autoComplete="current-password"
+                    />
+                    {authConfig.ldapEnabled && (
+                      <span className="input-hint">Autenticazione LDAP attiva</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="login-section">

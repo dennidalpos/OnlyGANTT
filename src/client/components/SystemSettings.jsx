@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useMemo, useState } = React;
+  const { useMemo, useState, useEffect } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -16,14 +16,32 @@
     onAdminServerBackup,
     onAdminServerRestore,
     onAdminModularExport,
-    onAdminModularImport
+    onAdminModularImport,
+    adminToken
   }) {
+    const api = window.OnlyGantt.api;
     const [modules, setModules] = useState({
       departments: true,
       users: false,
       settings: false,
       integrations: false
     });
+    const [ldapConfig, setLdapConfig] = useState({
+      enabled: false,
+      log: false,
+      url: '',
+      bindDn: '',
+      bindPassword: '',
+      baseDn: '',
+      userFilter: '(sAMAccountName={{username}})',
+      requiredGroupDn: '',
+      groupSearchBase: '',
+      localFallback: false
+    });
+    const [ldapTestUserId, setLdapTestUserId] = useState('');
+    const [ldapTestStatus, setLdapTestStatus] = useState(null);
+    const [ldapLoading, setLdapLoading] = useState(true);
+    const [ldapTesting, setLdapTesting] = useState(false);
 
     const moduleLabels = {
       departments: 'Reparti',
@@ -46,6 +64,63 @@
 
     const handleModuleToggle = (key) => {
       setModules((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    useEffect(() => {
+      if (!adminToken) return undefined;
+      const controller = new AbortController();
+      const loadLdapConfig = async () => {
+        setLdapLoading(true);
+        try {
+          const data = await api.getLdapConfig(adminToken, controller.signal);
+          setLdapConfig({
+            enabled: !!data.enabled,
+            log: !!data.log,
+            url: data.url || '',
+            bindDn: data.bindDn || '',
+            bindPassword: '',
+            baseDn: data.baseDn || '',
+            userFilter: data.userFilter || '(sAMAccountName={{username}})',
+            requiredGroupDn: data.requiredGroupDn || '',
+            groupSearchBase: data.groupSearchBase || '',
+            localFallback: !!data.localFallback
+          });
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          setLdapTestStatus({ type: 'error', message: 'Errore nel caricamento configurazione LDAP' });
+        } finally {
+          setLdapLoading(false);
+        }
+      };
+      loadLdapConfig();
+      return () => controller.abort();
+    }, [adminToken, api]);
+
+    const handleLdapFieldChange = (field, value) => {
+      setLdapConfig((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleLdapTest = async () => {
+      if (!adminToken) return;
+      setLdapTesting(true);
+      setLdapTestStatus(null);
+      try {
+        const result = await api.testLdapConnection(ldapConfig, ldapTestUserId || null, adminToken);
+        setLdapTestStatus({
+          type: 'success',
+          message: result.message || 'Test LDAP completato con successo'
+        });
+      } catch (err) {
+        let message = err.message || 'Test LDAP fallito';
+        if (err.code === 'GROUP_REQUIRED') {
+          message = 'Utente non presente nel gruppo richiesto';
+        } else if (err.code === 'LDAP_DOWN') {
+          message = 'Server LDAP non raggiungibile';
+        }
+        setLdapTestStatus({ type: 'error', message });
+      } finally {
+        setLdapTesting(false);
+      }
     };
 
     const readFileAsText = (file) => new Promise((resolve, reject) => {
@@ -109,6 +184,142 @@
         <div className="card-section">
           <h3 style={{ marginTop: 0 }}>Configurazioni</h3>
           <p className="text-muted">Gestisci parametri globali, policy di sicurezza e opzioni di default.</p>
+        </div>
+
+        <div className="card-section">
+          <h3 style={{ marginTop: 0 }}>LDAP</h3>
+          <p className="text-muted">
+            Configura l'integrazione LDAP tramite variabili ambiente. I valori inseriti qui vengono usati solo per il test.
+          </p>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={ldapConfig.enabled}
+                onChange={(e) => handleLdapFieldChange('enabled', e.target.checked)}
+                disabled={ldapLoading}
+              />
+              LDAP abilitato (LDAP_ENABLED)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={ldapConfig.log}
+                onChange={(e) => handleLdapFieldChange('log', e.target.checked)}
+                disabled={ldapLoading}
+              />
+              Log LDAP (LOG_LDAP)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={ldapConfig.localFallback}
+                onChange={(e) => handleLdapFieldChange('localFallback', e.target.checked)}
+                disabled={ldapLoading}
+              />
+              Fallback locale (LDAP_LOCAL_FALLBACK)
+            </label>
+          </div>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            <div>
+              <label htmlFor="ldap-url">URL LDAP (LDAP_URL)</label>
+              <input
+                id="ldap-url"
+                type="text"
+                value={ldapConfig.url}
+                onChange={(e) => handleLdapFieldChange('url', e.target.value)}
+                placeholder="ldap://server:389"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-bind-dn">Bind DN (LDAP_BIND_DN)</label>
+              <input
+                id="ldap-bind-dn"
+                type="text"
+                value={ldapConfig.bindDn}
+                onChange={(e) => handleLdapFieldChange('bindDn', e.target.value)}
+                placeholder="CN=svc,OU=Users,DC=example,DC=local"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-bind-password">Bind Password (LDAP_BIND_PASSWORD)</label>
+              <input
+                id="ldap-bind-password"
+                type="password"
+                value={ldapConfig.bindPassword}
+                onChange={(e) => handleLdapFieldChange('bindPassword', e.target.value)}
+                placeholder="••••••••"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-base-dn">Base DN (LDAP_BASE_DN)</label>
+              <input
+                id="ldap-base-dn"
+                type="text"
+                value={ldapConfig.baseDn}
+                onChange={(e) => handleLdapFieldChange('baseDn', e.target.value)}
+                placeholder="DC=example,DC=local"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-user-filter">User Filter (LDAP_USER_FILTER)</label>
+              <input
+                id="ldap-user-filter"
+                type="text"
+                value={ldapConfig.userFilter}
+                onChange={(e) => handleLdapFieldChange('userFilter', e.target.value)}
+                placeholder="(sAMAccountName={{username}})"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-required-group">Required Group (LDAP_REQUIRED_GROUP)</label>
+              <input
+                id="ldap-required-group"
+                type="text"
+                value={ldapConfig.requiredGroupDn}
+                onChange={(e) => handleLdapFieldChange('requiredGroupDn', e.target.value)}
+                placeholder="CN=OnlyGantt,OU=Groups,DC=example,DC=local"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-group-search">Group Search Base (LDAP_GROUP_SEARCH_BASE)</label>
+              <input
+                id="ldap-group-search"
+                type="text"
+                value={ldapConfig.groupSearchBase}
+                onChange={(e) => handleLdapFieldChange('groupSearchBase', e.target.value)}
+                placeholder="OU=Groups,DC=example,DC=local"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-test-user">Utente per test</label>
+              <input
+                id="ldap-test-user"
+                type="text"
+                value={ldapTestUserId}
+                onChange={(e) => setLdapTestUserId(e.target.value)}
+                placeholder="username"
+                disabled={ldapLoading}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn-success" type="button" onClick={handleLdapTest} disabled={ldapTesting || ldapLoading}>
+              {ldapTesting ? 'Test in corso...' : 'Test bind/search'}
+            </button>
+            {ldapTestStatus && (
+              <div className={`alert-item ${ldapTestStatus.type}`} style={{ margin: 0 }}>
+                {ldapTestStatus.message}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="card-section">
