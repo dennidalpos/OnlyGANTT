@@ -18,6 +18,7 @@
   const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
   const LoginScreen = window.OnlyGantt.components.LoginScreen;
   const SystemSettings = window.OnlyGantt.components.SystemSettings;
+  const UserManagement = window.OnlyGantt.components.UserManagement;
 
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
   const useProjects = window.OnlyGantt.hooks.useProjects;
@@ -295,7 +296,7 @@
     }, [filters, viewMode]);
 
     useEffect(() => {
-      if (activeView === 'systemSettings' && !adminToken) {
+      if ((activeView === 'systemSettings' || activeView === 'userManagement') && !adminToken) {
         setActiveView('gantt');
       }
     }, [activeView, adminToken]);
@@ -360,10 +361,16 @@
       return true;
     };
 
+    const viewActionLabels = {
+      systemSettings: 'aprire le impostazioni di sistema',
+      userManagement: 'aprire la gestione utenti'
+    };
+
     const handleViewChange = async (nextView) => {
       if (nextView === activeView) return;
       if (nextView !== 'gantt') {
-        const canProceed = await confirmPendingChanges('aprire le impostazioni di sistema');
+        const actionLabel = viewActionLabels[nextView] || 'cambiare schermata';
+        const canProceed = await confirmPendingChanges(actionLabel);
         if (!canProceed) return;
       }
       setActiveView(nextView);
@@ -1048,6 +1055,7 @@
           screensaverEnabled={screensaverEnabled}
           onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
           onNavigateSystemSettings={() => handleViewChange('systemSettings')}
+          onNavigateUserManagement={() => handleViewChange('userManagement')}
         />
 
         {lockError && lockError.lockedBy && (
@@ -1073,6 +1081,11 @@
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
               adminToken={adminToken}
+            />
+          ) : activeView === 'userManagement' && adminToken ? (
+            <UserManagement
+              adminToken={adminToken}
+              onBack={() => handleViewChange('gantt')}
             />
           ) : !department ? (
             <LoginScreen

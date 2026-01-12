@@ -20,6 +20,12 @@ function buildUserFilter(template, userId) {
   return template.replace(/\{\{\s*username\s*\}\}/g, safeUser);
 }
 
+function buildListFilter(template) {
+  if (!template) return '(objectClass=person)';
+  if (!/\{\{\s*username\s*\}\}/.test(template)) return template;
+  return template.replace(/\{\{\s*username\s*\}\}/g, '*');
+}
+
 function bufferSidToString(buffer) {
   if (!Buffer.isBuffer(buffer)) return null;
   const revision = buffer.readUInt8(0);
@@ -89,6 +95,16 @@ function pickAttribute(entry, attribute) {
     return value.length > 0 ? value[0] : null;
   }
   return value ?? null;
+}
+
+function pickUserIdentifier(entry) {
+  return (
+    pickAttribute(entry, 'sAMAccountName')
+    || pickAttribute(entry, 'userPrincipalName')
+    || pickAttribute(entry, 'cn')
+    || pickAttribute(entry, 'displayName')
+    || null
+  );
 }
 
 function normalizeMemberOf(value) {
@@ -408,8 +424,107 @@ async function testLdapConnection({ configOverride = {}, testUserId } = {}) {
   });
 }
 
+async function listLdapUsers(configOverride = {}) {
+  const config = { ...buildConfigFromEnv(), ...configOverride };
+  if (!config.url || !config.baseDn) {
+    return { ok: false, code: 'LDAP_CONFIG_ERROR', message: 'LDAP configuration missing' };
+  }
+
+  const filter = buildListFilter(config.userFilter);
+  const attributes = [
+    'dn',
+    'displayName',
+    'cn',
+    'mail',
+    'department',
+    'sAMAccountName',
+    'userPrincipalName',
+    'memberOf',
+    'primaryGroupID',
+    'objectSid'
+  ];
+
+  return withClient(config, async (client) => {
+    try {
+      logIfEnabled(config, 'Binding service account', config.bindDn);
+      await client.bind(config.bindDn, config.bindPassword);
+    } catch (err) {
+      logIfEnabled(config, 'Service bind failed', err.message);
+      return { ok: false, code: 'LDAP_DOWN', message: 'LDAP bind failed' };
+    }
+
+    let requiredGroupRid = null;
+    let requiredGroupDn = null;
+    let requiredGroupName = null;
+    if (config.requiredGroupDn) {
+      try {
+        const resolved = await resolveRequiredGroup(
+          client,
+          config.requiredGroupDn,
+          config.groupSearchBase,
+          config.baseDn
+        );
+        requiredGroupDn = resolved.dn;
+        requiredGroupRid = resolved.rid;
+        requiredGroupName = resolved.name;
+      } catch (err) {
+        logIfEnabled(config, 'Failed to resolve required group', err.message);
+      }
+    }
+
+    const groupNameToCheck = requiredGroupName || extractGroupNameFromDn(config.requiredGroupDn) || config.requiredGroupDn;
+    const groupDnToCheck = requiredGroupDn || (config.requiredGroupDn?.includes('=') ? config.requiredGroupDn : null);
+
+    const { searchEntries } = await client.search(config.baseDn, {
+      scope: 'sub',
+      filter,
+      attributes
+    });
+
+    const users = [];
+    const entries = searchEntries || [];
+    for (const entry of entries) {
+      if (config.requiredGroupDn) {
+        let inGroup = isMemberOfGroupByName(entry, groupNameToCheck);
+        if (!inGroup && groupDnToCheck) {
+          inGroup = isMemberOfGroupByDn(entry, groupDnToCheck);
+        }
+        if (!inGroup && requiredGroupRid) {
+          const primaryGroupId = normalizePrimaryGroupId(entry.primaryGroupID);
+          inGroup = primaryGroupId === requiredGroupRid;
+        }
+        if (!inGroup && requiredGroupRid) {
+          const primaryGroupName = await resolvePrimaryGroupName(client, entry, config);
+          if (primaryGroupName) {
+            inGroup = isGroupNameMatch(groupNameToCheck, primaryGroupName);
+          }
+        }
+        if (!inGroup) {
+          continue;
+        }
+      }
+
+      const userId = pickUserIdentifier(entry);
+      if (!userId) continue;
+      const displayName = pickAttribute(entry, 'displayName') || pickAttribute(entry, 'cn') || userId;
+      const mail = pickAttribute(entry, 'mail');
+      const department = pickAttribute(entry, 'department');
+      users.push({
+        userId,
+        displayName,
+        mail: mail || null,
+        department: department || null,
+        userType: 'ad'
+      });
+    }
+
+    return { ok: true, users };
+  });
+}
+
 module.exports = {
   buildConfigFromEnv,
   authenticateLdapUser,
-  testLdapConnection
+  testLdapConnection,
+  listLdapUsers
 };
