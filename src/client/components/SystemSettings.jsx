@@ -42,6 +42,11 @@
     const [ldapTestStatus, setLdapTestStatus] = useState(null);
     const [ldapLoading, setLdapLoading] = useState(true);
     const [ldapTesting, setLdapTesting] = useState(false);
+    const [httpsConfig, setHttpsConfig] = useState({
+      enabled: false,
+      keyPath: '',
+      certPath: ''
+    });
 
     const moduleLabels = {
       departments: 'Reparti',
@@ -98,6 +103,10 @@
 
     const handleLdapFieldChange = (field, value) => {
       setLdapConfig((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleHttpsFieldChange = (field, value) => {
+      setHttpsConfig((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleLdapTest = async () => {
@@ -319,6 +328,45 @@
                 {ldapTestStatus.message}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="card-section">
+          <h3 style={{ marginTop: 0 }}>HTTPS</h3>
+          <p className="text-muted">
+            Configura l'avvio HTTPS tramite variabili ambiente. I valori inseriti qui sono solo indicativi.
+          </p>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={httpsConfig.enabled}
+                onChange={(e) => handleHttpsFieldChange('enabled', e.target.checked)}
+              />
+              HTTPS abilitato (HTTPS_ENABLED)
+            </label>
+          </div>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+            <div>
+              <label htmlFor="https-key-path">Path chiave privata (HTTPS_KEY_PATH)</label>
+              <input
+                id="https-key-path"
+                type="text"
+                value={httpsConfig.keyPath}
+                onChange={(e) => handleHttpsFieldChange('keyPath', e.target.value)}
+                placeholder="/etc/ssl/private/server.key"
+              />
+            </div>
+            <div>
+              <label htmlFor="https-cert-path">Path certificato (HTTPS_CERT_PATH)</label>
+              <input
+                id="https-cert-path"
+                type="text"
+                value={httpsConfig.certPath}
+                onChange={(e) => handleHttpsFieldChange('certPath', e.target.value)}
+                placeholder="/etc/ssl/certs/server.crt"
+              />
+            </div>
           </div>
         </div>
 
