@@ -35,7 +35,8 @@
     onAdminServerBackup,
     onAdminServerRestore,
     screensaverEnabled,
-    onToggleScreensaver
+    onToggleScreensaver,
+    onNavigateSystemSettings
   }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
@@ -321,6 +322,12 @@
               {adminToken && (
                 <div className="topbar__dropdown-section">
                   <div className="topbar__dropdown-title">Admin</div>
+                  <button
+                    className="topbar__dropdown-item"
+                    onClick={() => handleMenuAction(onNavigateSystemSettings)}
+                  >
+                    Impostazioni di sistema
+                  </button>
                   <button
                     className="topbar__dropdown-item"
                     onClick={() => handleMenuAction(handleAdminCreate)}

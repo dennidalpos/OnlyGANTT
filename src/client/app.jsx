@@ -17,6 +17,7 @@
   const ProjectSidebar = window.OnlyGantt.components.ProjectSidebar;
   const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
   const LoginScreen = window.OnlyGantt.components.LoginScreen;
+  const SystemSettings = window.OnlyGantt.components.SystemSettings;
 
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
   const useProjects = window.OnlyGantt.hooks.useProjects;
@@ -70,6 +71,7 @@
     const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
 
     const [viewMode, setViewMode] = useState('4months');
+    const [activeView, setActiveView] = useState('gantt');
     const [selectedProjectIds, setSelectedProjectIds] = useState(new Set());
     const [scrollToTodayTrigger, setScrollToTodayTrigger] = useState(0);
     const [filters, setFilters] = useState({
@@ -292,6 +294,12 @@
       gantt.invalidateCache();
     }, [filters, viewMode]);
 
+    useEffect(() => {
+      if (activeView === 'systemSettings' && !adminToken) {
+        setActiveView('gantt');
+      }
+    }, [activeView, adminToken]);
+
     const hasUnsavedChanges = isDirty || hasDraftChanges;
     const showProjectUnsavedBadge = showProjectForm && hasUnsavedChanges;
 
@@ -352,6 +360,15 @@
       return true;
     };
 
+    const handleViewChange = async (nextView) => {
+      if (nextView === activeView) return;
+      if (nextView !== 'gantt') {
+        const canProceed = await confirmPendingChanges('aprire le impostazioni di sistema');
+        if (!canProceed) return;
+      }
+      setActiveView(nextView);
+    };
+
     const handleDepartmentChange = async (newDepartment) => {
       if (newDepartment === department) return;
 
@@ -363,6 +380,7 @@
       }
 
       setDepartment(newDepartment);
+      setActiveView('gantt');
       setLockEnabled(false);
       setEditingProject(null);
       setShowProjectForm(false);
@@ -439,6 +457,7 @@
       } catch (err) {}
 
       setDepartment(null);
+      setActiveView('gantt');
       setLockEnabled(false);
       setEditingProject(null);
       setShowProjectForm(false);
@@ -960,6 +979,7 @@
           onAdminServerRestore={handleAdminServerRestore}
           screensaverEnabled={screensaverEnabled}
           onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
+          onNavigateSystemSettings={() => handleViewChange('systemSettings')}
         />
 
         {lockError && lockError.lockedBy && (
@@ -972,7 +992,9 @@
         )}
 
         <main className="main-container">
-          {!department ? (
+          {activeView === 'systemSettings' && adminToken ? (
+            <SystemSettings onBack={() => handleViewChange('gantt')} />
+          ) : !department ? (
             <LoginScreen
               userName={userName}
               onUserNameChange={handleUserNameChange}
