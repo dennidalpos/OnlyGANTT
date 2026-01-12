@@ -604,6 +604,79 @@
       }
     };
 
+    const getSelectedModuleLabels = (modules) => {
+      const labels = {
+        departments: 'Reparti',
+        users: 'Utenti',
+        settings: 'Impostazioni',
+        integrations: 'Integrazioni'
+      };
+      return Object.keys(labels).filter((key) => modules?.[key]).map((key) => labels[key]);
+    };
+
+    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.users && !modules?.settings && !modules?.integrations;
+
+    const handleAdminModularExport = async (modules) => {
+      if (!adminToken) return;
+      try {
+        const backup = await api.adminExportModules(modules, adminToken);
+        const dataStr = JSON.stringify(backup, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = isOnlyDepartmentsModule(modules)
+          ? `onlygantt-backup-${new Date().toISOString().split('T')[0]}.json`
+          : `onlygantt-modular-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
+        pushNotification({
+          type: 'success',
+          message: `Backup modulare completato: ${moduleSummary}`
+        });
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Export modulare fallito' });
+      }
+    };
+
+    const handleAdminModularImport = async ({ backup, modules, overwriteExisting }) => {
+      if (!adminToken) return;
+      try {
+        const result = await api.adminImportModules(backup, modules, overwriteExisting, adminToken);
+        const { summary } = result;
+        const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
+
+        let message = `Import modulare completato:\n` +
+          `Moduli: ${moduleSummary}\n` +
+          `- Importati: ${summary.imported}\n` +
+          `- Saltati: ${summary.skipped}\n` +
+          `- Errori: ${summary.errors}`;
+
+        if (summary.errors > 0 && result.results?.departments?.errors?.length > 0) {
+          message += `\n\nErrori:\n${result.results.departments.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
+        }
+
+        alert(message);
+
+        if (summary.imported > 0) {
+          pushNotification({
+            type: 'success',
+            message: `Import modulare completato: ${summary.imported} reparti importati`
+          });
+
+          if (department) {
+            await handleDepartmentChange(null);
+          }
+        }
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Import modulare fallito' });
+      }
+    };
+
     const handleChangePassword = async ({ oldPassword, newPassword }) => {
       if (!department) return false;
 
@@ -964,9 +1037,6 @@
           onEnableLock={handleEnableLock}
           onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
-          onExportDepartment={handleExportDepartment}
-          onImportDepartment={handleImportDepartment}
-          canImportExport={!!department && (!!adminToken || !readOnlyDepartment)}
           readOnlyDepartment={readOnlyDepartment}
           adminToken={adminToken}
           onChangePassword={handleChangePassword}
@@ -975,8 +1045,6 @@
           onAdminResetPassword={handleAdminResetPassword}
           onAdminChangePassword={handleAdminChangePassword}
           onAdminReleaseLock={handleAdminReleaseLock}
-          onAdminServerBackup={handleAdminServerBackup}
-          onAdminServerRestore={handleAdminServerRestore}
           screensaverEnabled={screensaverEnabled}
           onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
           onNavigateSystemSettings={() => handleViewChange('systemSettings')}
@@ -993,7 +1061,18 @@
 
         <main className="main-container">
           {activeView === 'systemSettings' && adminToken ? (
-            <SystemSettings onBack={() => handleViewChange('gantt')} />
+            <SystemSettings
+              onBack={() => handleViewChange('gantt')}
+              department={department}
+              canImportExport={!!department && (!!adminToken || !readOnlyDepartment)}
+              readOnlyDepartment={readOnlyDepartment}
+              onExportDepartment={handleExportDepartment}
+              onImportDepartment={handleImportDepartment}
+              onAdminServerBackup={handleAdminServerBackup}
+              onAdminServerRestore={handleAdminServerRestore}
+              onAdminModularExport={handleAdminModularExport}
+              onAdminModularImport={handleAdminModularImport}
+            />
           ) : !department ? (
             <LoginScreen
               userName={userName}

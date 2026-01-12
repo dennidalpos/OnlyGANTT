@@ -203,6 +203,162 @@ function validateExistingDepartments() {
 
 validateExistingDepartments();
 
+function normalizeModules(modules = {}) {
+  return {
+    departments: !!modules.departments,
+    users: !!modules.users,
+    settings: !!modules.settings,
+    integrations: !!modules.integrations
+  };
+}
+
+function hasSelectedModules(modules) {
+  return Object.values(modules).some(Boolean);
+}
+
+function isOnlyDepartments(modules) {
+  return modules.departments && !modules.users && !modules.settings && !modules.integrations;
+}
+
+function collectDepartmentBackups() {
+  ensureDataDir();
+  const files = fs.readdirSync(CONFIG.dataDir);
+  const departments = [];
+
+  for (const file of files) {
+    if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+      const deptName = file.replace('.json', '');
+      const { data, error } = readDepartmentData(deptName);
+      if (error) {
+        console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
+        continue;
+      }
+      if (!data) continue;
+      departments.push({
+        name: deptName,
+        data
+      });
+    }
+  }
+
+  return departments;
+}
+
+function buildLegacyBackup() {
+  return {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    serverConfig: {
+      lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
+      adminSessionTtlHours: CONFIG.adminSessionTtlHours,
+      maxUploadBytes: CONFIG.maxUploadBytes,
+      enableBak: CONFIG.enableBak
+    },
+    adminCredentials: {
+      adminUser: CONFIG.adminUser
+    },
+    departments: collectDepartmentBackups()
+  };
+}
+
+function buildModularBackup(modules) {
+  return {
+    version: '2.0',
+    exportedAt: new Date().toISOString(),
+    modules: {
+      departments: modules.departments ? { data: collectDepartmentBackups() } : { data: null },
+      users: modules.users ? { data: [] } : { data: null },
+      settings: modules.settings ? {
+        data: {
+          serverConfig: {
+            lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
+            adminSessionTtlHours: CONFIG.adminSessionTtlHours,
+            maxUploadBytes: CONFIG.maxUploadBytes,
+            enableBak: CONFIG.enableBak
+          },
+          adminCredentials: {
+            adminUser: CONFIG.adminUser
+          }
+        }
+      } : { data: null },
+      integrations: modules.integrations ? { data: [] } : { data: null }
+    }
+  };
+}
+
+function importDepartmentsBackup(departments, overwriteExisting) {
+  const results = {
+    imported: [],
+    skipped: [],
+    errors: []
+  };
+
+  ensureDataDir();
+
+  for (const dept of departments) {
+    if (!dept.name || !dept.data) {
+      results.errors.push({
+        department: dept.name || 'unknown',
+        error: 'Missing name or data'
+      });
+      continue;
+    }
+
+    const normalized = normalizeDepartmentName(dept.name);
+    if (!normalized) {
+      results.errors.push({
+        department: dept.name,
+        error: 'Invalid department name'
+      });
+      continue;
+    }
+
+    const filePath = getDepartmentFilePath(normalized);
+    if (fs.existsSync(filePath) && !overwriteExisting) {
+      results.skipped.push({
+        department: normalized,
+        reason: 'Already exists (use overwriteExisting flag to replace)'
+      });
+      continue;
+    }
+
+    try {
+      const errors = validateDepartmentData(dept.data);
+      if (errors.length > 0) {
+        results.errors.push({
+          department: normalized,
+          error: 'Validation failed',
+          details: errors
+        });
+        continue;
+      }
+
+      const dataToWrite = {
+        ...dept.data,
+        meta: {
+          ...dept.data.meta,
+          importedAt: new Date().toISOString(),
+          importedBy: 'admin'
+        }
+      };
+
+      writeDepartmentData(normalized, dataToWrite);
+      results.imported.push(normalized);
+
+      if (locks.has(normalized)) {
+        locks.delete(normalized);
+      }
+    } catch (err) {
+      results.errors.push({
+        department: normalized,
+        error: err.message
+      });
+    }
+  }
+
+  return results;
+}
+
 const lockCleanupInterval = setInterval(cleanExpiredLocks, 60 * 1000);
 if (typeof lockCleanupInterval.unref === 'function') {
   lockCleanupInterval.unref();
@@ -718,39 +874,7 @@ app.get('/api/admin/departments', requireAdmin, (req, res) => {
 
 app.get('/api/admin/server-backup', requireAdmin, (req, res) => {
   try {
-    ensureDataDir();
-    const files = fs.readdirSync(CONFIG.dataDir);
-    const backup = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      serverConfig: {
-        lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
-        adminSessionTtlHours: CONFIG.adminSessionTtlHours,
-        maxUploadBytes: CONFIG.maxUploadBytes,
-        enableBak: CONFIG.enableBak
-      },
-      adminCredentials: {
-        adminUser: CONFIG.adminUser
-      },
-      departments: []
-    };
-
-    for (const file of files) {
-      if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-        const deptName = file.replace('.json', '');
-        const { data, error } = readDepartmentData(deptName);
-        if (error) {
-          console.warn(`Skipping invalid JSON for department ${deptName}:`, error.message);
-          continue;
-        }
-        if (!data) continue;
-        backup.departments.push({
-          name: deptName,
-          data: data
-        });
-      }
-    }
-
+    const backup = buildLegacyBackup();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="onlygantt-backup-${new Date().toISOString().split('T')[0]}.json"`);
     res.json(backup);
@@ -771,74 +895,7 @@ app.post('/api/admin/server-restore', requireAdmin, (req, res) => {
       return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: departments array missing');
     }
 
-    const results = {
-      imported: [],
-      skipped: [],
-      errors: []
-    };
-
-    ensureDataDir();
-
-    for (const dept of backup.departments) {
-      if (!dept.name || !dept.data) {
-        results.errors.push({
-          department: dept.name || 'unknown',
-          error: 'Missing name or data'
-        });
-        continue;
-      }
-
-      const normalized = normalizeDepartmentName(dept.name);
-      if (!normalized) {
-        results.errors.push({
-          department: dept.name,
-          error: 'Invalid department name'
-        });
-        continue;
-      }
-
-      const filePath = getDepartmentFilePath(normalized);
-      if (fs.existsSync(filePath) && !overwriteExisting) {
-        results.skipped.push({
-          department: normalized,
-          reason: 'Already exists (use overwriteExisting flag to replace)'
-        });
-        continue;
-      }
-
-      try {
-        const errors = validateDepartmentData(dept.data);
-        if (errors.length > 0) {
-          results.errors.push({
-            department: normalized,
-            error: 'Validation failed',
-            details: errors
-          });
-          continue;
-        }
-
-        const dataToWrite = {
-          ...dept.data,
-          meta: {
-            ...dept.data.meta,
-            importedAt: new Date().toISOString(),
-            importedBy: 'admin'
-          }
-        };
-
-        writeDepartmentData(normalized, dataToWrite);
-        results.imported.push(normalized);
-
-        if (locks.has(normalized)) {
-          locks.delete(normalized);
-        }
-      } catch (err) {
-        results.errors.push({
-          department: normalized,
-          error: err.message
-        });
-      }
-    }
+    const results = importDepartmentsBackup(backup.departments, overwriteExisting);
 
     res.json({
       ok: true,
@@ -849,6 +906,84 @@ app.post('/api/admin/server-restore', requireAdmin, (req, res) => {
         skipped: results.skipped.length,
         errors: results.errors.length
       }
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/export', requireAdmin, (req, res) => {
+  try {
+    const modules = normalizeModules(req.body?.modules);
+    if (!hasSelectedModules(modules)) {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'At least one module must be selected');
+    }
+
+    const backup = isOnlyDepartments(modules)
+      ? buildLegacyBackup()
+      : buildModularBackup(modules);
+
+    res.json(backup);
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/import', requireAdmin, (req, res) => {
+  try {
+    const { backup, overwriteExisting = false } = req.body;
+    const modules = normalizeModules(req.body?.modules);
+
+    if (!backup || typeof backup !== 'object') {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'backup data is required');
+    }
+
+    if (!hasSelectedModules(modules)) {
+      return errorResponse(res, 400, 'INVALID_REQUEST', 'At least one module must be selected');
+    }
+
+    let departmentPayload = null;
+
+    if (modules.departments) {
+      if (Array.isArray(backup.departments)) {
+        departmentPayload = backup.departments;
+      } else if (Array.isArray(backup.modules?.departments?.data)) {
+        departmentPayload = backup.modules.departments.data;
+      } else {
+        return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: departments data missing');
+      }
+    }
+
+    const results = {};
+    let summary = {
+      totalDepartments: departmentPayload ? departmentPayload.length : 0,
+      imported: 0,
+      skipped: 0,
+      errors: 0
+    };
+
+    if (modules.departments) {
+      const departmentResults = importDepartmentsBackup(departmentPayload, overwriteExisting);
+      results.departments = departmentResults;
+      summary = {
+        ...summary,
+        imported: departmentResults.imported.length,
+        skipped: departmentResults.skipped.length,
+        errors: departmentResults.errors.length
+      };
+    } else {
+      results.departments = { skipped: true, reason: 'Module disabled' };
+    }
+
+    const unsupportedReason = 'Module not supported yet';
+    results.users = modules.users ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
+    results.settings = modules.settings ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
+    results.integrations = modules.integrations ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
+
+    res.json({
+      ok: true,
+      results,
+      summary
     });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
