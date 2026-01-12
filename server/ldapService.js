@@ -43,6 +43,46 @@ function extractRidFromSid(sid) {
   return Number.isNaN(rid) ? null : rid;
 }
 
+function buildSidWithRid(objectSid, rid) {
+  const sidString = Buffer.isBuffer(objectSid) ? bufferSidToString(objectSid) : String(objectSid || '');
+  if (!sidString) return null;
+  const parts = sidString.split('-');
+  if (parts.length < 2) return null;
+  parts[parts.length - 1] = String(rid);
+  return parts.join('-');
+}
+
+const PRIMARY_GROUP_RID_ALIASES = new Map([
+  [513, 'Domain Users'],
+  [512, 'Domain Admins'],
+  [514, 'Domain Guests'],
+  [515, 'Domain Computers'],
+  [516, 'Domain Controllers']
+]);
+
+async function resolvePrimaryGroupName(client, entry, config) {
+  const primaryGroupId = normalizePrimaryGroupId(entry.primaryGroupID);
+  if (!primaryGroupId) return null;
+
+  const alias = PRIMARY_GROUP_RID_ALIASES.get(primaryGroupId);
+  if (alias) return alias;
+
+  const groupSid = buildSidWithRid(entry.objectSid, primaryGroupId);
+  if (!groupSid) return null;
+  const searchBase = config.groupSearchBase || config.baseDn;
+  if (!searchBase) return null;
+
+  const filter = `(objectSid=${groupSid})`;
+  const { searchEntries } = await client.search(searchBase, {
+    scope: 'sub',
+    filter,
+    attributes: ['distinguishedName', 'dn', 'cn']
+  });
+  const groupEntry = searchEntries[0];
+  if (!groupEntry) return null;
+  return groupEntry.cn || extractGroupNameFromDn(groupEntry.dn || groupEntry.distinguishedName);
+}
+
 function pickAttribute(entry, attribute) {
   const value = entry?.[attribute];
   if (Array.isArray(value)) {
@@ -55,6 +95,46 @@ function normalizeMemberOf(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
   return [value];
+}
+
+const GROUP_ALIASES = new Map([
+  ['domain users', ['utenti di dominio']],
+  ['utenti di dominio', ['domain users']]
+]);
+
+function extractGroupNameFromDn(dn) {
+  if (!dn) return null;
+  const match = /CN=([^,]+)/i.exec(String(dn));
+  return match ? match[1] : null;
+}
+
+function normalizeGroupName(name) {
+  if (!name) return null;
+  return String(name).trim().toLowerCase();
+}
+
+function buildGroupNameVariants(name) {
+  const normalized = normalizeGroupName(name);
+  if (!normalized) return [];
+  const variants = new Set([normalized]);
+  const aliases = GROUP_ALIASES.get(normalized) || [];
+  aliases.forEach((alias) => variants.add(normalizeGroupName(alias)));
+  return Array.from(variants);
+}
+
+function isGroupNameMatch(requiredName, memberName) {
+  const requiredVariants = buildGroupNameVariants(requiredName);
+  const memberNormalized = normalizeGroupName(memberName);
+  if (!memberNormalized) return false;
+  return requiredVariants.includes(memberNormalized);
+}
+
+function normalizePrimaryGroupId(value) {
+  if (value == null) return null;
+  const str = String(value);
+  if (!/^\d+$/.test(str)) return null;
+  const num = Number(str);
+  return Number.isNaN(num) ? null : num;
 }
 
 function buildConfigFromEnv(env = process.env) {
@@ -90,12 +170,12 @@ async function withClient(config, callback) {
 }
 
 async function resolveRequiredGroup(client, groupNameOrDn, groupSearchBase, baseDn) {
-  if (!groupNameOrDn) return { dn: null, rid: null };
+  if (!groupNameOrDn) return { dn: null, rid: null, name: null };
   const isDn = groupNameOrDn.includes('=');
   const safeValue = escapeLdapFilterValue(groupNameOrDn);
   const searchBase = groupSearchBase || baseDn;
   if (!searchBase) {
-    return { dn: isDn ? groupNameOrDn : null, rid: null };
+    return { dn: isDn ? groupNameOrDn : null, rid: null, name: isDn ? extractGroupNameFromDn(groupNameOrDn) : groupNameOrDn };
   }
 
   const filter = isDn
@@ -105,28 +185,34 @@ async function resolveRequiredGroup(client, groupNameOrDn, groupSearchBase, base
   const { searchEntries } = await client.search(searchBase, {
     scope: 'sub',
     filter,
-    attributes: ['distinguishedName', 'dn', 'objectSid']
+    attributes: ['distinguishedName', 'dn', 'objectSid', 'cn']
   });
   const entry = searchEntries[0];
   if (!entry) {
-    return { dn: isDn ? groupNameOrDn : null, rid: null };
+    return { dn: isDn ? groupNameOrDn : null, rid: null, name: isDn ? extractGroupNameFromDn(groupNameOrDn) : groupNameOrDn };
   }
   const dn = entry.dn || entry.distinguishedName || groupNameOrDn;
   const rid = extractRidFromSid(pickAttribute(entry, 'objectSid'));
-  return { dn, rid };
+  const name = entry.cn || extractGroupNameFromDn(dn) || groupNameOrDn;
+  return { dn, rid, name };
 }
 
-function userInRequiredGroup(entry, requiredGroupDn, requiredGroupRid) {
-  if (!requiredGroupDn) return true;
-  const normalizedRequired = requiredGroupDn.toLowerCase();
-  const memberOf = normalizeMemberOf(entry.memberOf).map((dn) => String(dn).toLowerCase());
-  if (memberOf.includes(normalizedRequired)) {
-    return true;
+function isMemberOfGroupByName(entry, requiredGroupName) {
+  if (!requiredGroupName) return false;
+  const memberOf = normalizeMemberOf(entry.memberOf);
+  for (const dn of memberOf) {
+    const memberName = extractGroupNameFromDn(dn) || dn;
+    if (isGroupNameMatch(requiredGroupName, memberName)) {
+      return true;
+    }
   }
-  const primaryGroupId = Number(entry.primaryGroupID);
-  if (Number.isNaN(primaryGroupId) || primaryGroupId <= 0) return false;
-  if (!requiredGroupRid) return false;
-  return primaryGroupId === requiredGroupRid;
+  return false;
+}
+
+function isMemberOfGroupByDn(entry, requiredGroupDn) {
+  if (!requiredGroupDn) return false;
+  const normalizedRequired = requiredGroupDn.toLowerCase();
+  return normalizeMemberOf(entry.memberOf).some((dn) => String(dn).toLowerCase() === normalizedRequired);
 }
 
 async function authenticateLdapUser(credentials, configOverride = {}) {
@@ -177,6 +263,7 @@ async function authenticateLdapUser(credentials, configOverride = {}) {
 
     let requiredGroupRid = null;
     let requiredGroupDn = null;
+    let requiredGroupName = null;
     if (config.requiredGroupDn) {
       try {
         const resolved = await resolveRequiredGroup(
@@ -187,11 +274,27 @@ async function authenticateLdapUser(credentials, configOverride = {}) {
         );
         requiredGroupDn = resolved.dn;
         requiredGroupRid = resolved.rid;
+        requiredGroupName = resolved.name;
       } catch (err) {
         logIfEnabled(config, 'Failed to read required group RID', err.message);
       }
-      const groupToCheck = requiredGroupDn || config.requiredGroupDn;
-      if (!userInRequiredGroup(entry, groupToCheck, requiredGroupRid)) {
+      const groupNameToCheck = requiredGroupName || extractGroupNameFromDn(config.requiredGroupDn) || config.requiredGroupDn;
+      const groupDnToCheck = requiredGroupDn || (config.requiredGroupDn.includes('=') ? config.requiredGroupDn : null);
+      let inGroup = isMemberOfGroupByName(entry, groupNameToCheck);
+      if (!inGroup && groupDnToCheck) {
+        inGroup = isMemberOfGroupByDn(entry, groupDnToCheck);
+      }
+      if (!inGroup && requiredGroupRid) {
+        const primaryGroupId = normalizePrimaryGroupId(entry.primaryGroupID);
+        inGroup = primaryGroupId === requiredGroupRid;
+      }
+      if (!inGroup) {
+        const primaryGroupName = await resolvePrimaryGroupName(client, entry, config);
+        if (primaryGroupName) {
+          inGroup = isGroupNameMatch(groupNameToCheck, primaryGroupName);
+        }
+      }
+      if (!inGroup) {
         return { ok: false, code: 'GROUP_REQUIRED', message: 'User not in required group' };
       }
     }
@@ -255,6 +358,7 @@ async function testLdapConnection({ configOverride = {}, testUserId } = {}) {
     const entry = searchEntries[0];
     let requiredGroupRid = null;
     let requiredGroupDn = null;
+    let requiredGroupName = null;
     if (config.requiredGroupDn) {
       try {
         const resolved = await resolveRequiredGroup(
@@ -265,20 +369,39 @@ async function testLdapConnection({ configOverride = {}, testUserId } = {}) {
         );
         requiredGroupDn = resolved.dn;
         requiredGroupRid = resolved.rid;
+        requiredGroupName = resolved.name;
       } catch (err) {
         logIfEnabled(config, 'Failed to read required group RID', err.message);
       }
     }
 
-    const groupToCheck = requiredGroupDn || config.requiredGroupDn;
-    const groupOk = userInRequiredGroup(entry, groupToCheck, requiredGroupRid);
+    const groupNameToCheck = requiredGroupName || extractGroupNameFromDn(config.requiredGroupDn) || config.requiredGroupDn;
+    const groupDnToCheck = requiredGroupDn || (config.requiredGroupDn.includes('=') ? config.requiredGroupDn : null);
+    let groupOk = !config.requiredGroupDn;
+    if (config.requiredGroupDn) {
+      groupOk = isMemberOfGroupByName(entry, groupNameToCheck);
+      if (!groupOk && groupDnToCheck) {
+        groupOk = isMemberOfGroupByDn(entry, groupDnToCheck);
+      }
+      if (!groupOk && requiredGroupRid) {
+        const primaryGroupId = normalizePrimaryGroupId(entry.primaryGroupID);
+        groupOk = primaryGroupId === requiredGroupRid;
+      }
+      if (!groupOk) {
+        const primaryGroupName = await resolvePrimaryGroupName(client, entry, config);
+        if (primaryGroupName) {
+          groupOk = isGroupNameMatch(groupNameToCheck, primaryGroupName);
+        }
+      }
+    }
     return {
       ok: groupOk,
       message: groupOk ? 'Bind/search OK' : 'User not in required group',
       details: {
         dn: entry.dn,
         groupCheck: groupOk,
-        requiredGroupDn: groupToCheck || null
+        requiredGroupDn: groupDnToCheck || null,
+        requiredGroupName: groupNameToCheck || null
       },
       code: groupOk ? null : 'GROUP_REQUIRED'
     };
