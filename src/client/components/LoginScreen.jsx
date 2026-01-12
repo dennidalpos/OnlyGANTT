@@ -251,7 +251,7 @@
         } else if (err.code === 'INVALID_CREDENTIALS') {
           setError('Credenziali non valide');
         } else if (err.code === 'GROUP_REQUIRED') {
-          setError('Accesso negato: gruppo richiesto');
+          setError('Utente non presente nel gruppo richiesto');
         } else if (err.code === 'ADMIN_LOCAL_ONLY') {
           setError('Accesso admin consentito solo localmente');
         } else {
