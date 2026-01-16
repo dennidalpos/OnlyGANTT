@@ -1169,14 +1169,6 @@ app.post('/api/admin/change-password', requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/admin/ldap/config', requireAdmin, (req, res) => {
-  try {
-    res.json(getLdapConfigSnapshot());
-  } catch (err) {
-    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
-  }
-});
-
 app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
   try {
     const { config, testUserId } = req.body || {};

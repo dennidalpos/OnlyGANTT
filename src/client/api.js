@@ -257,15 +257,6 @@
     });
   }
 
-  async function getLdapConfig(token, signal) {
-    return fetchJSON('/api/admin/ldap/config', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      signal
-    });
-  }
-
   async function getSystemConfig(token, signal) {
     return fetchJSON('/api/admin/system-config', {
       headers: {
@@ -439,7 +430,6 @@
     adminServerRestart,
     adminExportModules,
     adminImportModules,
-    getLdapConfig,
     testLdapConnection,
     getSystemConfig,
     updateSystemConfig
