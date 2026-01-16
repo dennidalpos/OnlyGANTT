@@ -197,7 +197,7 @@
           setScrollToTodayTrigger(prev => prev + 1);
         }, 150);
       }
-    }, [department]);
+    }, [department, projects.length]);
 
     useEffect(() => {
       if (!projectDraft) {
@@ -259,7 +259,7 @@
         }
       };
 
-      const passwordEvents = ['mousedown', 'keypress', 'touchstart'];
+      const passwordEvents = ['mousedown', 'keydown', 'touchstart'];
       const activityOnlyEvents = ['mousemove', 'scroll'];
 
       passwordEvents.forEach(event => {
