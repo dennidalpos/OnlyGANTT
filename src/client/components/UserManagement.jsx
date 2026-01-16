@@ -78,6 +78,7 @@
           {ldapError && (
             <div className="alert-item warning">
               Impossibile leggere utenti LDAP: {ldapError.message || 'Errore LDAP'}.
+              {ldapError.code ? ` Code: ${ldapError.code}` : ''}
             </div>
           )}
           {error && <div className="alert-item">Errore: {error}</div>}
