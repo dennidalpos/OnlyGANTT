@@ -69,12 +69,16 @@ function createUserStore({ dataDir, enableBak }) {
     if (!password || hashPassword(password) !== expectedHash) {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
-    user.lastLoginAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    user.lastLoginAt = now;
+    const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
+    history.push(now);
+    user.loginHistory = history.slice(-50);
     writeStore(data);
     return { ok: true, user };
   };
 
-  const upsertLdapUser = (userId, profile = {}) => {
+  const upsertLdapUser = (userId, profile = {}, { touchLoginAt = true } = {}) => {
     const normalized = normalizeUserId(userId);
     if (!normalized) {
       return { ok: false, code: 'INVALID_USER' };
@@ -94,13 +98,19 @@ function createUserStore({ dataDir, enableBak }) {
         mail: profile.mail || null,
         department: profile.department || null,
         createdAt: now,
-        lastLoginAt: now,
+        lastLoginAt: touchLoginAt ? now : null,
+        loginHistory: touchLoginAt ? [now] : [],
         ldapProvisionedAt: now
       };
       data.users.push(user);
       wasProvisioned = true;
     } else {
-      user.lastLoginAt = now;
+      if (touchLoginAt) {
+        user.lastLoginAt = now;
+        const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
+        history.push(now);
+        user.loginHistory = history.slice(-50);
+      }
       if (user.type === 'ad' && !user.ldapProvisionedAt) {
         user.displayName = profile.displayName || user.displayName || null;
         user.mail = profile.mail || user.mail || null;
@@ -134,7 +144,9 @@ function createUserStore({ dataDir, enableBak }) {
         displayName: user.displayName || user.userId,
         mail: user.mail || null,
         department: user.department || null,
-        userType: 'local'
+        userType: 'local',
+        lastLoginAt: user.lastLoginAt || user.createdAt || null,
+        loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
       }));
   };
 
@@ -145,7 +157,9 @@ function createUserStore({ dataDir, enableBak }) {
       displayName: user.displayName || user.userId,
       mail: user.mail || null,
       department: user.department || null,
-      userType: user.type === 'ad' ? 'ad' : 'local'
+      userType: user.type === 'ad' ? 'ad' : 'local',
+      lastLoginAt: user.lastLoginAt || user.ldapProvisionedAt || user.createdAt || null,
+      loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
     }));
   };
 
