@@ -201,7 +201,9 @@
       const handleUnload = () => {
         if (isLocked && department && userName) {
           const url = `/api/lock/${encodeURIComponent(department)}/release`;
-          const data = JSON.stringify({ userName });
+          const userToken = api.getUserToken();
+          const payload = userToken ? { userName, userToken } : { userName };
+          const data = JSON.stringify(payload);
           navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }));
         }
       };

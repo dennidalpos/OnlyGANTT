@@ -4,6 +4,31 @@
   window.OnlyGantt = window.OnlyGantt || {};
 
   const BASE_URL = '';
+  let userToken = null;
+
+  function setUserToken(token) {
+    userToken = token || null;
+  }
+
+  function getUserToken() {
+    return userToken;
+  }
+
+  function buildUserHeaders(headers = {}) {
+    if (!userToken) return headers;
+    return {
+      ...headers,
+      'X-User-Token': userToken
+    };
+  }
+
+  function buildUserPayload(payload = {}) {
+    if (!userToken) return payload;
+    return {
+      ...payload,
+      userToken
+    };
+  }
 
   async function fetchJSON(url, options = {}) {
     const response = await fetch(BASE_URL + url, {
@@ -85,7 +110,8 @@
   async function importDepartment(name, data, userName, signal) {
     return fetchJSON(`/api/departments/${encodeURIComponent(name)}/import`, {
       method: 'POST',
-      body: JSON.stringify({ data, userName }),
+      body: JSON.stringify(buildUserPayload({ data, userName })),
+      headers: buildUserHeaders(),
       signal
     });
   }
@@ -124,7 +150,8 @@
   async function saveProjects(department, projects, expectedRevision, userName, signal) {
     return fetchJSON(`/api/projects/${encodeURIComponent(department)}`, {
       method: 'POST',
-      body: JSON.stringify({ projects, expectedRevision, userName }),
+      body: JSON.stringify(buildUserPayload({ projects, expectedRevision, userName })),
+      headers: buildUserHeaders(),
       signal
     });
   }
@@ -133,10 +160,14 @@
     const formData = new FormData();
     formData.append('file', file);
     formData.append('userName', userName);
+    if (userToken) {
+      formData.append('userToken', userToken);
+    }
 
     const response = await fetch(`${BASE_URL}/api/upload/${encodeURIComponent(department)}`, {
       method: 'POST',
       body: formData,
+      headers: buildUserHeaders(),
       signal
     });
 
@@ -157,10 +188,10 @@
   async function acquireLock(department, userName, clientHost, signal) {
     const response = await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/acquire`, {
       method: 'POST',
-      headers: {
+      headers: buildUserHeaders({
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userName, clientHost }),
+      }),
+      body: JSON.stringify(buildUserPayload({ userName, clientHost })),
       signal
     });
 
@@ -186,10 +217,10 @@
   async function releaseLock(department, userName) {
     await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/release`, {
       method: 'POST',
-      headers: {
+      headers: buildUserHeaders({
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userName })
+      }),
+      body: JSON.stringify(buildUserPayload({ userName }))
     });
   }
 
@@ -200,10 +231,10 @@
   async function heartbeatLock(department, userName, signal) {
     await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/heartbeat`, {
       method: 'POST',
-      headers: {
+      headers: buildUserHeaders({
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ userName }),
+      }),
+      body: JSON.stringify(buildUserPayload({ userName })),
       signal
     });
   }
@@ -357,6 +388,8 @@
   }
 
   window.OnlyGantt.api = {
+    setUserToken,
+    getUserToken,
     getDepartments,
     createDepartment,
     deleteDepartment,
