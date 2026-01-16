@@ -20,6 +20,7 @@
     adminToken,
     onAdminLogin,
     onAdminLogout,
+    onUserTokenChange,
     loginError,
     setLoginError
   }) {
@@ -221,8 +222,13 @@
       setIsLoading(true);
 
       try {
+        let authResult = null;
         if (!adminToken && requiresUserPassword) {
-          await api.authLogin(pendingUserName.trim(), userPassword, selectedDept);
+          authResult = await api.authLogin(pendingUserName.trim(), userPassword, selectedDept);
+        }
+
+        if (authResult?.token) {
+          onUserTokenChange(authResult.token);
         }
 
         if (needsPassword) {
