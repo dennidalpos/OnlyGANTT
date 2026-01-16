@@ -9,6 +9,7 @@ const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection, listLdapUs
 const { startServer } = require('./httpsService');
 const { logAuditEvent } = require('./auditService');
 const { restartServer } = require('./serverService');
+const { createLockStore } = require('./lockStore');
 
 const app = express();
 
@@ -47,7 +48,7 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/src', express.static('src'));
 
-const locks = new Map();
+const lockStore = createLockStore({ dataDir: CONFIG.dataDir, logger: console });
 const adminTokens = new Map();
 const userSessions = new Map();
 const userStore = createUserStore({ dataDir: CONFIG.dataDir, enableBak: CONFIG.enableBak });
@@ -229,17 +230,12 @@ function requireAdmin(req, res, next) {
 }
 
 function cleanExpiredLocks() {
-  const now = new Date();
-  for (const [dept, lock] of locks.entries()) {
-    if (new Date(lock.expiresAt) < now) {
-      locks.delete(dept);
-    }
-  }
+  lockStore.cleanExpiredLocks();
 }
 
 function getLockInfo(department) {
   cleanExpiredLocks();
-  const lock = locks.get(department);
+  const lock = lockStore.get(department);
   if (!lock) {
     return { locked: false, department };
   }
@@ -257,13 +253,14 @@ function getLockInfo(department) {
 }
 
 function isLockOwner(department, userName) {
-  const lock = locks.get(department);
+  const lock = lockStore.get(department);
   if (!lock) return false;
   return lock.ownerUserName === userName;
 }
 
 ensureDataDir();
 userStore.ensureStore();
+lockStore.loadFromDisk();
 
 function validateExistingDepartments() {
   try {
@@ -430,9 +427,7 @@ function importDepartmentsBackup(departments, overwriteExisting) {
       writeDepartmentData(normalized, dataToWrite);
       results.imported.push(normalized);
 
-      if (locks.has(normalized)) {
-        locks.delete(normalized);
-      }
+      lockStore.remove(normalized);
     } catch (err) {
       results.errors.push({
         department: normalized,
@@ -444,10 +439,7 @@ function importDepartmentsBackup(departments, overwriteExisting) {
   return results;
 }
 
-const lockCleanupInterval = setInterval(cleanExpiredLocks, 60 * 1000);
-if (typeof lockCleanupInterval.unref === 'function') {
-  lockCleanupInterval.unref();
-}
+lockStore.startCleanup(60 * 1000);
 
 app.get('/api/departments', (req, res) => {
   try {
@@ -513,7 +505,7 @@ app.delete('/api/departments/:name', requireAdmin, (req, res) => {
     if (!filePath || !fs.existsSync(filePath)) {
       return errorResponse(res, 404, 'NOT_FOUND', 'Department not found');
     }
-    locks.delete(name);
+    lockStore.remove(name);
     fs.unlinkSync(filePath);
     const bakPath = filePath + '.bak';
     if (fs.existsSync(bakPath)) {
@@ -770,14 +762,14 @@ app.post('/api/lock/:department/acquire', (req, res) => {
       return;
     }
     cleanExpiredLocks();
-    const existing = locks.get(department);
+    const existing = lockStore.get(department);
     if (existing && existing.ownerUserName !== userName) {
       const lockInfo = getLockInfo(department);
       return res.status(423).json(lockInfo);
     }
     const now = new Date();
     const expiresAt = new Date(now.getTime() + CONFIG.lockTimeoutMinutes * 60 * 1000);
-    locks.set(department, {
+    const nextLock = {
       department,
       ownerUserName: userName,
       ownerType: req.body.ownerType || 'user',
@@ -785,17 +777,18 @@ app.post('/api/lock/:department/acquire', (req, res) => {
       lockedAt: existing ? existing.lockedAt : now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       lastHeartbeatAt: now.toISOString()
-    });
+    };
+    lockStore.set(department, nextLock);
     res.json({
       locked: true,
       department,
       lockedBy: userName,
-      ownerUserName: locks.get(department).ownerUserName,
-      ownerType: locks.get(department).ownerType,
-      lockedAt: locks.get(department).lockedAt,
+      ownerUserName: nextLock.ownerUserName,
+      ownerType: nextLock.ownerType,
+      lockedAt: nextLock.lockedAt,
       expiresAt: expiresAt.toISOString(),
-      clientHost: locks.get(department).clientHost,
-      lastHeartbeatAt: locks.get(department).lastHeartbeatAt
+      clientHost: nextLock.clientHost,
+      lastHeartbeatAt: nextLock.lastHeartbeatAt
     });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
@@ -806,12 +799,9 @@ app.post('/api/lock/:department/release', (req, res) => {
   try {
     const { department } = req.params;
     const { userName } = req.body;
-    if (!validateUserSession(req, res, userName)) {
-      return;
-    }
-    const lock = locks.get(department);
+    const lock = lockStore.get(department);
     if (lock && lock.ownerUserName === userName) {
-      locks.delete(department);
+      lockStore.remove(department);
     }
     res.status(204).send();
   } catch (err) {
@@ -837,13 +827,16 @@ app.post('/api/lock/:department/heartbeat', (req, res) => {
       return;
     }
     cleanExpiredLocks();
-    const lock = locks.get(department);
+    const lock = lockStore.get(department);
     if (!lock || lock.ownerUserName !== userName) {
       return errorResponse(res, 409, 'LOCK_NOT_OWNED', 'Lock not owned by user');
     }
     const expiresAt = new Date(Date.now() + CONFIG.lockTimeoutMinutes * 60 * 1000);
-    lock.expiresAt = expiresAt.toISOString();
-    lock.lastHeartbeatAt = new Date().toISOString();
+    lockStore.set(department, {
+      ...lock,
+      expiresAt: expiresAt.toISOString(),
+      lastHeartbeatAt: new Date().toISOString()
+    });
     res.status(204).send();
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
@@ -853,7 +846,7 @@ app.post('/api/lock/:department/heartbeat', (req, res) => {
 app.post('/api/lock/:department/admin-release', requireAdmin, (req, res) => {
   try {
     const { department } = req.params;
-    locks.delete(department);
+    lockStore.remove(department);
     res.status(204).send();
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
