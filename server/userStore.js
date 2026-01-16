@@ -135,7 +135,7 @@ function createUserStore({ dataDir, enableBak }) {
         mail: user.mail || null,
         department: user.department || null,
         userType: 'local',
-        lastLoginAt: user.lastLoginAt || null
+        lastLoginAt: user.lastLoginAt || user.createdAt || null
       }));
   };
 
@@ -147,7 +147,7 @@ function createUserStore({ dataDir, enableBak }) {
       mail: user.mail || null,
       department: user.department || null,
       userType: user.type === 'ad' ? 'ad' : 'local',
-      lastLoginAt: user.lastLoginAt || null
+      lastLoginAt: user.lastLoginAt || user.ldapProvisionedAt || user.createdAt || null
     }));
   };
 
