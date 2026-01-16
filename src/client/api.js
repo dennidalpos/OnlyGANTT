@@ -266,6 +266,15 @@
     });
   }
 
+  async function getSystemStatus(token, signal) {
+    return fetchJSON('/api/admin/system-status', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
   async function updateSystemConfig(config, token, signal) {
     return fetchJSON('/api/admin/system-config', {
       method: 'POST',
@@ -432,6 +441,7 @@
     adminImportModules,
     testLdapConnection,
     getSystemConfig,
+    getSystemStatus,
     updateSystemConfig
   };
 })();

@@ -14,6 +14,7 @@ Applicazione Timeline Progetti interattiva con blocco multi‑utente, pensata pe
 - **Avvisi completi**: ritardi, conflitti, anomalie e dati mancanti
 - **Screensaver**: salvaschermo automatico con timeout configurabile
 - **Preset fasi**: inserimento rapido delle fasi con colori e opzione personalizzata
+- **Impostazioni di sistema**: gestione LDAP/HTTPS, import/export moduli e stato server applicativo
 
 ## Architettura
 
@@ -41,7 +42,13 @@ OnlyGANTT/
 ├─ package.json
 ├─ server/
 │  ├─ server.js           # Server Express con API + lock + admin
-│  └─ schema.js           # Validazione schema JSON
+│  ├─ schema.js           # Validazione schema JSON
+│  ├─ ldapService.js      # Integrazione LDAP
+│  ├─ httpsService.js     # Avvio HTTPS
+│  ├─ lockStore.js        # Persistenza lock
+│  ├─ serverService.js    # Operazioni di manutenzione server
+│  ├─ userStore.js        # Utenti locali
+│  └─ auditService.js     # Audit log
 ├─ public/
 │  ├─ index.html          # HTML principale con script CDN
 │  └─ styles.css          # CSS tema scuro
@@ -61,6 +68,9 @@ OnlyGANTT/
 │  │     ├─ GanttCanvas.jsx
 │  │     ├─ ProjectForm.jsx
 │  │     ├─ ProjectList.jsx
+│  │     ├─ ProjectSidebar.jsx
+│  │     ├─ SystemSettings.jsx
+│  │     ├─ UserManagement.jsx
 │  │     └─ AlertsPanel.jsx
 │  └─ utils/
 │     ├─ easter.js        # Calcolo Pasqua (gregoriano)
@@ -210,9 +220,19 @@ Il server gira su `http://localhost:3000`
 ### Admin
 - `POST /api/admin/login` - Login (restituisce Bearer token)
 - `POST /api/admin/logout` - Logout
+- `POST /api/admin/change-password` - Cambio password admin
+- `POST /api/admin/reset-password` - Reset password admin via reset code
 - `GET /api/admin/departments` - Elenco reparti con dettagli
+- `GET /api/admin/users` - Elenco utenti locali e LDAP (se abilitato)
+- `GET /api/admin/system-config` - Configurazioni persistenti (LDAP/HTTPS)
+- `POST /api/admin/system-config` - Salva configurazioni persistenti
+- `GET /api/admin/system-status` - Stato server applicativo e ambiente
+- `POST /api/admin/ldap/test` - Test di connessione LDAP
+- `POST /api/admin/server-restart` - Riavvio server applicativo
 - `GET /api/admin/server-backup` - Backup completo del server (tutti i reparti + configurazione)
 - `POST /api/admin/server-restore` - Ripristino completo del server da file backup
+- `POST /api/admin/export` - Export modulare (reparti, utenti, impostazioni, integrazioni)
+- `POST /api/admin/import` - Import modulare con sovrascrittura opzionale
 
 ## Dettaglio funzionalità
 

@@ -61,6 +61,36 @@
       return date.toLocaleString('it-IT');
     };
 
+    const renderLdapDiagnostics = (ldapIssue) => {
+      if (!ldapIssue) return null;
+      const code = ldapIssue.code ? String(ldapIssue.code) : '—';
+      const message = ldapIssue.message || 'Errore LDAP';
+      const hints = [];
+      if (code === 'LDAP_CONFIG_ERROR') {
+        hints.push('Verifica LDAP_URL, LDAP_BASE_DN e il filtro utenti.');
+      } else if (code === 'LDAP_DOWN') {
+        hints.push('Verifica raggiungibilità server LDAP e credenziali Bind DN.');
+      } else {
+        hints.push('Controlla i log del server LDAP o del servizio OnlyGANTT per dettagli aggiuntivi.');
+      }
+
+      return (
+        <div className="alert-item warning">
+          <div>Impossibile leggere utenti LDAP.</div>
+          <div className="text-muted" style={{ marginTop: '0.25rem' }}>
+            Codice: <strong>{code}</strong> · Messaggio: <strong>{message}</strong>
+          </div>
+          {hints.length > 0 && (
+            <ul className="text-muted" style={{ margin: '0.5rem 0 0', paddingLeft: '1rem' }}>
+              {hints.map((hint) => (
+                <li key={hint}>{hint}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    };
+
     return (
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -82,18 +112,7 @@
           {!ldapEnabled && (
             <div className="alert-item info">LDAP non abilitato: sono mostrati solo utenti locali.</div>
           )}
-          {ldapError && (
-            <div className="alert-item warning">
-              {(() => {
-                const message = ldapError.message || 'Errore LDAP';
-                const codeSuffix = ldapError.code ? ` Code: ${ldapError.code}` : '';
-                if (ldapError.code && /code:/i.test(message)) {
-                  return `Impossibile leggere utenti LDAP: ${message}.`;
-                }
-                return `Impossibile leggere utenti LDAP: ${message}.${codeSuffix}`;
-              })()}
-            </div>
-          )}
+          {renderLdapDiagnostics(ldapError)}
           {error && <div className="alert-item">Errore: {error}</div>}
         </div>
 

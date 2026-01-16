@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
@@ -11,7 +12,10 @@ const { logAuditEvent } = require('./auditService');
 const { restartServer } = require('./serverService');
 const { createLockStore } = require('./lockStore');
 
+const packageInfo = require('../package.json');
+
 const app = express();
+const SERVER_STARTED_AT = new Date().toISOString();
 
 function parseBoolean(value) {
   if (typeof value === 'boolean') return value;
@@ -1193,6 +1197,40 @@ app.get('/api/admin/system-config', requireAdmin, (req, res) => {
     res.json({
       ldap: getLdapConfigSnapshot(),
       https: getHttpsConfigSnapshot()
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.get('/api/admin/system-status', requireAdmin, (req, res) => {
+  try {
+    const memory = process.memoryUsage();
+    res.json({
+      ok: true,
+      app: {
+        name: packageInfo.name || 'OnlyGANTT',
+        version: packageInfo.version || 'dev'
+      },
+      server: {
+        status: 'online',
+        startedAt: SERVER_STARTED_AT,
+        uptimeSeconds: Math.floor(process.uptime()),
+        pid: process.pid,
+        nodeVersion: process.version
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        platform: process.platform,
+        arch: process.arch,
+        hostname: os.hostname(),
+        cpuCount: os.cpus()?.length || 0,
+        totalMemory: os.totalmem(),
+        freeMemory: os.freemem(),
+        memoryRss: memory.rss,
+        heapUsed: memory.heapUsed,
+        heapTotal: memory.heapTotal
+      }
     });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
