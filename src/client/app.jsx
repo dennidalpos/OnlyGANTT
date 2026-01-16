@@ -58,6 +58,7 @@
 
   function App() {
     const [userName, setUserName] = useState(storage.getCurrentUser() || '');
+    const [userToken, setUserToken] = useState(null);
     const [notifications, setNotifications] = useState([]);
 
     const [department, setDepartment] = useState(null);
@@ -171,6 +172,10 @@
     useEffect(() => {
       storage.setCurrentUser(userName);
     }, [userName]);
+
+    useEffect(() => {
+      api.setUserToken(userToken);
+    }, [userToken]);
 
     const initialScrollDoneRef = useRef(null);
 
@@ -474,6 +479,7 @@
       setFocusedProjectId(null);
       setAdminToken(nextAdminToken);
       setUserName(nextUserName);
+      setUserToken(null);
       setLoginError('');
     };
 
@@ -495,6 +501,7 @@
 
       const result = await api.adminLogin(adminId, password);
       setAdminToken(result.token);
+      setUserToken(result.userToken || null);
       setUserName(adminId);
       pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
     };
@@ -1095,6 +1102,7 @@
               adminToken={adminToken}
               onAdminLogin={handleAdminLogin}
               onAdminLogout={handleUserLogout}
+              onUserTokenChange={setUserToken}
               loginError={loginError}
               setLoginError={setLoginError}
             />

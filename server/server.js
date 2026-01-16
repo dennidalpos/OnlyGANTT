@@ -50,6 +50,7 @@ app.use('/src', express.static('src'));
 
 const lockStore = createLockStore({ dataDir: CONFIG.dataDir, logger: console });
 const adminTokens = new Map();
+const userSessions = new Map();
 const userStore = createUserStore({ dataDir: CONFIG.dataDir, enableBak: CONFIG.enableBak });
 
 const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
@@ -172,6 +173,47 @@ function isValidAdminToken(token) {
     adminTokens.delete(token);
     return false;
   }
+  return true;
+}
+
+function createUserSession(userName) {
+  const token = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : crypto.randomBytes(16).toString('hex');
+  userSessions.set(token, {
+    userName,
+    createdAt: new Date().toISOString()
+  });
+  return token;
+}
+
+function getUserToken(req) {
+  return req.headers['x-user-token'] || req.body?.userToken || null;
+}
+
+function validateUserSession(req, res, userName) {
+  if (!userName || typeof userName !== 'string') {
+    errorResponse(res, 400, 'INVALID_REQUEST', 'userName is required');
+    return false;
+  }
+
+  const normalizedUserName = userName.trim();
+  const token = getUserToken(req);
+  if (!token) {
+    errorResponse(res, 401, 'UNAUTHORIZED', 'User token required');
+    return false;
+  }
+
+  const session = userSessions.get(token);
+  if (!session || session.userName !== normalizedUserName) {
+    errorResponse(res, 401, 'UNAUTHORIZED', 'Invalid or expired user session');
+    return false;
+  }
+
+  if (req.body && typeof req.body === 'object') {
+    req.body.userName = normalizedUserName;
+  }
+
   return true;
 }
 
@@ -574,8 +616,8 @@ app.post('/api/departments/:name/import', (req, res) => {
     if (!data || typeof data !== 'object') {
       return errorResponse(res, 400, 'INVALID_REQUEST', 'data is required');
     }
-    if (!userName) {
-      return errorResponse(res, 400, 'INVALID_REQUEST', 'userName is required');
+    if (!validateUserSession(req, res, userName)) {
+      return;
     }
     cleanExpiredLocks();
     if (!isLockOwner(name, userName)) {
@@ -608,6 +650,9 @@ app.post('/api/projects/:department', (req, res) => {
     const { projects, expectedRevision, userName } = req.body;
     if (expectedRevision === undefined || expectedRevision === null) {
       return errorResponse(res, 400, 'INVALID_REQUEST', 'expectedRevision is required');
+    }
+    if (!validateUserSession(req, res, userName)) {
+      return;
     }
     cleanExpiredLocks();
     if (!isLockOwner(department, userName)) {
@@ -667,6 +712,9 @@ app.post('/api/upload/:department', upload.single('file'), (req, res) => {
     const { department } = req.params;
     cleanExpiredLocks();
     const userName = req.body.userName || 'unknown';
+    if (!validateUserSession(req, res, userName)) {
+      return;
+    }
     if (!isLockOwner(department, userName)) {
       const lockInfo = getLockInfo(department);
       if (lockInfo.locked) {
@@ -710,8 +758,8 @@ app.post('/api/lock/:department/acquire', (req, res) => {
   try {
     const { department } = req.params;
     const { userName, clientHost } = req.body;
-    if (!userName) {
-      return errorResponse(res, 400, 'INVALID_REQUEST', 'userName is required');
+    if (!validateUserSession(req, res, userName)) {
+      return;
     }
     cleanExpiredLocks();
     const existing = lockStore.get(department);
@@ -775,6 +823,9 @@ app.post('/api/lock/:department/heartbeat', (req, res) => {
   try {
     const { department } = req.params;
     const { userName } = req.body;
+    if (!validateUserSession(req, res, userName)) {
+      return;
+    }
     cleanExpiredLocks();
     const lock = lockStore.get(department);
     if (!lock || lock.ownerUserName !== userName) {
@@ -836,9 +887,11 @@ app.post('/api/auth/login', async (req, res) => {
           mail: ldapResult.profile.mail,
           department: ldapResult.profile.department || department || null
         });
+        const userToken = createUserSession(normalizedUserId);
         return res.json({
           ok: true,
           authType: 'ldap',
+          token: userToken,
           user: {
             userId: normalizedUserId,
             type: 'ad',
@@ -856,9 +909,11 @@ app.post('/api/auth/login', async (req, res) => {
       if (CONFIG.ldapLocalFallback && ldapResult.code !== 'GROUP_REQUIRED') {
         const localResult = userStore.verifyLocalUser(normalizedUserId, password);
         if (localResult.ok) {
+          const userToken = createUserSession(normalizedUserId);
           return res.json({
             ok: true,
             authType: 'local',
+            token: userToken,
             user: {
               userId: normalizedUserId,
               type: 'local',
@@ -882,9 +937,11 @@ app.post('/api/auth/login', async (req, res) => {
     if (!localResult.ok) {
       return errorResponse(res, 401, 'INVALID_CREDENTIALS', 'Invalid credentials');
     }
+    const userToken = createUserSession(normalizedUserId);
     return res.json({
       ok: true,
       authType: 'local',
+      token: userToken,
       user: {
         userId: normalizedUserId,
         type: 'local',
@@ -913,7 +970,8 @@ app.post('/api/admin/login', (req, res) => {
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString()
     });
-    res.json({ token });
+    const userToken = createUserSession(userId);
+    res.json({ token, userToken });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
   }
