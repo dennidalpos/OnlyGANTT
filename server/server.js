@@ -1250,13 +1250,20 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     let ldapError = null;
 
     if (CONFIG.ldapEnabled) {
-      const ldapResult = await listLdapUsers(getLdapConfigForAuth());
-      if (ldapResult.ok) {
-        ldapUsers = ldapResult.users || [];
-      } else {
+      try {
+        const ldapResult = await listLdapUsers(getLdapConfigForAuth());
+        if (ldapResult.ok) {
+          ldapUsers = ldapResult.users || [];
+        } else {
+          ldapError = {
+            code: ldapResult.code || 'LDAP_ERROR',
+            message: ldapResult.message || 'LDAP search failed'
+          };
+        }
+      } catch (err) {
         ldapError = {
-          code: ldapResult.code || 'LDAP_ERROR',
-          message: ldapResult.message || 'LDAP search failed'
+          code: err?.code || 'LDAP_ERROR',
+          message: err?.message || 'LDAP search failed'
         };
       }
     }
