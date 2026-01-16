@@ -266,6 +266,26 @@
     });
   }
 
+  async function getSystemConfig(token, signal) {
+    return fetchJSON('/api/admin/system-config', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
+  async function updateSystemConfig(config, token, signal) {
+    return fetchJSON('/api/admin/system-config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
   async function testLdapConnection(config, testUserId, token, signal) {
     return fetchJSON('/api/admin/ldap/test', {
       method: 'POST',
@@ -420,6 +440,8 @@
     adminExportModules,
     adminImportModules,
     getLdapConfig,
-    testLdapConnection
+    testLdapConnection,
+    getSystemConfig,
+    updateSystemConfig
   };
 })();
