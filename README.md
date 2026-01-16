@@ -67,8 +67,18 @@ OnlyGANTT/
 │     ├─ utils-date.js    # Utilità date + festività italiane
 │     ├─ utils-logic.js   # Logica di business (ritardi, conflitti, ecc.)
 │     └─ utils-gantt.js   # Rendering canvas
-├─ data/
-│  └─ Demo.json           # Reparto demo con 15 progetti (2025-2030)
+├─ Data/
+│  ├─ reparti/            # Reparti JSON
+│  │  └─ Demo.json        # Reparto demo con 15 progetti (2025-2030)
+│  ├─ utenti/             # Utenti locali
+│  │  └─ users.json
+│  ├─ config/             # Configurazioni persistenti
+│  │  └─ system-config.json
+│  └─ log/                # Log di audit
+│     └─ audit.log
+├─ scripts/
+│  ├─ install-service.ps1 # Installa servizio Windows OnlyGanttWeb
+│  └─ uninstall-service.ps1 # Rimuove servizio Windows OnlyGanttWeb
 └─ README.md
 ```
 
@@ -104,9 +114,12 @@ Consulta [`context.md`](context.md) per l'ambiente di runtime, la struttura dei 
    npm start
    ```
 6. **(Opzionale) Servizio Windows**  
-   Per l'esecuzione in background puoi usare NSSM:
-   - Crea un servizio che esegue `npm start` nella cartella del progetto.
-   - Configura il servizio per il riavvio automatico.
+   Puoi usare gli script PowerShell inclusi:
+   ```powershell
+   scripts\\install-service.ps1
+   scripts\\uninstall-service.ps1
+   ```
+   Il servizio installato si chiama `OnlyGanttWeb` e punta a `node server/server.js`.
 
 ### Installare le dipendenze
 ```bash
@@ -125,7 +138,7 @@ Il server gira su `http://localhost:3000`
 ### Credenziali di default
 - **ID Admin**: `admin` (modifica in `server/server.js`)
 - **Password Admin**: `admin123` (modifica in `server/server.js`)
-- **Reparto Demo**: password `demo123`
+- **Reparto Demo**: nessuna password
 
 ## Modello dati
 
@@ -158,7 +171,7 @@ Il server gira su `http://localhost:3000`
 }
 ```
 
-### File reparto (data/<Reparto>.json)
+### File reparto (Data/reparti/<Reparto>.json)
 ```javascript
 {
   "password": "string" | null,
@@ -268,7 +281,7 @@ Il server gira su `http://localhost:3000`
 ## Troubleshooting
 
 ### File reparto JSON non valido
-Se un file `data/<Reparto>.json` è corrotto o contiene JSON invalido, le API che leggono quel reparto rispondono con errore `INVALID_JSON`.
+Se un file `Data/reparti/<Reparto>.json` è corrotto o contiene JSON invalido, le API che leggono quel reparto rispondono con errore `INVALID_JSON`.
 Controlla il file indicato nel payload di errore, correggi il JSON o ripristina un backup `.bak` valido, quindi riavvia il server se necessario.
 
 

@@ -38,10 +38,13 @@
       groupSearchBase: '',
       localFallback: false
     });
+    const [ldapHasSavedBindPassword, setLdapHasSavedBindPassword] = useState(false);
     const [ldapTestUserId, setLdapTestUserId] = useState('');
     const [ldapTestStatus, setLdapTestStatus] = useState(null);
     const [ldapLoading, setLdapLoading] = useState(true);
     const [ldapTesting, setLdapTesting] = useState(false);
+    const [configSaving, setConfigSaving] = useState(false);
+    const [configStatus, setConfigStatus] = useState(null);
     const [restartStatus, setRestartStatus] = useState(null);
     const [restartCountdown, setRestartCountdown] = useState(null);
     const [httpsConfig, setHttpsConfig] = useState({
@@ -79,30 +82,37 @@
     useEffect(() => {
       if (!adminToken) return undefined;
       const controller = new AbortController();
-      const loadLdapConfig = async () => {
+      const loadSystemConfig = async () => {
         setLdapLoading(true);
+        setConfigStatus(null);
         try {
-          const data = await api.getLdapConfig(adminToken, controller.signal);
+          const data = await api.getSystemConfig(adminToken, controller.signal);
           setLdapConfig({
-            enabled: !!data.enabled,
-            log: !!data.log,
-            url: data.url || '',
-            bindDn: data.bindDn || '',
+            enabled: !!data.ldap?.enabled,
+            log: !!data.ldap?.log,
+            url: data.ldap?.url || '',
+            bindDn: data.ldap?.bindDn || '',
             bindPassword: '',
-            baseDn: data.baseDn || '',
-            userFilter: data.userFilter || '(sAMAccountName={{username}})',
-            requiredGroupDn: data.requiredGroupDn || '',
-            groupSearchBase: data.groupSearchBase || '',
-            localFallback: !!data.localFallback
+            baseDn: data.ldap?.baseDn || '',
+            userFilter: data.ldap?.userFilter || '(sAMAccountName={{username}})',
+            requiredGroupDn: data.ldap?.requiredGroupDn || '',
+            groupSearchBase: data.ldap?.groupSearchBase || '',
+            localFallback: !!data.ldap?.localFallback
           });
+          setHttpsConfig({
+            enabled: !!data.https?.enabled,
+            keyPath: data.https?.keyPath || '',
+            certPath: data.https?.certPath || ''
+          });
+          setLdapHasSavedBindPassword(!!data.ldap?.bindPasswordSet);
         } catch (err) {
           if (err.name === 'AbortError') return;
-          setLdapTestStatus({ type: 'error', message: 'Errore nel caricamento configurazione LDAP' });
+          setConfigStatus({ type: 'error', message: 'Errore nel caricamento delle configurazioni' });
         } finally {
           setLdapLoading(false);
         }
       };
-      loadLdapConfig();
+      loadSystemConfig();
       return () => controller.abort();
     }, [adminToken, api]);
 
@@ -123,6 +133,41 @@
 
     const handleHttpsFieldChange = (field, value) => {
       setHttpsConfig((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleSaveSystemConfig = async () => {
+      if (!adminToken) return;
+      setConfigSaving(true);
+      setConfigStatus(null);
+      try {
+        const payload = {
+          ldap: {
+            enabled: ldapConfig.enabled,
+            log: ldapConfig.log,
+            url: ldapConfig.url,
+            bindDn: ldapConfig.bindDn,
+            bindPassword: ldapConfig.bindPassword ? ldapConfig.bindPassword : null,
+            baseDn: ldapConfig.baseDn,
+            userFilter: ldapConfig.userFilter,
+            requiredGroupDn: ldapConfig.requiredGroupDn,
+            groupSearchBase: ldapConfig.groupSearchBase,
+            localFallback: ldapConfig.localFallback
+          },
+          https: {
+            enabled: httpsConfig.enabled,
+            keyPath: httpsConfig.keyPath,
+            certPath: httpsConfig.certPath
+          }
+        };
+        const result = await api.updateSystemConfig(payload, adminToken);
+        setLdapHasSavedBindPassword(!!result.ldap?.bindPasswordSet);
+        setLdapConfig((prev) => ({ ...prev, bindPassword: '' }));
+        setConfigStatus({ type: 'success', message: 'Configurazioni salvate in modo persistente' });
+      } catch (err) {
+        setConfigStatus({ type: 'error', message: err.message || 'Salvataggio configurazioni fallito' });
+      } finally {
+        setConfigSaving(false);
+      }
     };
 
     const clearRestartTimers = () => {
@@ -260,13 +305,29 @@
         <div className="card-section">
           <h3 style={{ marginTop: 0 }}>Configurazioni</h3>
           <p className="text-muted">Gestisci parametri globali, policy di sicurezza e opzioni di default.</p>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-success"
+              type="button"
+              onClick={handleSaveSystemConfig}
+              disabled={!adminToken || configSaving || ldapLoading}
+            >
+              {configSaving ? 'Salvataggio...' : 'Salva configurazioni'}
+            </button>
+            {configStatus && (
+              <div className={`alert-item ${configStatus.type}`} style={{ margin: 0 }}>
+                {configStatus.message}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="card-section">
           <h3 style={{ marginTop: 0 }}>LDAP</h3>
           <p className="text-muted">
-            Configura l'integrazione LDAP tramite variabili ambiente. I valori inseriti qui vengono usati solo per il test.
+            Configura l'integrazione LDAP in modo persistente. Le modifiche salvate vengono usate per l'autenticazione.
           </p>
+          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Stato e fallback</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
             <label className="checkbox-label">
               <input
@@ -296,6 +357,7 @@
               Fallback locale (LDAP_LOCAL_FALLBACK)
             </label>
           </div>
+          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Connessione</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-url">URL LDAP (LDAP_URL)</label>
@@ -305,6 +367,17 @@
                 value={ldapConfig.url}
                 onChange={(e) => handleLdapFieldChange('url', e.target.value)}
                 placeholder="ldap://server:389"
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="ldap-base-dn">Base DN (LDAP_BASE_DN)</label>
+              <input
+                id="ldap-base-dn"
+                type="text"
+                value={ldapConfig.baseDn}
+                onChange={(e) => handleLdapFieldChange('baseDn', e.target.value)}
+                placeholder="DC=example,DC=local"
                 disabled={ldapLoading}
               />
             </div>
@@ -329,18 +402,13 @@
                 placeholder="••••••••"
                 disabled={ldapLoading}
               />
+              <p className="text-muted" style={{ margin: '0.25rem 0 0' }}>
+                {ldapHasSavedBindPassword ? 'Password già salvata. Lascia vuoto per mantenerla.' : 'Inserisci la password per salvarla.'}
+              </p>
             </div>
-            <div>
-              <label htmlFor="ldap-base-dn">Base DN (LDAP_BASE_DN)</label>
-              <input
-                id="ldap-base-dn"
-                type="text"
-                value={ldapConfig.baseDn}
-                onChange={(e) => handleLdapFieldChange('baseDn', e.target.value)}
-                placeholder="DC=example,DC=local"
-                disabled={ldapLoading}
-              />
-            </div>
+          </div>
+          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Filtri e gruppi</h4>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-user-filter">User Filter (LDAP_USER_FILTER)</label>
               <input
@@ -374,6 +442,9 @@
                 disabled={ldapLoading}
               />
             </div>
+          </div>
+          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Test</h4>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-test-user">Utente per test</label>
               <input
@@ -401,7 +472,7 @@
         <div className="card-section">
           <h3 style={{ marginTop: 0 }}>HTTPS</h3>
           <p className="text-muted">
-            Configura l'avvio HTTPS tramite variabili ambiente. I valori inseriti qui sono solo indicativi.
+            Configura HTTPS in modo persistente. Dopo il salvataggio è necessario riavviare il server.
           </p>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
             <label className="checkbox-label">
@@ -409,6 +480,7 @@
                 type="checkbox"
                 checked={httpsConfig.enabled}
                 onChange={(e) => handleHttpsFieldChange('enabled', e.target.checked)}
+                disabled={ldapLoading}
               />
               HTTPS abilitato (HTTPS_ENABLED)
             </label>
@@ -422,6 +494,7 @@
                 value={httpsConfig.keyPath}
                 onChange={(e) => handleHttpsFieldChange('keyPath', e.target.value)}
                 placeholder="/etc/ssl/private/server.key"
+                disabled={ldapLoading}
               />
             </div>
             <div>
@@ -432,6 +505,7 @@
                 value={httpsConfig.certPath}
                 onChange={(e) => handleHttpsFieldChange('certPath', e.target.value)}
                 placeholder="/etc/ssl/certs/server.crt"
+                disabled={ldapLoading}
               />
             </div>
           </div>

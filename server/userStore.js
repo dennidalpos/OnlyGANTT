@@ -138,12 +138,24 @@ function createUserStore({ dataDir, enableBak }) {
       }));
   };
 
+  const listUsers = () => {
+    const data = readStore();
+    return data.users.map((user) => ({
+      userId: user.userId,
+      displayName: user.displayName || user.userId,
+      mail: user.mail || null,
+      department: user.department || null,
+      userType: user.type === 'ad' ? 'ad' : 'local'
+    }));
+  };
+
   return {
     ensureStore,
     verifyLocalUser,
     upsertLdapUser,
     getAuthSnapshot,
-    listLocalUsers
+    listLocalUsers,
+    listUsers
   };
 }
 

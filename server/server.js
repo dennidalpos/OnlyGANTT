@@ -5,7 +5,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 const { validateDepartmentData, ensureIDs } = require('./schema');
 const { createUserStore } = require('./userStore');
-const { authenticateLdapUser, buildConfigFromEnv, testLdapConnection, listLdapUsers } = require('./ldapService');
+const { authenticateLdapUser, testLdapConnection, listLdapUsers } = require('./ldapService');
 const { startServer } = require('./httpsService');
 const { logAuditEvent } = require('./auditService');
 const { restartServer } = require('./serverService');
@@ -21,7 +21,7 @@ function parseBoolean(value) {
 
 const CONFIG = {
   port: 3000,
-  dataDir: 'data',
+  dataDir: 'Data',
   enableBak: true,
   lockTimeoutMinutes: 60,
   adminSessionTtlHours: 8,
@@ -48,13 +48,21 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/src', express.static('src'));
 
-const lockStore = createLockStore({ dataDir: CONFIG.dataDir, logger: console });
+const PATHS = {
+  root: CONFIG.dataDir,
+  departments: path.join(CONFIG.dataDir, 'reparti'),
+  users: path.join(CONFIG.dataDir, 'utenti'),
+  config: path.join(CONFIG.dataDir, 'config'),
+  logs: path.join(CONFIG.dataDir, 'log')
+};
+
+const lockStore = createLockStore({ dataDir: PATHS.config, fileName: 'locks.json', logger: console });
 const adminTokens = new Map();
 const userSessions = new Map();
-const userStore = createUserStore({ dataDir: CONFIG.dataDir, enableBak: CONFIG.enableBak });
+const userStore = createUserStore({ dataDir: PATHS.users, enableBak: CONFIG.enableBak });
 
 const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
-const USER_STORE_FILE = 'users.json';
+const SYSTEM_CONFIG_FILE = 'system-config.json';
 
 function normalizeDepartmentName(name) {
   if (!name || typeof name !== 'string') return null;
@@ -67,19 +75,29 @@ function normalizeDepartmentName(name) {
 }
 
 function isDepartmentFile(fileName) {
-  return fileName.endsWith('.json') && !fileName.endsWith('.bak') && !fileName.endsWith('.tmp') && fileName !== USER_STORE_FILE;
+  return fileName.endsWith('.json') && !fileName.endsWith('.bak') && !fileName.endsWith('.tmp');
 }
 
 function getDepartmentFilePath(department) {
   const normalized = normalizeDepartmentName(department);
   if (!normalized) return null;
-  return path.join(CONFIG.dataDir, `${normalized}.json`);
+  return path.join(PATHS.departments, `${normalized}.json`);
+}
+
+function getSystemConfigFilePath() {
+  ensureDataDir();
+  return path.join(PATHS.config, SYSTEM_CONFIG_FILE);
 }
 
 function ensureDataDir() {
-  if (!fs.existsSync(CONFIG.dataDir)) {
-    fs.mkdirSync(CONFIG.dataDir, { recursive: true });
+  if (!fs.existsSync(PATHS.root)) {
+    fs.mkdirSync(PATHS.root, { recursive: true });
   }
+  [PATHS.departments, PATHS.users, PATHS.config, PATHS.logs].forEach((dirPath) => {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  });
 }
 
 function atomicWrite(filePath, data) {
@@ -151,17 +169,138 @@ function errorResponse(res, statusCode, code, message, details = null) {
   res.status(statusCode).json(payload);
 }
 
+function normalizeSystemConfigValue(value, fallback = '') {
+  if (value == null) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return fallback;
+}
+
+function buildSystemConfigPayload(config, { includeBindPassword = true } = {}) {
+  return {
+    ldap: {
+      enabled: parseBoolean(config.ldapEnabled),
+      log: parseBoolean(config.logLdap),
+      url: config.ldapUrl || '',
+      bindDn: config.ldapBindDn || '',
+      bindPassword: includeBindPassword ? (config.ldapBindPassword || '') : '',
+      bindPasswordSet: !!config.ldapBindPassword,
+      baseDn: config.ldapBaseDn || '',
+      userFilter: config.ldapUserFilter || '(sAMAccountName={{username}})',
+      requiredGroupDn: config.ldapRequiredGroup || '',
+      groupSearchBase: config.ldapGroupSearchBase || '',
+      localFallback: parseBoolean(config.ldapLocalFallback)
+    },
+    https: {
+      enabled: parseBoolean(config.httpsEnabled),
+      keyPath: config.httpsKeyPath || '',
+      certPath: config.httpsCertPath || ''
+    }
+  };
+}
+
+function getSystemConfigState() {
+  return {
+    ldap: {
+      enabled: parseBoolean(CONFIG.ldapEnabled),
+      log: parseBoolean(CONFIG.logLdap),
+      url: CONFIG.ldapUrl || '',
+      bindDn: CONFIG.ldapBindDn || '',
+      bindPassword: CONFIG.ldapBindPassword || '',
+      baseDn: CONFIG.ldapBaseDn || '',
+      userFilter: CONFIG.ldapUserFilter || '(sAMAccountName={{username}})',
+      requiredGroupDn: CONFIG.ldapRequiredGroup || '',
+      groupSearchBase: CONFIG.ldapGroupSearchBase || '',
+      localFallback: parseBoolean(CONFIG.ldapLocalFallback)
+    },
+    https: {
+      enabled: parseBoolean(CONFIG.httpsEnabled),
+      keyPath: CONFIG.httpsKeyPath || '',
+      certPath: CONFIG.httpsCertPath || ''
+    }
+  };
+}
+
+function applySystemConfig(configPayload) {
+  if (!configPayload || typeof configPayload !== 'object') return;
+  const ldap = configPayload.ldap || {};
+  const https = configPayload.https || {};
+
+  if ('enabled' in ldap) CONFIG.ldapEnabled = parseBoolean(ldap.enabled);
+  if ('log' in ldap) CONFIG.logLdap = parseBoolean(ldap.log);
+  if ('url' in ldap) CONFIG.ldapUrl = normalizeSystemConfigValue(ldap.url, CONFIG.ldapUrl);
+  if ('bindDn' in ldap) CONFIG.ldapBindDn = normalizeSystemConfigValue(ldap.bindDn, CONFIG.ldapBindDn);
+  if ('baseDn' in ldap) CONFIG.ldapBaseDn = normalizeSystemConfigValue(ldap.baseDn, CONFIG.ldapBaseDn);
+  if ('userFilter' in ldap) CONFIG.ldapUserFilter = normalizeSystemConfigValue(ldap.userFilter, CONFIG.ldapUserFilter);
+  if ('requiredGroupDn' in ldap) CONFIG.ldapRequiredGroup = normalizeSystemConfigValue(ldap.requiredGroupDn, CONFIG.ldapRequiredGroup);
+  if ('groupSearchBase' in ldap) CONFIG.ldapGroupSearchBase = normalizeSystemConfigValue(ldap.groupSearchBase, CONFIG.ldapGroupSearchBase);
+  if ('localFallback' in ldap) CONFIG.ldapLocalFallback = parseBoolean(ldap.localFallback);
+  if ('bindPassword' in ldap) {
+    CONFIG.ldapBindPassword = normalizeSystemConfigValue(ldap.bindPassword, '');
+  }
+
+  if ('enabled' in https) CONFIG.httpsEnabled = parseBoolean(https.enabled);
+  if ('keyPath' in https) CONFIG.httpsKeyPath = normalizeSystemConfigValue(https.keyPath, CONFIG.httpsKeyPath);
+  if ('certPath' in https) CONFIG.httpsCertPath = normalizeSystemConfigValue(https.certPath, CONFIG.httpsCertPath);
+}
+
+function readSystemConfig() {
+  try {
+    const filePath = getSystemConfigFilePath();
+    if (!fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(content);
+  } catch (err) {
+    console.warn('Unable to read system config:', err.message);
+    return null;
+  }
+}
+
+function writeSystemConfig(configPayload) {
+  const filePath = getSystemConfigFilePath();
+  atomicWrite(filePath, configPayload);
+}
+
+const storedSystemConfig = readSystemConfig();
+if (storedSystemConfig) {
+  applySystemConfig(storedSystemConfig);
+}
+
 function getLdapConfigSnapshot() {
   return {
     enabled: CONFIG.ldapEnabled,
     log: CONFIG.logLdap,
     url: CONFIG.ldapUrl,
     bindDn: CONFIG.ldapBindDn,
+    bindPasswordSet: !!CONFIG.ldapBindPassword,
     baseDn: CONFIG.ldapBaseDn,
     userFilter: CONFIG.ldapUserFilter,
     requiredGroupDn: CONFIG.ldapRequiredGroup,
     groupSearchBase: CONFIG.ldapGroupSearchBase,
     localFallback: CONFIG.ldapLocalFallback
+  };
+}
+
+function getLdapConfigForAuth() {
+  return {
+    enabled: CONFIG.ldapEnabled,
+    log: CONFIG.logLdap,
+    url: CONFIG.ldapUrl,
+    bindDn: CONFIG.ldapBindDn,
+    bindPassword: CONFIG.ldapBindPassword,
+    baseDn: CONFIG.ldapBaseDn,
+    userFilter: CONFIG.ldapUserFilter,
+    requiredGroupDn: CONFIG.ldapRequiredGroup,
+    groupSearchBase: CONFIG.ldapGroupSearchBase,
+    localFallback: CONFIG.ldapLocalFallback
+  };
+}
+
+function getHttpsConfigSnapshot() {
+  return {
+    enabled: CONFIG.httpsEnabled,
+    keyPath: CONFIG.httpsKeyPath,
+    certPath: CONFIG.httpsCertPath
   };
 }
 
@@ -264,7 +403,7 @@ lockStore.loadFromDisk();
 
 function validateExistingDepartments() {
   try {
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     files.forEach(file => {
       if (!isDepartmentFile(file)) return;
       const deptName = file.replace('.json', '');
@@ -305,7 +444,7 @@ function isOnlyDepartments(modules) {
 
 function collectDepartmentBackups() {
   ensureDataDir();
-  const files = fs.readdirSync(CONFIG.dataDir);
+  const files = fs.readdirSync(PATHS.departments);
   const departments = [];
 
   for (const file of files) {
@@ -444,7 +583,7 @@ lockStore.startCleanup(60 * 1000);
 app.get('/api/departments', (req, res) => {
   try {
     ensureDataDir();
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     const departments = [];
     for (const file of files) {
       if (!isDepartmentFile(file)) continue;
@@ -877,7 +1016,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const normalizedUserId = userId.trim();
-    const ldapConfig = buildConfigFromEnv();
+    const ldapConfig = getLdapConfigForAuth();
 
     if (CONFIG.ldapEnabled) {
       const ldapResult = await authenticateLdapUser({ userId: normalizedUserId, password }, ldapConfig);
@@ -1030,19 +1169,13 @@ app.post('/api/admin/change-password', requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/admin/ldap/config', requireAdmin, (req, res) => {
-  try {
-    res.json(getLdapConfigSnapshot());
-  } catch (err) {
-    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
-  }
-});
-
 app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
   try {
     const { config, testUserId } = req.body || {};
+    const baseConfig = getLdapConfigForAuth();
+    const mergedConfig = { ...baseConfig, ...(config || {}) };
     const result = await testLdapConnection({
-      configOverride: config || {},
+      configOverride: mergedConfig,
       testUserId: testUserId || null
     });
     if (!result.ok) {
@@ -1055,26 +1188,103 @@ app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/admin/system-config', requireAdmin, (req, res) => {
+  try {
+    res.json({
+      ldap: getLdapConfigSnapshot(),
+      https: getHttpsConfigSnapshot()
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.post('/api/admin/system-config', requireAdmin, (req, res) => {
+  try {
+    const payload = req.body || {};
+    const ldapPayload = payload.ldap || {};
+    const httpsPayload = payload.https || {};
+
+    const currentConfig = getSystemConfigState();
+    const nextConfig = {
+      ldap: { ...currentConfig.ldap },
+      https: { ...currentConfig.https }
+    };
+
+    if ('enabled' in ldapPayload) nextConfig.ldap.enabled = parseBoolean(ldapPayload.enabled);
+    if ('log' in ldapPayload) nextConfig.ldap.log = parseBoolean(ldapPayload.log);
+    if ('url' in ldapPayload) nextConfig.ldap.url = normalizeSystemConfigValue(ldapPayload.url, currentConfig.ldap.url);
+    if ('bindDn' in ldapPayload) nextConfig.ldap.bindDn = normalizeSystemConfigValue(ldapPayload.bindDn, currentConfig.ldap.bindDn);
+    if ('baseDn' in ldapPayload) nextConfig.ldap.baseDn = normalizeSystemConfigValue(ldapPayload.baseDn, currentConfig.ldap.baseDn);
+    if ('userFilter' in ldapPayload) nextConfig.ldap.userFilter = normalizeSystemConfigValue(ldapPayload.userFilter, currentConfig.ldap.userFilter);
+    if ('requiredGroupDn' in ldapPayload) nextConfig.ldap.requiredGroupDn = normalizeSystemConfigValue(ldapPayload.requiredGroupDn, currentConfig.ldap.requiredGroupDn);
+    if ('groupSearchBase' in ldapPayload) nextConfig.ldap.groupSearchBase = normalizeSystemConfigValue(ldapPayload.groupSearchBase, currentConfig.ldap.groupSearchBase);
+    if ('localFallback' in ldapPayload) nextConfig.ldap.localFallback = parseBoolean(ldapPayload.localFallback);
+    if ('bindPassword' in ldapPayload) {
+      if (ldapPayload.bindPassword !== null) {
+        nextConfig.ldap.bindPassword = normalizeSystemConfigValue(ldapPayload.bindPassword, currentConfig.ldap.bindPassword);
+      }
+    }
+
+    if ('enabled' in httpsPayload) nextConfig.https.enabled = parseBoolean(httpsPayload.enabled);
+    if ('keyPath' in httpsPayload) nextConfig.https.keyPath = normalizeSystemConfigValue(httpsPayload.keyPath, currentConfig.https.keyPath);
+    if ('certPath' in httpsPayload) nextConfig.https.certPath = normalizeSystemConfigValue(httpsPayload.certPath, currentConfig.https.certPath);
+
+    writeSystemConfig(nextConfig);
+    applySystemConfig(nextConfig);
+
+    res.json({
+      ok: true,
+      ldap: getLdapConfigSnapshot(),
+      https: getHttpsConfigSnapshot()
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
-    const localUsers = userStore.listLocalUsers();
+    const storedUsers = userStore.listUsers();
     let ldapUsers = [];
     let ldapError = null;
 
     if (CONFIG.ldapEnabled) {
-      const ldapResult = await listLdapUsers();
-      if (ldapResult.ok) {
-        ldapUsers = ldapResult.users || [];
-      } else {
+      try {
+        const ldapResult = await listLdapUsers(getLdapConfigForAuth());
+        if (ldapResult.ok) {
+          ldapUsers = ldapResult.users || [];
+        } else {
+          ldapError = {
+            code: ldapResult.code || 'LDAP_ERROR',
+            message: ldapResult.message || 'LDAP search failed'
+          };
+        }
+      } catch (err) {
         ldapError = {
-          code: ldapResult.code || 'LDAP_ERROR',
-          message: ldapResult.message || 'LDAP search failed'
+          code: err?.code || 'LDAP_ERROR',
+          message: err?.message || 'LDAP search failed'
         };
       }
     }
 
+    const mergedUsers = new Map();
+    storedUsers.forEach((user) => {
+      const key = (user.userId || '').toLowerCase();
+      if (key) {
+        mergedUsers.set(key, user);
+      }
+    });
+    ldapUsers.forEach((user) => {
+      const key = (user.userId || '').toLowerCase();
+      if (!key) return;
+      if (!mergedUsers.has(key)) {
+        mergedUsers.set(key, user);
+      }
+    });
+
     res.json({
-      users: [...localUsers, ...ldapUsers],
+      users: Array.from(mergedUsers.values()),
       ldapEnabled: CONFIG.ldapEnabled,
       ldapError
     });
@@ -1086,7 +1296,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 app.get('/api/admin/departments', requireAdmin, (req, res) => {
   try {
     ensureDataDir();
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     const departments = [];
     for (const file of files) {
       if (!isDepartmentFile(file)) continue;
@@ -1122,7 +1332,7 @@ app.post('/api/admin/server-restart', requireAdmin, (req, res) => {
       eventType: 'SERVER_RESTART',
       actor: CONFIG.adminUser,
       ip: req.ip,
-      dataDir: CONFIG.dataDir,
+      logDir: PATHS.logs,
       details: {
         userAgent: req.headers['user-agent'] || null
       }
@@ -1267,7 +1477,7 @@ try {
     httpsCertPath: CONFIG.httpsCertPath
   });
   console.log(`OnlyGANTT server running on ${protocol}://localhost:${PORT}`);
-  console.log(`Data directory: ${path.resolve(CONFIG.dataDir)}`);
+  console.log(`Data directory: ${path.resolve(PATHS.root)}`);
 } catch (err) {
   console.error(`Errore avvio server: ${err.message}`);
   process.exit(1);
