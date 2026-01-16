@@ -77,8 +77,14 @@
           )}
           {ldapError && (
             <div className="alert-item warning">
-              Impossibile leggere utenti LDAP: {ldapError.message || 'Errore LDAP'}.
-              {ldapError.code ? ` Code: ${ldapError.code}` : ''}
+              {(() => {
+                const message = ldapError.message || 'Errore LDAP';
+                const codeSuffix = ldapError.code ? ` Code: ${ldapError.code}` : '';
+                if (ldapError.code && /code:/i.test(message)) {
+                  return `Impossibile leggere utenti LDAP: ${message}.`;
+                }
+                return `Impossibile leggere utenti LDAP: ${message}.${codeSuffix}`;
+              })()}
             </div>
           )}
           {error && <div className="alert-item">Errore: {error}</div>}
