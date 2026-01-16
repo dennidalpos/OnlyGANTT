@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useMemo, useState, useEffect, useRef } = React;
+  const { useMemo, useState, useEffect, useRef, useCallback } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -40,6 +40,9 @@
     const [configStatus, setConfigStatus] = useState(null);
     const [restartStatus, setRestartStatus] = useState(null);
     const [restartCountdown, setRestartCountdown] = useState(null);
+    const [systemStatus, setSystemStatus] = useState(null);
+    const [systemStatusLoading, setSystemStatusLoading] = useState(false);
+    const [systemStatusError, setSystemStatusError] = useState(null);
     const [httpsConfig, setHttpsConfig] = useState({
       enabled: false,
       keyPath: '',
@@ -107,6 +110,31 @@
       loadSystemConfig();
       return () => controller.abort();
     }, [adminToken, api]);
+
+    const loadSystemStatus = useCallback(async (signal) => {
+      if (!adminToken) return;
+      setSystemStatusLoading(true);
+      setSystemStatusError(null);
+      try {
+        const data = await api.getSystemStatus(adminToken, signal);
+        setSystemStatus(data);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        setSystemStatusError('Errore nel caricamento dello stato server.');
+      } finally {
+        setSystemStatusLoading(false);
+      }
+    }, [adminToken, api]);
+
+    useEffect(() => {
+      if (!adminToken) {
+        setSystemStatus(null);
+        return undefined;
+      }
+      const controller = new AbortController();
+      loadSystemStatus(controller.signal);
+      return () => controller.abort();
+    }, [adminToken, loadSystemStatus]);
 
     useEffect(() => {
       return () => {
@@ -276,17 +304,44 @@
       }
     };
 
+    const formatBytes = (value) => {
+      if (value === null || value === undefined) return '-';
+      if (value === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.floor(Math.log(value) / Math.log(1024));
+      const size = value / Math.pow(1024, index);
+      return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+    };
+
+    const formatUptime = (seconds) => {
+      if (seconds === null || seconds === undefined) return '-';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      const parts = [];
+      if (hrs) parts.push(`${hrs}h`);
+      if (mins || hrs) parts.push(`${mins}m`);
+      parts.push(`${secs}s`);
+      return parts.join(' ');
+    };
+
+    const formattedStartedAt = systemStatus?.server?.startedAt
+      ? new Date(systemStatus.server.startedAt).toLocaleString('it-IT')
+      : '-';
+
     return (
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <h2 className="card-title">Impostazioni di sistema</h2>
+        <div className="settings-header">
+          <h2 className="card-title settings-title">Impostazioni di sistema</h2>
           <button className="btn-secondary" onClick={onBack}>Torna alla timeline</button>
         </div>
 
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Configurazioni</h3>
-          <p className="text-muted">Gestisci parametri globali, policy di sicurezza e opzioni di default.</p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">Configurazioni</h3>
+          <p className="settings-section-description text-muted">
+            Gestisci parametri globali, policy di sicurezza e opzioni di default.
+          </p>
+          <div className="settings-section-actions">
             <button
               className="btn-success"
               type="button"
@@ -303,12 +358,106 @@
           </div>
         </div>
 
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>LDAP</h3>
-          <p className="text-muted">
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">Stato server e ambiente</h3>
+          <p className="settings-section-description text-muted">
+            Visualizza lo stato del server applicativo e dell&apos;ambiente in esecuzione.
+          </p>
+          <div className="settings-section-actions">
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => loadSystemStatus()}
+              disabled={!adminToken || systemStatusLoading}
+            >
+              {systemStatusLoading ? 'Aggiornamento...' : 'Aggiorna stato'}
+            </button>
+            {systemStatusError && (
+              <div className="alert-item error" style={{ margin: 0 }}>
+                {systemStatusError}
+              </div>
+            )}
+          </div>
+          <div className="settings-status-grid" aria-live="polite">
+            <div className="settings-status-item">
+              <span className="settings-status-label">Stato server</span>
+              <span className="settings-status-value">
+                {systemStatus?.server?.status === 'online' ? 'Operativo' : 'Non disponibile'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Uptime</span>
+              <span className="settings-status-value">
+                {formatUptime(systemStatus?.server?.uptimeSeconds)}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Avvio server</span>
+              <span className="settings-status-value">{formattedStartedAt}</span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Versione applicazione</span>
+              <span className="settings-status-value">
+                {systemStatus?.app?.version || '-'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Node.js</span>
+              <span className="settings-status-value">
+                {systemStatus?.server?.nodeVersion || '-'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Ambiente</span>
+              <span className="settings-status-value">
+                {systemStatus?.environment?.nodeEnv || '-'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Hostname</span>
+              <span className="settings-status-value">
+                {systemStatus?.environment?.hostname || '-'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Piattaforma</span>
+              <span className="settings-status-value">
+                {systemStatus?.environment?.platform || '-'} {systemStatus?.environment?.arch || ''}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">CPU</span>
+              <span className="settings-status-value">
+                {systemStatus?.environment?.cpuCount ? `${systemStatus.environment.cpuCount} core` : '-'}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Memoria heap</span>
+              <span className="settings-status-value">
+                {formatBytes(systemStatus?.environment?.heapUsed)} / {formatBytes(systemStatus?.environment?.heapTotal)}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Memoria RSS</span>
+              <span className="settings-status-value">
+                {formatBytes(systemStatus?.environment?.memoryRss)}
+              </span>
+            </div>
+            <div className="settings-status-item">
+              <span className="settings-status-label">Memoria libera</span>
+              <span className="settings-status-value">
+                {formatBytes(systemStatus?.environment?.freeMemory)} / {formatBytes(systemStatus?.environment?.totalMemory)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">LDAP</h3>
+          <p className="settings-section-description text-muted">
             Configura l'integrazione LDAP in modo persistente. Le modifiche salvate vengono usate per l'autenticazione.
           </p>
-          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Stato e fallback</h4>
+          <h4 className="settings-section-subtitle">Stato e fallback</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
             <label className="checkbox-label">
               <input
@@ -338,7 +487,7 @@
               Fallback locale (LDAP_LOCAL_FALLBACK)
             </label>
           </div>
-          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Connessione</h4>
+          <h4 className="settings-section-subtitle">Connessione</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-url">URL LDAP (LDAP_URL)</label>
@@ -388,7 +537,7 @@
               </p>
             </div>
           </div>
-          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Filtri e gruppi</h4>
+          <h4 className="settings-section-subtitle">Filtri e gruppi</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-user-filter">User Filter (LDAP_USER_FILTER)</label>
@@ -424,7 +573,7 @@
               />
             </div>
           </div>
-          <h4 style={{ margin: '0.75rem 0 0.5rem' }}>Test</h4>
+          <h4 className="settings-section-subtitle">Test</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
             <div>
               <label htmlFor="ldap-test-user">Utente per test</label>
@@ -450,9 +599,9 @@
           </div>
         </div>
 
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>HTTPS</h3>
-          <p className="text-muted">
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">HTTPS</h3>
+          <p className="settings-section-description text-muted">
             Configura HTTPS in modo persistente. Dopo il salvataggio è necessario riavviare il server.
           </p>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
@@ -492,10 +641,12 @@
           </div>
         </div>
 
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Manutenzione server</h3>
-          <p className="text-muted">Operazioni amministrative per mantenere il server operativo.</p>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">Manutenzione server</h3>
+          <p className="settings-section-description text-muted">
+            Operazioni amministrative per mantenere il server operativo.
+          </p>
+          <div className="settings-section-actions">
             <button
               className="btn-danger"
               type="button"
@@ -517,12 +668,12 @@
           )}
         </div>
 
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Import/Export impostazioni</h3>
-          <p className="text-muted">
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">Import/Export impostazioni</h3>
+          <p className="settings-section-description text-muted">
             Gestisci esportazioni e importazioni per reparto e per moduli di configurazione.
           </p>
-          <h4 style={{ margin: '0 0 0.5rem' }}>Moduli globali</h4>
+          <h4 className="settings-section-subtitle">Moduli globali</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
             {Object.keys(moduleLabels).map((key) => (
               <label key={key} className="checkbox-label">
