@@ -74,7 +74,7 @@ function createUserStore({ dataDir, enableBak }) {
     return { ok: true, user };
   };
 
-  const upsertLdapUser = (userId, profile = {}) => {
+  const upsertLdapUser = (userId, profile = {}, { touchLoginAt = true } = {}) => {
     const normalized = normalizeUserId(userId);
     if (!normalized) {
       return { ok: false, code: 'INVALID_USER' };
@@ -94,13 +94,15 @@ function createUserStore({ dataDir, enableBak }) {
         mail: profile.mail || null,
         department: profile.department || null,
         createdAt: now,
-        lastLoginAt: now,
+        lastLoginAt: touchLoginAt ? now : null,
         ldapProvisionedAt: now
       };
       data.users.push(user);
       wasProvisioned = true;
     } else {
-      user.lastLoginAt = now;
+      if (touchLoginAt) {
+        user.lastLoginAt = now;
+      }
       if (user.type === 'ad' && !user.ldapProvisionedAt) {
         user.displayName = profile.displayName || user.displayName || null;
         user.mail = profile.mail || user.mail || null;

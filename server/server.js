@@ -1254,6 +1254,18 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
         const ldapResult = await listLdapUsers(getLdapConfigForAuth());
         if (ldapResult.ok) {
           ldapUsers = ldapResult.users || [];
+          ldapUsers.forEach((user) => {
+            if (!user?.userId) return;
+            userStore.upsertLdapUser(
+              user.userId,
+              {
+                displayName: user.displayName,
+                mail: user.mail,
+                department: user.department || null
+              },
+              { touchLoginAt: false }
+            );
+          });
         } else {
           ldapError = {
             code: ldapResult.code || 'LDAP_ERROR',
