@@ -65,6 +65,13 @@
       }, 50);
     }, [onVerticalScrollChange]);
 
+    useEffect(() => () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+    }, []);
+
     const updateScrollbars = useCallback((newLayout) => {
       if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {
         return;

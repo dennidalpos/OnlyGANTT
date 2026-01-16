@@ -134,7 +134,8 @@ function createUserStore({ dataDir, enableBak }) {
         displayName: user.displayName || user.userId,
         mail: user.mail || null,
         department: user.department || null,
-        userType: 'local'
+        userType: 'local',
+        lastLoginAt: user.lastLoginAt || null
       }));
   };
 
@@ -145,7 +146,8 @@ function createUserStore({ dataDir, enableBak }) {
       displayName: user.displayName || user.userId,
       mail: user.mail || null,
       department: user.department || null,
-      userType: user.type === 'ad' ? 'ad' : 'local'
+      userType: user.type === 'ad' ? 'ad' : 'local',
+      lastLoginAt: user.lastLoginAt || null
     }));
   };
 

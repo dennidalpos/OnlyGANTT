@@ -53,6 +53,7 @@
 
     const scrollContainerRef = useRef(null);
     const isScrollingRef = useRef(false);
+    const scrollTimeoutRef = useRef(null);
 
     useEffect(() => {
       try {
@@ -82,10 +83,21 @@
         onScrollChange(e.target.scrollTop);
       }
 
-      setTimeout(() => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
         isScrollingRef.current = false;
       }, 50);
     }, [onScrollChange]);
+
+    useEffect(() => () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
+      }
+    }, []);
 
     const toggleCollapsed = useCallback(() => {
       setIsCollapsed(prev => !prev);

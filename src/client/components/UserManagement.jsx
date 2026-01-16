@@ -53,6 +53,12 @@
     }, [users]);
 
     const renderCell = (value) => (value ? value : '—');
+    const renderLastLogin = (value) => {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return date.toLocaleString('it-IT');
+    };
 
     return (
       <div className="card">
@@ -105,12 +111,13 @@
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Email</th>
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Reparto</th>
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Tipo</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Ultimo accesso</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={{ padding: '0.75rem' }} className="text-muted">
+                      <td colSpan="6" style={{ padding: '0.75rem' }} className="text-muted">
                         Nessun utente trovato.
                       </td>
                     </tr>
@@ -124,6 +131,7 @@
                         <td style={{ padding: '0.5rem' }}>
                           {user.userType === 'ad' ? 'AD' : 'Locale'}
                         </td>
+                        <td style={{ padding: '0.5rem' }}>{renderLastLogin(user.lastLoginAt)}</td>
                       </tr>
                     ))
                   )}
