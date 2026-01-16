@@ -8,13 +8,6 @@
 
   function SystemSettings({
     onBack,
-    department,
-    canImportExport,
-    readOnlyDepartment,
-    onExportDepartment,
-    onImportDepartment,
-    onAdminServerBackup,
-    onAdminServerRestore,
     onAdminModularExport,
     onAdminModularImport,
     adminToken
@@ -22,9 +15,9 @@
     const api = window.OnlyGantt.api;
     const [modules, setModules] = useState({
       departments: true,
-      users: false,
-      settings: false,
-      integrations: false
+      users: true,
+      settings: true,
+      integrations: true
     });
     const [ldapConfig, setLdapConfig] = useState({
       enabled: false,
@@ -72,7 +65,6 @@
       ? selectedModules.map((key) => moduleLabels[key] || key).join(', ')
       : 'Nessun modulo selezionato';
 
-    const canUseDepartmentTools = !!department && canImportExport && !readOnlyDepartment;
     const canUseModules = selectedModules.length > 0;
 
     const handleModuleToggle = (key) => {
@@ -233,12 +225,21 @@
         });
       } catch (err) {
         let message = err.message || 'Test LDAP fallito';
+        let type = 'error';
         if (err.code === 'GROUP_REQUIRED') {
           message = 'Utente non presente nel gruppo richiesto';
+          type = 'warning';
         } else if (err.code === 'LDAP_DOWN') {
           message = 'Server LDAP non raggiungibile';
+          type = 'warning';
+        } else if (err.code === 'LDAP_CONFIG_ERROR') {
+          message = 'Configurazione LDAP incompleta';
+          type = 'warning';
+        } else if (err.code === 'USER_NOT_FOUND') {
+          message = 'Utente di test non trovato';
+          type = 'warning';
         }
-        setLdapTestStatus({ type: 'error', message });
+        setLdapTestStatus({ type, message });
       } finally {
         setLdapTesting(false);
       }
@@ -251,26 +252,6 @@
       reader.readAsText(file);
     });
 
-    const handleServerRestore = async (file) => {
-      if (!file) return;
-      try {
-        const text = await readFileAsText(file);
-        const backup = JSON.parse(text);
-        const overwrite = confirm(
-          `Ripristinare il backup del server?\n\n` +
-          `Reparti nel backup: ${backup.departments?.length || 0}\n` +
-          `Data export: ${backup.exportedAt ? new Date(backup.exportedAt).toLocaleString('it-IT') : 'N/A'}\n\n` +
-          `ATTENZIONE: I reparti esistenti verranno sovrascritti!\n\n` +
-          `Confermi il ripristino?`
-        );
-        if (overwrite) {
-          await onAdminServerRestore({ backup, overwriteExisting: true });
-        }
-      } catch (err) {
-        alert(`Errore nella lettura del file: ${err.message}`);
-      }
-    };
-
     const handleModularExport = async () => {
       if (!canUseModules) return;
       await onAdminModularExport(modules);
@@ -282,7 +263,7 @@
         const text = await readFileAsText(file);
         const backup = JSON.parse(text);
         const overwrite = confirm(
-          `Importare i moduli selezionati?\n\n` +
+          `Importare le impostazioni selezionate?\n\n` +
           `Moduli: ${modulesSummary}\n` +
           `ATTENZIONE: i dati importati sovrascriveranno quelli esistenti.\n\n` +
           `Confermi l'import?`
@@ -512,32 +493,9 @@
         </div>
 
         <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Integrazioni</h3>
-          <p className="text-muted">Collega servizi esterni, webhook e strumenti di reporting.</p>
-        </div>
-
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Strumenti admin</h3>
-          <p className="text-muted">Utility avanzate per manutenzione, backup e monitoraggio.</p>
+          <h3 style={{ marginTop: 0 }}>Manutenzione server</h3>
+          <p className="text-muted">Operazioni amministrative per mantenere il server operativo.</p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button className="btn-success" onClick={onAdminServerBackup}>
-              Esporta backup completo
-            </button>
-            <label className="btn-secondary" style={{ margin: 0, cursor: 'pointer' }}>
-              Ripristina backup
-              <input
-                type="file"
-                accept=".json"
-                onChange={(event) => {
-                  const file = event.target.files[0];
-                  if (file) {
-                    handleServerRestore(file);
-                    event.target.value = '';
-                  }
-                }}
-                style={{ display: 'none' }}
-              />
-            </label>
             <button
               className="btn-danger"
               type="button"
@@ -560,38 +518,11 @@
         </div>
 
         <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Export/Import reparto</h3>
-          <p className="text-muted">Esporta o importa i dati del reparto selezionato.</p>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button
-              className="btn-success"
-              onClick={onExportDepartment}
-              disabled={!canUseDepartmentTools}
-            >
-              Esporta reparto
-            </button>
-            <label className="btn-secondary" style={{ margin: 0, cursor: canUseDepartmentTools ? 'pointer' : 'default', opacity: canUseDepartmentTools ? 1 : 0.6 }}>
-              Importa reparto
-              <input
-                type="file"
-                accept=".json"
-                disabled={!canUseDepartmentTools}
-                onChange={(event) => {
-                  const file = event.target.files[0];
-                  if (file) {
-                    onImportDepartment(file);
-                    event.target.value = '';
-                  }
-                }}
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="card-section">
-          <h3 style={{ marginTop: 0 }}>Import/Export modulare</h3>
-          <p className="text-muted">Seleziona i moduli da includere nel backup modulare.</p>
+          <h3 style={{ marginTop: 0 }}>Import/Export impostazioni</h3>
+          <p className="text-muted">
+            Gestisci esportazioni e importazioni per reparto e per moduli di configurazione.
+          </p>
+          <h4 style={{ margin: '0 0 0.5rem' }}>Moduli globali</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
             {Object.keys(moduleLabels).map((key) => (
               <label key={key} className="checkbox-label">
@@ -613,10 +544,10 @@
               onClick={handleModularExport}
               disabled={!canUseModules}
             >
-              Esporta moduli
+              Esporta impostazioni
             </button>
             <label className="btn-secondary" style={{ margin: 0, cursor: canUseModules ? 'pointer' : 'default', opacity: canUseModules ? 1 : 0.6 }}>
-              Importa moduli
+              Importa impostazioni
               <input
                 type="file"
                 accept=".json"

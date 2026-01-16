@@ -563,61 +563,6 @@
       }
     };
 
-    const handleAdminServerBackup = async () => {
-      if (!adminToken) return;
-      try {
-        const backup = await api.adminServerBackup(adminToken);
-        const dataStr = JSON.stringify(backup, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `onlygantt-backup-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        pushNotification({
-          type: 'success',
-          message: `Backup completato: ${backup.departments.length} reparti esportati`
-        });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Backup fallito' });
-      }
-    };
-
-    const handleAdminServerRestore = async ({ backup, overwriteExisting }) => {
-      if (!adminToken) return;
-      try {
-        const result = await api.adminServerRestore(backup, overwriteExisting, adminToken);
-        const { summary } = result;
-
-        let message = `Ripristino completato:\n` +
-          `- Importati: ${summary.imported}\n` +
-          `- Saltati: ${summary.skipped}\n` +
-          `- Errori: ${summary.errors}`;
-
-        if (summary.errors > 0 && result.results.errors.length > 0) {
-          message += `\n\nErrori:\n${result.results.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
-        }
-
-        alert(message);
-
-        if (summary.imported > 0) {
-          pushNotification({
-            type: 'success',
-            message: `Ripristino completato: ${summary.imported} reparti importati`
-          });
-
-          if (department) {
-            await handleDepartmentChange(null);
-          }
-        }
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Ripristino fallito' });
-      }
-    };
-
     const getSelectedModuleLabels = (modules) => {
       const labels = {
         departments: 'Reparti',
@@ -650,10 +595,10 @@
         const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
         pushNotification({
           type: 'success',
-          message: `Backup modulare completato: ${moduleSummary}`
+          message: `Export impostazioni completato: ${moduleSummary}`
         });
       } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Export modulare fallito' });
+        pushNotification({ type: 'error', message: err.message || 'Export impostazioni fallito' });
       }
     };
 
@@ -664,7 +609,7 @@
         const { summary } = result;
         const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
 
-        let message = `Import modulare completato:\n` +
+        let message = `Import impostazioni completato:\n` +
           `Moduli: ${moduleSummary}\n` +
           `- Importati: ${summary.imported}\n` +
           `- Saltati: ${summary.skipped}\n` +
@@ -679,7 +624,7 @@
         if (summary.imported > 0) {
           pushNotification({
             type: 'success',
-            message: `Import modulare completato: ${summary.imported} reparti importati`
+            message: `Import impostazioni completato: ${summary.imported} reparti importati`
           });
 
           if (department) {
@@ -687,7 +632,7 @@
           }
         }
       } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Import modulare fallito' });
+        pushNotification({ type: 'error', message: err.message || 'Import impostazioni fallito' });
       }
     };
 
@@ -1078,13 +1023,6 @@
           {activeView === 'systemSettings' && adminToken ? (
             <SystemSettings
               onBack={() => handleViewChange('gantt')}
-              department={department}
-              canImportExport={!!department && (!!adminToken || !readOnlyDepartment)}
-              readOnlyDepartment={readOnlyDepartment}
-              onExportDepartment={handleExportDepartment}
-              onImportDepartment={handleImportDepartment}
-              onAdminServerBackup={handleAdminServerBackup}
-              onAdminServerRestore={handleAdminServerRestore}
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
               adminToken={adminToken}

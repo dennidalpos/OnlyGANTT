@@ -13,55 +13,115 @@ function hashPassword(password) {
 }
 
 function createUserStore({ dataDir, enableBak }) {
-  const usersFilePath = path.join(dataDir, 'users.json');
+  const legacyUsersFilePath = path.join(dataDir, 'users.json');
 
   const ensureStore = () => {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    if (!fs.existsSync(usersFilePath)) {
-      fs.writeFileSync(usersFilePath, JSON.stringify({ users: [] }, null, 2), 'utf8');
-    }
+    migrateLegacyStore();
   };
 
-  const readStore = () => {
-    ensureStore();
-    const content = fs.readFileSync(usersFilePath, 'utf8');
+  const getUserFilePath = (userId) => {
+    const normalized = normalizeUserId(userId);
+    if (!normalized) return null;
+    return path.join(dataDir, `${normalized.toLowerCase()}.json`);
+  };
+
+  const readUserFile = (userId) => {
+    const filePath = getUserFilePath(userId);
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, 'utf8');
     const data = JSON.parse(content);
-    if (!data.users || !Array.isArray(data.users)) {
-      throw new Error('Invalid users.json structure');
+    if (!data.userId || !data.userIdNormalized) {
+      throw new Error('Invalid user file structure');
     }
     return data;
   };
 
-  const writeStore = (data) => {
-    ensureStore();
-    const tmpPath = `${usersFilePath}.tmp`;
-    const bakPath = `${usersFilePath}.bak`;
+  const writeUserFileAtPath = (filePath, data) => {
+    const tmpPath = `${filePath}.tmp`;
+    const bakPath = `${filePath}.bak`;
     fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    if (enableBak && fs.existsSync(usersFilePath)) {
+    if (enableBak && fs.existsSync(filePath)) {
       if (fs.existsSync(bakPath)) {
         fs.unlinkSync(bakPath);
       }
-      fs.copyFileSync(usersFilePath, bakPath);
+      fs.copyFileSync(filePath, bakPath);
     }
-    if (fs.existsSync(usersFilePath)) {
-      fs.unlinkSync(usersFilePath);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
     }
-    fs.renameSync(tmpPath, usersFilePath);
+    fs.renameSync(tmpPath, filePath);
   };
 
-  const findUser = (data, userId) => {
-    const normalized = normalizeUserId(userId);
-    if (!normalized) return null;
-    return data.users.find((user) => user.userIdNormalized === normalized.toLowerCase());
+  const writeUserFile = (userId, data) => {
+    ensureStore();
+    const filePath = getUserFilePath(userId);
+    if (!filePath) {
+      throw new Error('Invalid user id');
+    }
+    writeUserFileAtPath(filePath, data);
+  };
+
+  const migrateLegacyStore = () => {
+    if (!fs.existsSync(legacyUsersFilePath)) return;
+    try {
+      const content = fs.readFileSync(legacyUsersFilePath, 'utf8');
+      const data = JSON.parse(content);
+      if (!data.users || !Array.isArray(data.users)) {
+        return;
+      }
+      data.users.forEach((user) => {
+        const normalized = normalizeUserId(user.userId || user.userIdNormalized);
+        if (!normalized) return;
+        const payload = {
+          ...user,
+          userId: user.userId || normalized,
+          userIdNormalized: user.userIdNormalized || normalized.toLowerCase()
+        };
+        const userPath = path.join(dataDir, `${payload.userIdNormalized}.json`);
+        if (!fs.existsSync(userPath)) {
+          writeUserFileAtPath(userPath, payload);
+        }
+      });
+      const migratedPath = `${legacyUsersFilePath}.migrated`;
+      if (!fs.existsSync(migratedPath)) {
+        fs.renameSync(legacyUsersFilePath, migratedPath);
+      }
+    } catch (err) {
+      return;
+    }
+  };
+
+  const listUserFiles = () => {
+    ensureStore();
+    return fs.readdirSync(dataDir)
+      .filter((file) => file.endsWith('.json') && !file.endsWith('.tmp') && !file.endsWith('.bak'))
+      .map((file) => path.join(dataDir, file));
+  };
+
+  const readAllUsers = () => {
+    const files = listUserFiles();
+    const users = [];
+    for (const filePath of files) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const data = JSON.parse(content);
+        if (data.userId && data.userIdNormalized) {
+          users.push(data);
+        }
+      } catch (err) {
+        continue;
+      }
+    }
+    return users;
   };
 
   const verifyLocalUser = (userId, password) => {
     const normalized = normalizeUserId(userId);
     if (!normalized) return { ok: false, code: 'INVALID_CREDENTIALS' };
-    const data = readStore();
-    const user = findUser(data, normalized);
+    const user = readUserFile(normalized);
     if (!user || user.type !== 'local') {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
@@ -74,7 +134,7 @@ function createUserStore({ dataDir, enableBak }) {
     const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
     history.push(now);
     user.loginHistory = history.slice(-50);
-    writeStore(data);
+    writeUserFile(normalized, user);
     return { ok: true, user };
   };
 
@@ -84,8 +144,7 @@ function createUserStore({ dataDir, enableBak }) {
       return { ok: false, code: 'INVALID_USER' };
     }
 
-    const data = readStore();
-    let user = findUser(data, normalized);
+    let user = readUserFile(normalized);
     const now = new Date().toISOString();
     let wasProvisioned = false;
 
@@ -102,7 +161,6 @@ function createUserStore({ dataDir, enableBak }) {
         loginHistory: touchLoginAt ? [now] : [],
         ldapProvisionedAt: now
       };
-      data.users.push(user);
       wasProvisioned = true;
     } else {
       if (touchLoginAt) {
@@ -120,15 +178,15 @@ function createUserStore({ dataDir, enableBak }) {
       }
     }
 
-    writeStore(data);
+    writeUserFile(normalized, user);
     return { ok: true, user, provisioned: wasProvisioned };
   };
 
   const getAuthSnapshot = () => {
     try {
-      const data = readStore();
+      const data = readAllUsers();
       return {
-        localUsers: data.users.filter((user) => user.type === 'local').length
+        localUsers: data.filter((user) => user.type === 'local').length
       };
     } catch (err) {
       return { localUsers: 0 };
@@ -136,8 +194,8 @@ function createUserStore({ dataDir, enableBak }) {
   };
 
   const listLocalUsers = () => {
-    const data = readStore();
-    return data.users
+    const data = readAllUsers();
+    return data
       .filter((user) => user.type === 'local')
       .map((user) => ({
         userId: user.userId,
@@ -151,8 +209,8 @@ function createUserStore({ dataDir, enableBak }) {
   };
 
   const listUsers = () => {
-    const data = readStore();
-    return data.users.map((user) => ({
+    const data = readAllUsers();
+    return data.map((user) => ({
       userId: user.userId,
       displayName: user.displayName || user.userId,
       mail: user.mail || null,
