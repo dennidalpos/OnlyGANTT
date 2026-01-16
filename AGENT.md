@@ -109,6 +109,11 @@ style: compact Gantt options panel layout
 4. **Test Gantt**: scroll, tooltip, export PNG
 5. **Test form**: creazione/modifica progetto e fasi
 
+### 2.5 Documentazione
+
+- Aggiorna `README.md` e `context.md` quando cambiano API, struttura progetto o funzionalità admin.
+- Usa la capitalizzazione corretta della directory dati (`Data/`) in tutta la documentazione.
+
 ---
 
 ## 3. Regole UI e Design System

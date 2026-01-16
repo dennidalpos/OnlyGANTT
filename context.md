@@ -16,8 +16,8 @@ Questo progetto è pensato per un'esecuzione "no build": React 18 viene caricato
 
 ## Persistenza dati
 
-- **Directory dati**: `data/`.
-- **Formato**: un file JSON per reparto (es. `data/TestCompleto.json`).
+- **Directory dati**: `Data/`.
+- **Formato**: un file JSON per reparto (es. `Data/reparti/TestCompleto.json`).
 - **Scritture atomiche**: gestione `.tmp` e `.bak` per compatibilità Windows.
 
 ## Configurazione applicativa
@@ -25,11 +25,17 @@ Questo progetto è pensato per un'esecuzione "no build": React 18 viene caricato
 - **Configurazione centrale**: `src/app-config.js` esposto su `window.AppConfig`.
 - **Componenti client**: esposti su `window.OnlyGantt.components`.
 - **Utility e hook**: esposti su `window.OnlyGantt` (vedi `README.md`).
+- **Impostazioni di sistema**: le configurazioni persistenti (LDAP/HTTPS) sono gestite via API admin e salvate in `Data/config/system-config.json`.
+
+## Stato server (admin)
+
+- **Endpoint**: `GET /api/admin/system-status` (richiede Bearer token admin).
+- **Uso**: alimenta la sezione "Stato server e ambiente" nelle impostazioni di sistema.
 
 ## Note operative
 
 - **Caricamento script**: ordine rigoroso definito in `public/index.html` (nessun bundler).
-- **Dati di esempio**: `data/Demo.json` contiene 15 progetti di esempio (timeline 2025-2030).
+- **Dati di esempio**: `Data/reparti/Demo.json` contiene 15 progetti di esempio (timeline 2025-2030).
 - **Credenziali demo**: admin `admin` / `admin123`, reparto `Demo` con password `demo123`.
 - **Windows Server (NSSM)**: puoi installare il server come servizio configurando `node.exe` e `server\\server.js` con NSSM (vedi README).
 
@@ -74,13 +80,19 @@ window.OnlyGantt.hooks
 
 ```
 OnlyGANTT/
-├── data/                    # Dati persistenti (JSON per reparto)
+├── Data/                    # Dati persistenti (JSON per reparto)
 ├── public/                  # File statici serviti direttamente
 │   ├── index.html          # Entry point HTML
 │   └── styles.css          # CSS tema scuro
 ├── server/                  # Backend Express
 │   ├── server.js           # API + lock + admin
-│   └── schema.js           # Validazione JSON
+│   ├── schema.js           # Validazione JSON
+│   ├── ldapService.js      # Integrazione LDAP
+│   ├── httpsService.js     # Avvio HTTPS
+│   ├── lockStore.js        # Persistenza lock
+│   ├── serverService.js    # Operazioni di manutenzione server
+│   ├── userStore.js        # Utenti locali
+│   └── auditService.js     # Audit log
 ├── src/                     # Codice sorgente client
 │   ├── app-config.js       # Configurazione centralizzata
 │   ├── client/             # React app
@@ -95,6 +107,9 @@ OnlyGANTT/
 │   │       ├── GanttCanvas.jsx    # Canvas Gantt interattivo
 │   │       ├── ProjectForm.jsx    # Form creazione/modifica progetto
 │   │       ├── ProjectList.jsx    # Lista progetti selezionabili
+│   │       ├── ProjectSidebar.jsx # Sidebar dettagli progetto
+│   │       ├── SystemSettings.jsx # Impostazioni di sistema (admin)
+│   │       ├── UserManagement.jsx # Gestione utenti (admin)
 │   │       └── AlertsPanel.jsx    # Pannello avvisi e anomalie
 │   └── utils/              # Utility pure (no React)
 ├── README.md               # Documentazione principale
@@ -171,6 +186,8 @@ Ogni 5 minuti → POST /api/lock/:dept/heartbeat
 |-----------|---------|-------------|
 | `ONLYGANTT_ADMIN_USER` | admin | Username admin |
 | `ONLYGANTT_ADMIN_PASSWORD` | admin123 | Password admin |
+| `LDAP_ENABLED` | false | Abilita integrazione LDAP |
+| `HTTPS_ENABLED` | false | Abilita HTTPS |
 
 ---
 
