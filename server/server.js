@@ -21,7 +21,7 @@ function parseBoolean(value) {
 
 const CONFIG = {
   port: 3000,
-  dataDir: 'data',
+  dataDir: 'Data',
   enableBak: true,
   lockTimeoutMinutes: 60,
   adminSessionTtlHours: 8,
@@ -48,13 +48,20 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/src', express.static('src'));
 
-const lockStore = createLockStore({ dataDir: CONFIG.dataDir, logger: console });
+const PATHS = {
+  root: CONFIG.dataDir,
+  departments: path.join(CONFIG.dataDir, 'reparti'),
+  users: path.join(CONFIG.dataDir, 'utenti'),
+  config: path.join(CONFIG.dataDir, 'config'),
+  logs: path.join(CONFIG.dataDir, 'log')
+};
+
+const lockStore = createLockStore({ dataDir: PATHS.config, fileName: 'locks.json', logger: console });
 const adminTokens = new Map();
 const userSessions = new Map();
-const userStore = createUserStore({ dataDir: CONFIG.dataDir, enableBak: CONFIG.enableBak });
+const userStore = createUserStore({ dataDir: PATHS.users, enableBak: CONFIG.enableBak });
 
 const RESERVED_NAMES = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
-const USER_STORE_FILE = 'users.json';
 const SYSTEM_CONFIG_FILE = 'system-config.json';
 
 function normalizeDepartmentName(name) {
@@ -68,24 +75,29 @@ function normalizeDepartmentName(name) {
 }
 
 function isDepartmentFile(fileName) {
-  return fileName.endsWith('.json') && !fileName.endsWith('.bak') && !fileName.endsWith('.tmp') && fileName !== USER_STORE_FILE;
+  return fileName.endsWith('.json') && !fileName.endsWith('.bak') && !fileName.endsWith('.tmp');
 }
 
 function getDepartmentFilePath(department) {
   const normalized = normalizeDepartmentName(department);
   if (!normalized) return null;
-  return path.join(CONFIG.dataDir, `${normalized}.json`);
+  return path.join(PATHS.departments, `${normalized}.json`);
 }
 
 function getSystemConfigFilePath() {
   ensureDataDir();
-  return path.join(CONFIG.dataDir, SYSTEM_CONFIG_FILE);
+  return path.join(PATHS.config, SYSTEM_CONFIG_FILE);
 }
 
 function ensureDataDir() {
-  if (!fs.existsSync(CONFIG.dataDir)) {
-    fs.mkdirSync(CONFIG.dataDir, { recursive: true });
+  if (!fs.existsSync(PATHS.root)) {
+    fs.mkdirSync(PATHS.root, { recursive: true });
   }
+  [PATHS.departments, PATHS.users, PATHS.config, PATHS.logs].forEach((dirPath) => {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  });
 }
 
 function atomicWrite(filePath, data) {
@@ -391,7 +403,7 @@ lockStore.loadFromDisk();
 
 function validateExistingDepartments() {
   try {
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     files.forEach(file => {
       if (!isDepartmentFile(file)) return;
       const deptName = file.replace('.json', '');
@@ -432,7 +444,7 @@ function isOnlyDepartments(modules) {
 
 function collectDepartmentBackups() {
   ensureDataDir();
-  const files = fs.readdirSync(CONFIG.dataDir);
+  const files = fs.readdirSync(PATHS.departments);
   const departments = [];
 
   for (const file of files) {
@@ -571,7 +583,7 @@ lockStore.startCleanup(60 * 1000);
 app.get('/api/departments', (req, res) => {
   try {
     ensureDataDir();
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     const departments = [];
     for (const file of files) {
       if (!isDepartmentFile(file)) continue;
@@ -1270,7 +1282,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 app.get('/api/admin/departments', requireAdmin, (req, res) => {
   try {
     ensureDataDir();
-    const files = fs.readdirSync(CONFIG.dataDir);
+    const files = fs.readdirSync(PATHS.departments);
     const departments = [];
     for (const file of files) {
       if (!isDepartmentFile(file)) continue;
@@ -1306,7 +1318,7 @@ app.post('/api/admin/server-restart', requireAdmin, (req, res) => {
       eventType: 'SERVER_RESTART',
       actor: CONFIG.adminUser,
       ip: req.ip,
-      dataDir: CONFIG.dataDir,
+      logDir: PATHS.logs,
       details: {
         userAgent: req.headers['user-agent'] || null
       }
@@ -1451,7 +1463,7 @@ try {
     httpsCertPath: CONFIG.httpsCertPath
   });
   console.log(`OnlyGANTT server running on ${protocol}://localhost:${PORT}`);
-  console.log(`Data directory: ${path.resolve(CONFIG.dataDir)}`);
+  console.log(`Data directory: ${path.resolve(PATHS.root)}`);
 } catch (err) {
   console.error(`Errore avvio server: ${err.message}`);
   process.exit(1);

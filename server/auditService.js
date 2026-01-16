@@ -7,12 +7,12 @@ function ensureDirExists(dirPath) {
   }
 }
 
-function logAuditEvent({ eventType, actor, ip, dataDir = 'data', details = null }) {
+function logAuditEvent({ eventType, actor, ip, logDir = 'data/log', details = null }) {
   if (!eventType) {
     throw new Error('eventType is required');
   }
 
-  ensureDirExists(dataDir);
+  ensureDirExists(logDir);
 
   const entry = {
     timestamp: new Date().toISOString(),
@@ -22,7 +22,7 @@ function logAuditEvent({ eventType, actor, ip, dataDir = 'data', details = null 
     details
   };
 
-  const filePath = path.join(dataDir, 'audit.log');
+  const filePath = path.join(logDir, 'audit.log');
   fs.appendFileSync(filePath, `${JSON.stringify(entry)}\n`, 'utf8');
   return entry;
 }
