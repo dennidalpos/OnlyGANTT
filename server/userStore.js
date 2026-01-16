@@ -69,7 +69,11 @@ function createUserStore({ dataDir, enableBak }) {
     if (!password || hashPassword(password) !== expectedHash) {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
-    user.lastLoginAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    user.lastLoginAt = now;
+    const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
+    history.push(now);
+    user.loginHistory = history.slice(-50);
     writeStore(data);
     return { ok: true, user };
   };
@@ -95,6 +99,7 @@ function createUserStore({ dataDir, enableBak }) {
         department: profile.department || null,
         createdAt: now,
         lastLoginAt: touchLoginAt ? now : null,
+        loginHistory: touchLoginAt ? [now] : [],
         ldapProvisionedAt: now
       };
       data.users.push(user);
@@ -102,6 +107,9 @@ function createUserStore({ dataDir, enableBak }) {
     } else {
       if (touchLoginAt) {
         user.lastLoginAt = now;
+        const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
+        history.push(now);
+        user.loginHistory = history.slice(-50);
       }
       if (user.type === 'ad' && !user.ldapProvisionedAt) {
         user.displayName = profile.displayName || user.displayName || null;
@@ -137,7 +145,8 @@ function createUserStore({ dataDir, enableBak }) {
         mail: user.mail || null,
         department: user.department || null,
         userType: 'local',
-        lastLoginAt: user.lastLoginAt || user.createdAt || null
+        lastLoginAt: user.lastLoginAt || user.createdAt || null,
+        loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
       }));
   };
 
@@ -149,7 +158,8 @@ function createUserStore({ dataDir, enableBak }) {
       mail: user.mail || null,
       department: user.department || null,
       userType: user.type === 'ad' ? 'ad' : 'local',
-      lastLoginAt: user.lastLoginAt || user.ldapProvisionedAt || user.createdAt || null
+      lastLoginAt: user.lastLoginAt || user.ldapProvisionedAt || user.createdAt || null,
+      loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
     }));
   };
 
