@@ -1245,7 +1245,7 @@ app.post('/api/admin/system-config', requireAdmin, (req, res) => {
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
-    const localUsers = userStore.listLocalUsers();
+    const storedUsers = userStore.listUsers();
     let ldapUsers = [];
     let ldapError = null;
 
@@ -1261,8 +1261,23 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
       }
     }
 
+    const mergedUsers = new Map();
+    storedUsers.forEach((user) => {
+      const key = (user.userId || '').toLowerCase();
+      if (key) {
+        mergedUsers.set(key, user);
+      }
+    });
+    ldapUsers.forEach((user) => {
+      const key = (user.userId || '').toLowerCase();
+      if (!key) return;
+      if (!mergedUsers.has(key)) {
+        mergedUsers.set(key, user);
+      }
+    });
+
     res.json({
-      users: [...localUsers, ...ldapUsers],
+      users: Array.from(mergedUsers.values()),
       ldapEnabled: CONFIG.ldapEnabled,
       ldapError
     });
