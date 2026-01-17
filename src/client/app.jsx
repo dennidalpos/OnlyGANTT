@@ -566,14 +566,12 @@
     const getSelectedModuleLabels = (modules) => {
       const labels = {
         departments: 'Reparti',
-        users: 'Utenti',
-        settings: 'Impostazioni',
-        integrations: 'Integrazioni'
+        settings: 'Impostazioni'
       };
       return Object.keys(labels).filter((key) => modules?.[key]).map((key) => labels[key]);
     };
 
-    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.users && !modules?.settings && !modules?.integrations;
+    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.settings;
 
     const handleAdminModularExport = async (modules) => {
       if (!adminToken) return;

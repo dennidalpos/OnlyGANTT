@@ -15,9 +15,7 @@
     const api = window.OnlyGantt.api;
     const [modules, setModules] = useState({
       departments: true,
-      users: true,
-      settings: true,
-      integrations: true
+      settings: true
     });
     const [ldapConfig, setLdapConfig] = useState({
       enabled: false,
@@ -54,9 +52,7 @@
 
     const moduleLabels = {
       departments: 'Reparti',
-      users: 'Utenti',
-      settings: 'Impostazioni',
-      integrations: 'Integrazioni'
+      settings: 'Impostazioni'
     };
 
     const selectedModules = useMemo(
@@ -671,7 +667,7 @@
         <div className="card-section settings-section">
           <h3 className="settings-section-title">Import/Export impostazioni</h3>
           <p className="settings-section-description text-muted">
-            Gestisci esportazioni e importazioni per reparto e per moduli di configurazione.
+            Gestisci esportazioni e importazioni per reparto e per moduli di configurazione disponibili.
           </p>
           <h4 className="settings-section-subtitle">Moduli globali</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>

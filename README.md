@@ -14,7 +14,7 @@ Applicazione Timeline Progetti interattiva con blocco multi‑utente, pensata pe
 - **Avvisi completi**: ritardi, conflitti, anomalie e dati mancanti
 - **Screensaver**: salvaschermo automatico con timeout configurabile
 - **Preset fasi**: inserimento rapido delle fasi con colori e opzione personalizzata
-- **Impostazioni di sistema**: gestione LDAP/HTTPS, import/export moduli e stato server applicativo
+- **Impostazioni di sistema**: gestione LDAP/HTTPS, import/export moduli disponibili e stato server applicativo
 
 ## Architettura
 
@@ -259,8 +259,8 @@ Imposta le variabili d'ambiente per adeguare il deployment in produzione:
 - `POST /api/admin/server-restart` - Riavvio server applicativo
 - `GET /api/admin/server-backup` - Backup completo del server (tutti i reparti + configurazione)
 - `POST /api/admin/server-restore` - Ripristino completo del server da file backup
-- `POST /api/admin/export` - Export modulare (reparti, utenti, impostazioni, integrazioni)
-- `POST /api/admin/import` - Import modulare con sovrascrittura opzionale
+- `POST /api/admin/export` - Export modulare (reparti, impostazioni)
+- `POST /api/admin/import` - Import modulare (solo reparti) con sovrascrittura opzionale
 
 ## Dettaglio funzionalità
 
@@ -336,6 +336,9 @@ Controlla il file indicato nel payload di errore, correggi il JSON o ripristina 
 ### Import/Export
 - **Elenco progetti**: import/export progetti per trasferirli tra reparti diversi
 - **Topbar**: import/export reparto completo (configurazione + progetti)
+- **Moduli globali**: export disponibile per reparti e impostazioni
+- **Moduli globali**: import disponibile solo per reparti
+- **Moduli globali**: integrazioni non esposte
 - Validazione dati lato server e client con elenco errori mostrato in UI
 
 ### Percentuale completamento
