@@ -127,7 +127,7 @@
     const isUserNameValid = pendingUserName.trim().length >= 2;
     const hasDepartments = departments.length > 0;
     const needsPassword = selectedDeptObj?.protected && !adminToken;
-    const requiresUserPassword = !adminToken && (authConfig.ldapEnabled || authConfig.localUsers > 0 || !authLoading);
+    const requiresUserPassword = !adminToken && (authConfig.ldapEnabled || authConfig.localUsers > 0);
 
     
     const canSubmitDept = Boolean(
@@ -135,6 +135,7 @@
       (adminToken || isUserNameValid) &&
       (!needsPassword || deptPassword) &&
       (!requiresUserPassword || userPassword) &&
+      !authLoading &&
       !isLoading
     );
 
@@ -153,6 +154,11 @@
     };
 
     const handleUserNameKeyDown = (e) => {
+      if (e.key === 'Tab' && !e.shiftKey && requiresUserPassword) {
+        e.preventDefault();
+        userPasswordRef.current?.focus();
+        return;
+      }
       if (e.key === 'Enter') {
         handleUserNameBlur();
         if (isUserNameValid) {
@@ -215,6 +221,11 @@
       if (requiresUserPassword && !userPassword) {
         setError('Inserisci la password utente');
         userPasswordRef.current?.focus();
+        return;
+      }
+
+      if (authLoading) {
+        setError('Configurazione autenticazione in caricamento');
         return;
       }
 

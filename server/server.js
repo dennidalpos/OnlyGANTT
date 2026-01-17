@@ -17,19 +17,28 @@ const packageInfo = require('../package.json');
 const app = express();
 const SERVER_STARTED_AT = new Date().toISOString();
 
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 function parseBoolean(value) {
   if (typeof value === 'boolean') return value;
   if (!value) return false;
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
 }
 
+function parseNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const CONFIG = {
-  port: 3000,
-  dataDir: 'Data',
-  enableBak: true,
-  lockTimeoutMinutes: 60,
-  adminSessionTtlHours: 8,
-  maxUploadBytes: 2000000,
+  port: parseNumber(process.env.PORT, 3000),
+  dataDir: process.env.ONLYGANTT_DATA_DIR || process.env.DATA_DIR || 'Data',
+  enableBak: parseBoolean(process.env.ONLYGANTT_ENABLE_BAK ?? true),
+  lockTimeoutMinutes: parseNumber(process.env.ONLYGANTT_LOCK_TIMEOUT_MINUTES, 60),
+  adminSessionTtlHours: parseNumber(process.env.ONLYGANTT_ADMIN_TTL_HOURS, 8),
+  maxUploadBytes: parseNumber(process.env.ONLYGANTT_MAX_UPLOAD_BYTES, 2000000),
   adminUser: process.env.ONLYGANTT_ADMIN_USER || 'admin',
   adminPassword: process.env.ONLYGANTT_ADMIN_PASSWORD || 'admin123',
   adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null,
@@ -492,7 +501,7 @@ function buildModularBackup(modules) {
     exportedAt: new Date().toISOString(),
     modules: {
       departments: modules.departments ? { data: collectDepartmentBackups() } : { data: null },
-      users: modules.users ? { data: [] } : { data: null },
+      users: modules.users ? { data: userStore.exportUsers() } : { data: null },
       settings: modules.settings ? {
         data: {
           serverConfig: {
@@ -509,6 +518,35 @@ function buildModularBackup(modules) {
       integrations: modules.integrations ? { data: [] } : { data: null }
     }
   };
+}
+
+function applyImportedSettings(payload = {}) {
+  const serverConfig = payload.serverConfig || {};
+  const adminCredentials = payload.adminCredentials || {};
+  const applied = {};
+
+  if (typeof serverConfig.lockTimeoutMinutes === 'number') {
+    CONFIG.lockTimeoutMinutes = serverConfig.lockTimeoutMinutes;
+    applied.lockTimeoutMinutes = CONFIG.lockTimeoutMinutes;
+  }
+  if (typeof serverConfig.adminSessionTtlHours === 'number') {
+    CONFIG.adminSessionTtlHours = serverConfig.adminSessionTtlHours;
+    applied.adminSessionTtlHours = CONFIG.adminSessionTtlHours;
+  }
+  if (typeof serverConfig.maxUploadBytes === 'number') {
+    CONFIG.maxUploadBytes = serverConfig.maxUploadBytes;
+    applied.maxUploadBytes = CONFIG.maxUploadBytes;
+  }
+  if (typeof serverConfig.enableBak === 'boolean') {
+    CONFIG.enableBak = serverConfig.enableBak;
+    applied.enableBak = CONFIG.enableBak;
+  }
+  if (typeof adminCredentials.adminUser === 'string' && adminCredentials.adminUser.trim()) {
+    CONFIG.adminUser = adminCredentials.adminUser.trim();
+    applied.adminUser = CONFIG.adminUser;
+  }
+
+  return applied;
 }
 
 function importDepartmentsBackup(departments, overwriteExisting) {
@@ -1471,6 +1509,8 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     }
 
     let departmentPayload = null;
+    let userPayload = null;
+    let settingsPayload = null;
 
     if (modules.departments) {
       if (Array.isArray(backup.departments)) {
@@ -1482,9 +1522,33 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
       }
     }
 
+    if (modules.users) {
+      if (Array.isArray(backup.modules?.users?.data)) {
+        userPayload = backup.modules.users.data;
+      } else if (Array.isArray(backup.users)) {
+        userPayload = backup.users;
+      } else {
+        return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: users data missing');
+      }
+    }
+
+    if (modules.settings) {
+      if (backup.modules?.settings?.data) {
+        settingsPayload = backup.modules.settings.data;
+      } else if (backup.serverConfig || backup.adminCredentials) {
+        settingsPayload = {
+          serverConfig: backup.serverConfig || {},
+          adminCredentials: backup.adminCredentials || {}
+        };
+      } else {
+        return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: settings data missing');
+      }
+    }
+
     const results = {};
     let summary = {
       totalDepartments: departmentPayload ? departmentPayload.length : 0,
+      totalUsers: userPayload ? userPayload.length : 0,
       imported: 0,
       skipped: 0,
       errors: 0
@@ -1503,9 +1567,31 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
       results.departments = { skipped: true, reason: 'Module disabled' };
     }
 
+    if (modules.users) {
+      const userResults = userStore.importUsers(userPayload, overwriteExisting);
+      results.users = userResults;
+      summary = {
+        ...summary,
+        imported: summary.imported + userResults.imported.length,
+        skipped: summary.skipped + userResults.skipped.length,
+        errors: summary.errors + userResults.errors.length
+      };
+    } else {
+      results.users = { skipped: true, reason: 'Module disabled' };
+    }
+
+    if (modules.settings) {
+      const applied = applyImportedSettings(settingsPayload);
+      results.settings = { applied };
+      summary = {
+        ...summary,
+        imported: summary.imported + (Object.keys(applied).length > 0 ? 1 : 0)
+      };
+    } else {
+      results.settings = { skipped: true, reason: 'Module disabled' };
+    }
+
     const unsupportedReason = 'Module not supported yet';
-    results.users = modules.users ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
-    results.settings = modules.settings ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
     results.integrations = modules.integrations ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
 
     res.json({

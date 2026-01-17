@@ -16,8 +16,7 @@
     const [modules, setModules] = useState({
       departments: true,
       users: true,
-      settings: true,
-      integrations: true
+      settings: true
     });
     const [ldapConfig, setLdapConfig] = useState({
       enabled: false,
@@ -55,8 +54,7 @@
     const moduleLabels = {
       departments: 'Reparti',
       users: 'Utenti',
-      settings: 'Impostazioni',
-      integrations: 'Integrazioni'
+      settings: 'Impostazioni'
     };
 
     const selectedModules = useMemo(
@@ -671,7 +669,7 @@
         <div className="card-section settings-section">
           <h3 className="settings-section-title">Import/Export impostazioni</h3>
           <p className="settings-section-description text-muted">
-            Gestisci esportazioni e importazioni per reparto e per moduli di configurazione.
+            Gestisci esportazioni e importazioni per reparto e per moduli di configurazione disponibili.
           </p>
           <h4 className="settings-section-subtitle">Moduli globali</h4>
           <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
@@ -688,6 +686,9 @@
           </div>
           <div className="alert-item info" style={{ marginTop: '0.75rem' }}>
             Moduli selezionati: {modulesSummary}
+          </div>
+          <div className="alert-item warning" style={{ marginTop: '0.75rem' }}>
+            Import disponibile per reparti, utenti e impostazioni. Le integrazioni non sono esposte.
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
             <button

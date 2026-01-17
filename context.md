@@ -36,7 +36,7 @@ Questo progetto è pensato per un'esecuzione "no build": React 18 viene caricato
 
 - **Caricamento script**: ordine rigoroso definito in `public/index.html` (nessun bundler).
 - **Dati di esempio**: `Data/reparti/Demo.json` contiene 15 progetti di esempio (timeline 2025-2030).
-- **Credenziali demo**: admin `admin` / `admin123`, reparto `Demo` con password `demo123`.
+- **Credenziali demo**: admin `admin` / `admin123`, reparto `Demo` senza password.
 - **Windows Server (NSSM)**: puoi installare il server come servizio configurando `node.exe` e `server\\server.js` con NSSM (vedi README).
 
 ---
@@ -184,10 +184,28 @@ Ogni 5 minuti → POST /api/lock/:dept/heartbeat
 
 | Variabile | Default | Descrizione |
 |-----------|---------|-------------|
+| `NODE_ENV` | production | Ambiente runtime |
+| `PORT` | 3000 | Porta HTTP |
+| `ONLYGANTT_DATA_DIR` | Data | Directory dati |
+| `ONLYGANTT_ENABLE_BAK` | true | Abilita file `.bak` |
+| `ONLYGANTT_LOCK_TIMEOUT_MINUTES` | 60 | Timeout lock reparto |
+| `ONLYGANTT_ADMIN_TTL_HOURS` | 8 | Durata sessione admin |
+| `ONLYGANTT_MAX_UPLOAD_BYTES` | 2000000 | Limite upload JSON |
 | `ONLYGANTT_ADMIN_USER` | admin | Username admin |
 | `ONLYGANTT_ADMIN_PASSWORD` | admin123 | Password admin |
+| `ONLYGANTT_ADMIN_RESET_CODE` | null | Codice reset password admin |
 | `LDAP_ENABLED` | false | Abilita integrazione LDAP |
+| `LDAP_URL` | "" | URL server LDAP |
+| `LDAP_BIND_DN` | "" | Bind DN |
+| `LDAP_BIND_PASSWORD` | "" | Bind password |
+| `LDAP_BASE_DN` | "" | Base DN |
+| `LDAP_USER_FILTER` | `(sAMAccountName={{username}})` | Filtro utenti |
+| `LDAP_REQUIRED_GROUP` | "" | Gruppo richiesto |
+| `LDAP_GROUP_SEARCH_BASE` | "" | Base ricerca gruppi |
+| `LDAP_LOCAL_FALLBACK` | false | Fallback utenti locali |
 | `HTTPS_ENABLED` | false | Abilita HTTPS |
+| `HTTPS_KEY_PATH` | "" | Percorso chiave TLS |
+| `HTTPS_CERT_PATH` | "" | Percorso certificato TLS |
 
 ---
 

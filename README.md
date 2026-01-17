@@ -14,7 +14,7 @@ Applicazione Timeline Progetti interattiva con blocco multi‑utente, pensata pe
 - **Avvisi completi**: ritardi, conflitti, anomalie e dati mancanti
 - **Screensaver**: salvaschermo automatico con timeout configurabile
 - **Preset fasi**: inserimento rapido delle fasi con colori e opzione personalizzata
-- **Impostazioni di sistema**: gestione LDAP/HTTPS, import/export moduli e stato server applicativo
+- **Impostazioni di sistema**: gestione LDAP/HTTPS, import/export moduli disponibili e stato server applicativo
 
 ## Architettura
 
@@ -145,6 +145,35 @@ npm start
 
 Il server gira su `http://localhost:3000`
 
+## Configurazione produzione
+
+Imposta le variabili d'ambiente per adeguare il deployment in produzione:
+
+| Variabile | Default | Descrizione |
+| --- | --- | --- |
+| `NODE_ENV` | production | Ambiente runtime |
+| `PORT` | 3000 | Porta HTTP |
+| `ONLYGANTT_DATA_DIR` | Data | Directory dati |
+| `ONLYGANTT_ENABLE_BAK` | true | Abilita file `.bak` |
+| `ONLYGANTT_LOCK_TIMEOUT_MINUTES` | 60 | Timeout lock reparto |
+| `ONLYGANTT_ADMIN_TTL_HOURS` | 8 | Durata sessione admin |
+| `ONLYGANTT_MAX_UPLOAD_BYTES` | 2000000 | Limite upload JSON |
+| `ONLYGANTT_ADMIN_USER` | admin | Username admin |
+| `ONLYGANTT_ADMIN_PASSWORD` | admin123 | Password admin |
+| `ONLYGANTT_ADMIN_RESET_CODE` | null | Codice reset password admin |
+| `LDAP_ENABLED` | false | Abilita LDAP |
+| `LDAP_URL` | "" | URL server LDAP |
+| `LDAP_BIND_DN` | "" | Bind DN |
+| `LDAP_BIND_PASSWORD` | "" | Bind password |
+| `LDAP_BASE_DN` | "" | Base DN |
+| `LDAP_USER_FILTER` | `(sAMAccountName={{username}})` | Filtro utenti |
+| `LDAP_REQUIRED_GROUP` | "" | Gruppo richiesto |
+| `LDAP_GROUP_SEARCH_BASE` | "" | Base ricerca gruppi |
+| `LDAP_LOCAL_FALLBACK` | false | Fallback utenti locali |
+| `HTTPS_ENABLED` | false | Abilita HTTPS |
+| `HTTPS_KEY_PATH` | "" | Percorso chiave TLS |
+| `HTTPS_CERT_PATH` | "" | Percorso certificato TLS |
+
 ### Credenziali di default
 - **ID Admin**: `admin` (modifica in `server/server.js`)
 - **Password Admin**: `admin123` (modifica in `server/server.js`)
@@ -231,8 +260,8 @@ Il server gira su `http://localhost:3000`
 - `POST /api/admin/server-restart` - Riavvio server applicativo
 - `GET /api/admin/server-backup` - Backup completo del server (tutti i reparti + configurazione)
 - `POST /api/admin/server-restore` - Ripristino completo del server da file backup
-- `POST /api/admin/export` - Export modulare (reparti, utenti, impostazioni, integrazioni)
-- `POST /api/admin/import` - Import modulare con sovrascrittura opzionale
+- `POST /api/admin/export` - Export modulare (reparti, utenti, impostazioni)
+- `POST /api/admin/import` - Import modulare (reparti, utenti, impostazioni) con sovrascrittura opzionale
 
 ## Dettaglio funzionalità
 
@@ -308,6 +337,9 @@ Controlla il file indicato nel payload di errore, correggi il JSON o ripristina 
 ### Import/Export
 - **Elenco progetti**: import/export progetti per trasferirli tra reparti diversi
 - **Topbar**: import/export reparto completo (configurazione + progetti)
+- **Moduli globali**: export disponibile per reparti, utenti e impostazioni
+- **Moduli globali**: import disponibile per reparti, utenti e impostazioni
+- **Moduli globali**: integrazioni non esposte
 - Validazione dati lato server e client con elenco errori mostrato in UI
 
 ### Percentuale completamento
