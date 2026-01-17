@@ -688,7 +688,7 @@
             Moduli selezionati: {modulesSummary}
           </div>
           <div className="alert-item warning" style={{ marginTop: '0.75rem' }}>
-            Import disponibile solo per i reparti. L'export include anche gli utenti locali e LDAP. Le integrazioni non sono esposte.
+            Import disponibile per reparti, utenti e impostazioni. Le integrazioni non sono esposte.
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
             <button

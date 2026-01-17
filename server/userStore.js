@@ -223,6 +223,46 @@ function createUserStore({ dataDir, enableBak }) {
 
   const exportUsers = () => readAllUsers();
 
+  const importUsers = (users, overwriteExisting) => {
+    ensureStore();
+    const results = {
+      imported: [],
+      skipped: [],
+      errors: []
+    };
+    if (!Array.isArray(users)) {
+      results.errors.push({ userId: null, error: 'Invalid users payload' });
+      return results;
+    }
+    users.forEach((user) => {
+      try {
+        const normalized = normalizeUserId(user?.userId || user?.userIdNormalized);
+        if (!normalized) {
+          results.skipped.push({ userId: null, reason: 'Invalid user id' });
+          return;
+        }
+        const normalizedId = normalized.toLowerCase();
+        if (!overwriteExisting) {
+          const existing = readUserFile(normalized);
+          if (existing) {
+            results.skipped.push({ userId: normalized, reason: 'User already exists' });
+            return;
+          }
+        }
+        const payload = {
+          ...user,
+          userId: normalized,
+          userIdNormalized: normalizedId
+        };
+        writeUserFile(normalized, payload);
+        results.imported.push(normalized);
+      } catch (err) {
+        results.errors.push({ userId: user?.userId || user?.userIdNormalized || null, error: err.message });
+      }
+    });
+    return results;
+  };
+
   return {
     ensureStore,
     verifyLocalUser,
@@ -230,7 +270,8 @@ function createUserStore({ dataDir, enableBak }) {
     getAuthSnapshot,
     listLocalUsers,
     listUsers,
-    exportUsers
+    exportUsers,
+    importUsers
   };
 }
 

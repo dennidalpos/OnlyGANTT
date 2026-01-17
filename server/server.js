@@ -520,6 +520,35 @@ function buildModularBackup(modules) {
   };
 }
 
+function applyImportedSettings(payload = {}) {
+  const serverConfig = payload.serverConfig || {};
+  const adminCredentials = payload.adminCredentials || {};
+  const applied = {};
+
+  if (typeof serverConfig.lockTimeoutMinutes === 'number') {
+    CONFIG.lockTimeoutMinutes = serverConfig.lockTimeoutMinutes;
+    applied.lockTimeoutMinutes = CONFIG.lockTimeoutMinutes;
+  }
+  if (typeof serverConfig.adminSessionTtlHours === 'number') {
+    CONFIG.adminSessionTtlHours = serverConfig.adminSessionTtlHours;
+    applied.adminSessionTtlHours = CONFIG.adminSessionTtlHours;
+  }
+  if (typeof serverConfig.maxUploadBytes === 'number') {
+    CONFIG.maxUploadBytes = serverConfig.maxUploadBytes;
+    applied.maxUploadBytes = CONFIG.maxUploadBytes;
+  }
+  if (typeof serverConfig.enableBak === 'boolean') {
+    CONFIG.enableBak = serverConfig.enableBak;
+    applied.enableBak = CONFIG.enableBak;
+  }
+  if (typeof adminCredentials.adminUser === 'string' && adminCredentials.adminUser.trim()) {
+    CONFIG.adminUser = adminCredentials.adminUser.trim();
+    applied.adminUser = CONFIG.adminUser;
+  }
+
+  return applied;
+}
+
 function importDepartmentsBackup(departments, overwriteExisting) {
   const results = {
     imported: [],
@@ -1480,6 +1509,8 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     }
 
     let departmentPayload = null;
+    let userPayload = null;
+    let settingsPayload = null;
 
     if (modules.departments) {
       if (Array.isArray(backup.departments)) {
@@ -1491,9 +1522,33 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
       }
     }
 
+    if (modules.users) {
+      if (Array.isArray(backup.modules?.users?.data)) {
+        userPayload = backup.modules.users.data;
+      } else if (Array.isArray(backup.users)) {
+        userPayload = backup.users;
+      } else {
+        return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: users data missing');
+      }
+    }
+
+    if (modules.settings) {
+      if (backup.modules?.settings?.data) {
+        settingsPayload = backup.modules.settings.data;
+      } else if (backup.serverConfig || backup.adminCredentials) {
+        settingsPayload = {
+          serverConfig: backup.serverConfig || {},
+          adminCredentials: backup.adminCredentials || {}
+        };
+      } else {
+        return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: settings data missing');
+      }
+    }
+
     const results = {};
     let summary = {
       totalDepartments: departmentPayload ? departmentPayload.length : 0,
+      totalUsers: userPayload ? userPayload.length : 0,
       imported: 0,
       skipped: 0,
       errors: 0
@@ -1512,9 +1567,31 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
       results.departments = { skipped: true, reason: 'Module disabled' };
     }
 
+    if (modules.users) {
+      const userResults = userStore.importUsers(userPayload, overwriteExisting);
+      results.users = userResults;
+      summary = {
+        ...summary,
+        imported: summary.imported + userResults.imported.length,
+        skipped: summary.skipped + userResults.skipped.length,
+        errors: summary.errors + userResults.errors.length
+      };
+    } else {
+      results.users = { skipped: true, reason: 'Module disabled' };
+    }
+
+    if (modules.settings) {
+      const applied = applyImportedSettings(settingsPayload);
+      results.settings = { applied };
+      summary = {
+        ...summary,
+        imported: summary.imported + (Object.keys(applied).length > 0 ? 1 : 0)
+      };
+    } else {
+      results.settings = { skipped: true, reason: 'Module disabled' };
+    }
+
     const unsupportedReason = 'Module not supported yet';
-    results.users = modules.users ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
-    results.settings = modules.settings ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
     results.integrations = modules.integrations ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
 
     res.json({

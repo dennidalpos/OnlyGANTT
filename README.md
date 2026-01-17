@@ -261,7 +261,7 @@ Imposta le variabili d'ambiente per adeguare il deployment in produzione:
 - `GET /api/admin/server-backup` - Backup completo del server (tutti i reparti + configurazione)
 - `POST /api/admin/server-restore` - Ripristino completo del server da file backup
 - `POST /api/admin/export` - Export modulare (reparti, utenti, impostazioni)
-- `POST /api/admin/import` - Import modulare (solo reparti) con sovrascrittura opzionale
+- `POST /api/admin/import` - Import modulare (reparti, utenti, impostazioni) con sovrascrittura opzionale
 
 ## Dettaglio funzionalità
 
@@ -338,7 +338,7 @@ Controlla il file indicato nel payload di errore, correggi il JSON o ripristina 
 - **Elenco progetti**: import/export progetti per trasferirli tra reparti diversi
 - **Topbar**: import/export reparto completo (configurazione + progetti)
 - **Moduli globali**: export disponibile per reparti, utenti e impostazioni
-- **Moduli globali**: import disponibile solo per reparti
+- **Moduli globali**: import disponibile per reparti, utenti e impostazioni
 - **Moduli globali**: integrazioni non esposte
 - Validazione dati lato server e client con elenco errori mostrato in UI
 
