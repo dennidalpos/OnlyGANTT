@@ -23,13 +23,18 @@ function parseBoolean(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
 }
 
+function parseNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const CONFIG = {
-  port: 3000,
-  dataDir: 'Data',
-  enableBak: true,
-  lockTimeoutMinutes: 60,
-  adminSessionTtlHours: 8,
-  maxUploadBytes: 2000000,
+  port: parseNumber(process.env.PORT, 3000),
+  dataDir: process.env.ONLYGANTT_DATA_DIR || process.env.DATA_DIR || 'Data',
+  enableBak: parseBoolean(process.env.ONLYGANTT_ENABLE_BAK ?? true),
+  lockTimeoutMinutes: parseNumber(process.env.ONLYGANTT_LOCK_TIMEOUT_MINUTES, 60),
+  adminSessionTtlHours: parseNumber(process.env.ONLYGANTT_ADMIN_TTL_HOURS, 8),
+  maxUploadBytes: parseNumber(process.env.ONLYGANTT_MAX_UPLOAD_BYTES, 2000000),
   adminUser: process.env.ONLYGANTT_ADMIN_USER || 'admin',
   adminPassword: process.env.ONLYGANTT_ADMIN_PASSWORD || 'admin123',
   adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null,

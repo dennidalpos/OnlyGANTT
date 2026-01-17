@@ -113,6 +113,7 @@ style: compact Gantt options panel layout
 
 - Aggiorna `README.md` e `context.md` quando cambiano API, struttura progetto o funzionalità admin.
 - Usa la capitalizzazione corretta della directory dati (`Data/`) in tutta la documentazione.
+- Mantieni allineate le credenziali demo con i file presenti in `Data/reparti/`.
 
 ---
 

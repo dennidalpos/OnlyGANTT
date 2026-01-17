@@ -1,7 +1,7 @@
 window.AppConfig = {
   server: {
     port: 3000,
-    dataDir: 'data',
+    dataDir: 'Data',
     enableBak: true,
     lockTimeoutMinutes: 60,
     adminSessionTtlHours: 8,
