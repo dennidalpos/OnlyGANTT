@@ -221,13 +221,16 @@ function createUserStore({ dataDir, enableBak }) {
     }));
   };
 
+  const exportUsers = () => readAllUsers();
+
   return {
     ensureStore,
     verifyLocalUser,
     upsertLdapUser,
     getAuthSnapshot,
     listLocalUsers,
-    listUsers
+    listUsers,
+    exportUsers
   };
 }
 

@@ -184,6 +184,7 @@ Ogni 5 minuti → POST /api/lock/:dept/heartbeat
 
 | Variabile | Default | Descrizione |
 |-----------|---------|-------------|
+| `NODE_ENV` | production | Ambiente runtime |
 | `PORT` | 3000 | Porta HTTP |
 | `ONLYGANTT_DATA_DIR` | Data | Directory dati |
 | `ONLYGANTT_ENABLE_BAK` | true | Abilita file `.bak` |

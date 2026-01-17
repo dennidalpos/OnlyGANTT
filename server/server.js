@@ -17,6 +17,10 @@ const packageInfo = require('../package.json');
 const app = express();
 const SERVER_STARTED_AT = new Date().toISOString();
 
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 function parseBoolean(value) {
   if (typeof value === 'boolean') return value;
   if (!value) return false;
@@ -497,7 +501,7 @@ function buildModularBackup(modules) {
     exportedAt: new Date().toISOString(),
     modules: {
       departments: modules.departments ? { data: collectDepartmentBackups() } : { data: null },
-      users: modules.users ? { data: [] } : { data: null },
+      users: modules.users ? { data: userStore.exportUsers() } : { data: null },
       settings: modules.settings ? {
         data: {
           serverConfig: {

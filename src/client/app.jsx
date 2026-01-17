@@ -566,12 +566,21 @@
     const getSelectedModuleLabels = (modules) => {
       const labels = {
         departments: 'Reparti',
+        users: 'Utenti',
         settings: 'Impostazioni'
       };
       return Object.keys(labels).filter((key) => modules?.[key]).map((key) => labels[key]);
     };
 
-    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.settings;
+    const formatExportTimestamp = () => {
+      const now = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
+      return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}-${pad(now.getHours())}-${pad(now.getMinutes())}`;
+    };
+
+    const buildExportFileName = () => `OnlyGANTT-${formatExportTimestamp()}.json`;
+
+    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.users && !modules?.settings;
 
     const handleAdminModularExport = async (modules) => {
       if (!adminToken) return;
@@ -582,9 +591,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = isOnlyDepartmentsModule(modules)
-          ? `onlygantt-backup-${new Date().toISOString().split('T')[0]}.json`
-          : `onlygantt-modular-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = buildExportFileName();
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -882,7 +889,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `progetti_${department}_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = buildExportFileName();
       a.click();
       URL.revokeObjectURL(url);
       pushNotification({ type: 'success', message: 'Export progetti completato' });
@@ -903,7 +910,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `reparto_${department}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = buildExportFileName();
         a.click();
         URL.revokeObjectURL(url);
         pushNotification({ type: 'success', message: 'Export reparto completato' });
