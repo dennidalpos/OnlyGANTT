@@ -493,7 +493,7 @@ async function listLdapUsers(configOverride = {}) {
           const primaryGroupId = normalizePrimaryGroupId(entry.primaryGroupID);
           inGroup = primaryGroupId === requiredGroupRid;
         }
-        if (!inGroup && requiredGroupRid) {
+        if (!inGroup) {
           const primaryGroupName = await resolvePrimaryGroupName(client, entry, config);
           if (primaryGroupName) {
             inGroup = isGroupNameMatch(groupNameToCheck, primaryGroupName);
