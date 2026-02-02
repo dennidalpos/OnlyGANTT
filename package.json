@@ -1,0 +1,23 @@
+{
+  "name": "onlygantt",
+  "version": "1.0.0",
+  "description": "OnlyGANTT - Interactive Gantt chart application with multi-user locking",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "keywords": [
+    "gantt",
+    "project-management"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ldapts": "^7.2.0",
+    "multer": "^2.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
