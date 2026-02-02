@@ -45,10 +45,10 @@ function validatePhase(phase, index) {
     errors.push(`Phase ${index}: nome is required and must be a non-empty string`);
   }
 
-  if (phase.dataInizio !== null && !isValidDateString(phase.dataInizio)) {
+  if (phase.dataInizio != null && !isValidDateString(phase.dataInizio)) {
     errors.push(`Phase ${index}: dataInizio must be null or valid YYYY-MM-DD date`);
   }
-  if (phase.dataFine !== null && !isValidDateString(phase.dataFine)) {
+  if (phase.dataFine != null && !isValidDateString(phase.dataFine)) {
     errors.push(`Phase ${index}: dataFine must be null or valid YYYY-MM-DD date`);
   }
 
@@ -56,7 +56,7 @@ function validatePhase(phase, index) {
     errors.push(`Phase ${index}: stato must be one of ${VALID_STATES.join(', ')}`);
   }
 
-  if (phase.percentualeCompletamento !== null) {
+  if (phase.percentualeCompletamento != null) {
     if (typeof phase.percentualeCompletamento !== 'number' ||
         phase.percentualeCompletamento < 0 ||
         phase.percentualeCompletamento > 100) {
@@ -99,10 +99,10 @@ function validateProject(project, index) {
     errors.push(`Project ${index}: colore is required and must be a string`);
   }
 
-  if (project.dataInizio !== null && !isValidDateString(project.dataInizio)) {
+  if (project.dataInizio != null && !isValidDateString(project.dataInizio)) {
     errors.push(`Project ${index}: dataInizio must be null or valid YYYY-MM-DD date`);
   }
-  if (project.dataFine !== null && !isValidDateString(project.dataFine)) {
+  if (project.dataFine != null && !isValidDateString(project.dataFine)) {
     errors.push(`Project ${index}: dataFine must be null or valid YYYY-MM-DD date`);
   }
 
@@ -110,7 +110,7 @@ function validateProject(project, index) {
     errors.push(`Project ${index}: stato must be one of ${VALID_STATES.join(', ')}`);
   }
 
-  if (project.percentualeCompletamento !== null) {
+  if (project.percentualeCompletamento != null) {
     if (typeof project.percentualeCompletamento !== 'number' ||
         project.percentualeCompletamento < 0 ||
         project.percentualeCompletamento > 100) {
