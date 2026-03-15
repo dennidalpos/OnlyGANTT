@@ -1,0 +1,19 @@
+{
+  "ldap": {
+    "enabled": false,
+    "log": false,
+    "url": "",
+    "bindDn": "admin",
+    "bindPassword": "admin123",
+    "baseDn": "",
+    "userFilter": "(sAMAccountName={{username}})",
+    "requiredGroupDn": "",
+    "groupSearchBase": "",
+    "localFallback": false
+  },
+  "https": {
+    "enabled": false,
+    "keyPath": "",
+    "certPath": ""
+  }
+}

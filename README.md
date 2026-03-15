@@ -16,7 +16,7 @@ OnlyGANTT è un'applicazione web per la gestione di diagrammi di Gantt con suppo
 - [Troubleshooting](#troubleshooting)
 
 ## Panoramica
-- **Frontend**: UI statica servita da Express (cartella `public` e assets in `src`).
+- **Frontend**: UI statica servita da Express (cartella `public`, stili modulari in `public/styles` e assets in `src`).
 - **Backend**: server Node.js/Express (`server/server.js`) con API REST per reparti, progetti e amministrazione.
 - **Persistenza**: file JSON su disco sotto la cartella dati configurata (`Data/` di default).
 - **Concorrenza**: lock per reparto per evitare modifiche concorrenti.
@@ -27,11 +27,11 @@ OnlyGANTT è un'applicazione web per la gestione di diagrammi di Gantt con suppo
 
 ## Avvio rapido
 1. Installa le dipendenze:
-   ```bash
+   ```powershell
    npm install
    ```
 2. Avvia il server:
-   ```bash
+   ```powershell
    npm start
    ```
 3. Apri il browser su:
@@ -83,8 +83,11 @@ Data/
   reparti/
     <reparto>.json
   utenti/
+    users.json
     <user>.json
 ```
+
+`users.json` e' il formato legacy importato automaticamente verso file utente separati (`<user>.json`) quando contiene dati validi.
 
 ### Reparto (`reparti/<nome>.json`)
 Esempio minimale:
@@ -168,6 +171,15 @@ Per abilitare HTTPS:
 1. Impostare `HTTPS_ENABLED=true`.
 2. Configurare `HTTPS_KEY_PATH` e `HTTPS_CERT_PATH`.
 3. Riavviare il server.
+
+## Script operativi
+- `scripts/install-service.ps1` crea un servizio Windows per `server/server.js`.
+- `scripts/uninstall-service.ps1` rimuove il servizio Windows creato per l'applicazione.
+
+## Documentation
+- `PROJECT_SPEC.md`
+- `PROJECT_STATUS.json`
+- `AGENTS.md`
 
 ## Troubleshooting
 - **Errore LDAP_CONFIG_ERROR**: verificare URL e BASE_DN.

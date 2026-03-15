@@ -1,0 +1,343 @@
+.gantt-with-sidebar {
+  display: flex;
+  width: 100%;
+  position: relative;
+  gap: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--bg-secondary);
+}
+
+.gantt-main-area {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+
+.project-sidebar {
+  flex-shrink: 0;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.project-sidebar.expanded {
+  width: 260px;
+}
+
+.project-sidebar.collapsed {
+  width: 40px;
+}
+
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.sidebar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.sidebar-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  min-height: auto;
+  font-size: 0.85rem;
+}
+
+.sidebar-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-btn.active {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.sidebar-pin-btn.active {
+  background-color: var(--success);
+  border-color: var(--success);
+}
+
+.sidebar-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sidebar-count {
+  background-color: var(--bg-secondary);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+
+.sidebar-select-all {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.sidebar-select-all .checkbox-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+
+.sidebar-header-spacer {
+  flex-shrink: 0;
+  background-color: var(--bg-secondary);
+}
+
+
+.sidebar-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-hover) var(--bg-secondary);
+}
+
+.sidebar-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 3px;
+}
+
+.sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+.sidebar-empty {
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+
+.sidebar-projects {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-project-row {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.sidebar-project-row.selected {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+
+.sidebar-project-row:hover::before,
+.sidebar-project-row.hovered::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 32px;
+  background-color: rgba(59, 130, 246, 0.12);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.sidebar-project-row.hovered::before {
+  background-color: rgba(59, 130, 246, 0.18);
+}
+
+
+.sidebar-project-row.severity-error {
+  border-left: 3px solid var(--error);
+  padding-left: 0;
+}
+
+.sidebar-project-row.severity-warning {
+  border-left: 3px solid var(--warning);
+  padding-left: 0;
+}
+
+.sidebar-project-row.severity-info {
+  border-left: 3px solid var(--info);
+  padding-left: 0;
+}
+
+.sidebar-project-row.severity-success {
+  border-left: 3px solid var(--success);
+  padding-left: 0;
+}
+
+.sidebar-project-row.severity-none {
+  border-left: 3px solid transparent;
+  padding-left: 0;
+}
+
+
+.sidebar-project-collapsed {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.sidebar-project-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-check-indicator {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 0.6rem;
+  color: var(--success);
+  font-weight: bold;
+}
+
+
+.sidebar-project-expanded {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-project-checkbox {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-project-checkbox input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent-primary);
+}
+
+.sidebar-project-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+}
+
+.sidebar-project-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.sidebar-project-row.hovered .sidebar-project-name {
+  color: var(--accent-light);
+}
+
+.sidebar-project-percent {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-weight: 500;
+  background-color: var(--bg-tertiary);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+
+.gantt-with-sidebar.sidebar-collapsed .gantt-canvas-wrapper {
+  
+}
+
+
+@media (max-width: 768px) {
+  .project-sidebar.expanded {
+    width: 220px;
+  }
+
+  .sidebar-project-name {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .project-sidebar.expanded {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .project-sidebar.collapsed {
+    width: 40px;
+  }
+}

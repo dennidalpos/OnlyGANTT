@@ -1,0 +1,150 @@
+{
+  "treeview": [
+    ".gitignore",
+    "AGENTS.md",
+    "PROJECT_SPEC.md",
+    "PROJECT_STATUS.json",
+    "README.md",
+    "package-lock.json",
+    "package.json",
+    "Data/",
+    "Data/config/",
+    "Data/config/.gitkeep",
+    "Data/log/",
+    "Data/log/audit.log",
+    "Data/reparti/",
+    "Data/reparti/Demo.json",
+    "Data/utenti/",
+    "Data/utenti/users.json",
+    "public/",
+    "public/styles/",
+    "public/styles/00-foundation.css",
+    "public/styles/10-forms-auth.css",
+    "public/styles/20-feedback.css",
+    "public/styles/30-gantt.css",
+    "public/styles/40-sidebar.css",
+    "public/index.html",
+    "public/styles.css",
+    "scripts/",
+    "scripts/install-service.ps1",
+    "scripts/uninstall-service.ps1",
+    "server/",
+    "server/auditService.js",
+    "server/httpsService.js",
+    "server/ldapService.js",
+    "server/lockStore.js",
+    "server/schema.js",
+    "server/server.js",
+    "server/serverService.js",
+    "server/userStore.js",
+    "src/",
+    "src/app-config.js",
+    "src/client/",
+    "src/client/api.js",
+    "src/client/app.jsx",
+    "src/client/storage.js",
+    "src/client/components/",
+    "src/client/components/AlertsPanel.jsx",
+    "src/client/components/GanttCanvas.jsx",
+    "src/client/components/GanttControls.jsx",
+    "src/client/components/HeaderBar.jsx",
+    "src/client/components/LoginScreen.jsx",
+    "src/client/components/ProjectForm.jsx",
+    "src/client/components/ProjectList.jsx",
+    "src/client/components/ProjectSidebar.jsx",
+    "src/client/components/SystemSettings.jsx",
+    "src/client/components/UserManagement.jsx",
+    "src/client/hooks/",
+    "src/client/hooks/useDepartmentLock.js",
+    "src/client/hooks/useProjects.js",
+    "src/utils/",
+    "src/utils/easter.js",
+    "src/utils/utils-date.js",
+    "src/utils/utils-gantt.js",
+    "src/utils/utils-logic.js"
+  ],
+  "files_big": [
+    "package-lock.json:1106",
+    "Data/reparti/Demo.json:1255",
+    "server/server.js:1484",
+    "src/client/app.jsx:1102"
+  ],
+  "tasks": [
+    {
+      "id": "fix-lock-release-auth-validation",
+      "status": "pending",
+      "description": "Proteggere l'endpoint di rilascio lock con la stessa validazione sessione usata per acquire/heartbeat, per evitare rilascio lock non autenticato o spoofing del solo userName.",
+      "files": [
+        "server/server.js",
+        "src/client/api.js",
+        "src/client/hooks/useDepartmentLock.js"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "remove-insecure-admin-default-password",
+      "status": "pending",
+      "description": "Eliminare la password admin di default hardcoded e rendere coerente la gestione delle credenziali admin tra codice, persistenza/configurazione e documentazione.",
+      "files": [
+        "server/server.js",
+        "README.md",
+        "PROJECT_SPEC.md"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "stop-storing-department-passwords-in-localstorage",
+      "status": "pending",
+      "description": "Rimuovere il salvataggio in chiaro delle password reparto in localStorage o sostituirlo con una gestione non persistente/coerente con i requisiti di sicurezza del repository.",
+      "files": [
+        "src/client/storage.js",
+        "src/client/components/LoginScreen.jsx",
+        "src/client/app.jsx"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "fix-runtime-config-and-upload-limit-drift",
+      "status": "pending",
+      "description": "Allineare la configurazione runtime del server con il comportamento reale: il limite upload aggiornato via API deve essere applicato effettivamente al middleware e le modifiche sensibili non devono restare solo in memoria.",
+      "files": [
+        "server/server.js",
+        "server/httpsService.js"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "stabilize-windows-service-and-startup-flow",
+      "status": "pending",
+      "description": "Correggere la fragilita' operativa di avvio/riavvio su Windows, includendo working directory, comando di restart e prerequisiti di bootstrap documentati per un checkout pulito.",
+      "files": [
+        "scripts/install-service.ps1",
+        "server/serverService.js",
+        "README.md"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "upgrade-vulnerable-runtime-dependencies",
+      "status": "pending",
+      "description": "Aggiornare le dipendenze runtime vulnerabili segnalate da npm audit, in particolare multer e la catena che include qs, e verificare la compatibilita' del server dopo l'upgrade.",
+      "files": [
+        "package.json",
+        "package-lock.json",
+        "server/server.js"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "add-minimum-runtime-smoke-checks",
+      "status": "pending",
+      "description": "Introdurre verifiche minime riproducibili per bootstrap e smoke test del server, oggi assenti nonostante aree critiche di autenticazione, lock, import/export e configurazione runtime.",
+      "files": [
+        "package.json",
+        "README.md",
+        "server/server.js"
+      ],
+      "priority": 3
+    }
+  ]
+}
