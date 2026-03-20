@@ -4,11 +4,23 @@
   "description": "OnlyGANTT - Interactive Gantt chart application with multi-user locking",
   "main": "server/server.js",
   "scripts": {
+    "bootstrap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap.ps1",
+    "doctor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/doctor.ps1",
+    "compile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/compile.ps1",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1",
+    "test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test.ps1",
+    "pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack.ps1",
+    "publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish.ps1",
+    "clean": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1",
     "start": "node server/server.js",
-    "smoke": "node scripts/smoke-check.js",
-    "wix:provision": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-wix.ps1",
-    "build:msi": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-msi.ps1",
-    "clean": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1"
+    "smoke": "node tests/smoke-check.js",
+    "wix:provision": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/packaging/provision-wix.ps1",
+    "build:msi": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/packaging/build-msi.ps1",
+    "service:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/install-service.ps1",
+    "service:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/uninstall-service.ps1",
+    "service:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start-service.ps1",
+    "service:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/stop-service.ps1",
+    "service:cleanup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/services-cleanup.ps1"
   },
   "keywords": [
     "gantt",

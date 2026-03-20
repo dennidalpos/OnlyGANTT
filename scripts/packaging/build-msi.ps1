@@ -116,6 +116,40 @@ function Copy-RepoItem {
   }
 }
 
+function Remove-NodeModulesPackagingNoise {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$StageRoot
+  )
+
+  $nodeModulesRoot = Join-Path $StageRoot 'node_modules'
+  if (-not (Test-Path $nodeModulesRoot)) {
+    return
+  }
+
+  $excludedDirectoryNames = @(
+    'test',
+    'tests',
+    '__tests__',
+    'docs',
+    'doc',
+    'example',
+    'examples',
+    '.github',
+    'bench',
+    'benchmark',
+    'coverage'
+  )
+
+  $directoriesToRemove = Get-ChildItem -Path $nodeModulesRoot -Recurse -Directory -Force |
+    Where-Object { $_.Name -in $excludedDirectoryNames } |
+    Sort-Object FullName -Descending
+
+  foreach ($directory in $directoriesToRemove) {
+    Remove-Item -Path $directory.FullName -Recurse -Force
+  }
+}
+
 function New-DirectoryXml {
   param(
     [Parameter(Mandatory = $true)]
@@ -227,9 +261,9 @@ $script:WixNamespace = 'http://schemas.microsoft.com/wix/2006/wi'
 $script:XmlNamespaceManager = New-Object System.Xml.XmlNamespaceManager((New-Object System.Xml.NameTable))
 $script:XmlNamespaceManager.AddNamespace('wix', $script:WixNamespace)
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $packageJsonPath = Join-Path $repoRoot 'package.json'
-$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\provision-wix.ps1'
+$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.ps1'
 $wixSourcePath = Join-Path $repoRoot 'tools\wix\Product.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $nssmSourcePath = Join-Path $repoRoot 'tools\nssm\win64\nssm.exe'
@@ -265,10 +299,10 @@ $packageVersion = if ($Version) { $Version } else { [string]$packageJson.version
 $semVerCore = Get-SemVerCore -InputVersion $packageVersion
 $productVersion = $semVerCore.WixVersion
 
-$buildRoot = Join-Path $repoRoot 'build\msi'
+$buildRoot = Join-Path $repoRoot 'artifacts\build\msi'
 $stageRoot = Join-Path $buildRoot 'stage'
 $objRoot = Join-Path $buildRoot 'obj'
-$distRoot = Join-Path $repoRoot 'dist\msi'
+$distRoot = Join-Path $repoRoot 'artifacts\packages\msi'
 $appFilesWxs = Join-Path $buildRoot 'AppFiles.wxs'
 $msiName = "OnlyGantt-$productVersion-x64.msi"
 $msiOutputPath = Join-Path $distRoot $msiName
@@ -287,13 +321,14 @@ $stageTargets = @(
   @{ Source = 'server'; Destination = 'server' },
   @{ Source = 'src'; Destination = 'src' },
   @{ Source = 'node_modules'; Destination = 'node_modules' },
-  @{ Source = 'scripts\install-service.ps1'; Destination = 'scripts\install-service.ps1' },
-  @{ Source = 'scripts\uninstall-service.ps1'; Destination = 'scripts\uninstall-service.ps1' }
+  @{ Source = 'scripts\windows'; Destination = 'scripts\windows' }
 )
 
 foreach ($target in $stageTargets) {
   Copy-RepoItem -SourcePath (Join-Path $repoRoot $target.Source) -DestinationPath (Join-Path $stageRoot $target.Destination)
 }
+
+Remove-NodeModulesPackagingNoise -StageRoot $stageRoot
 
 Write-AppFilesFragment -StageRoot $stageRoot -OutputPath $appFilesWxs
 
@@ -335,6 +370,14 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "MSI created: $msiOutputPath"
 
 if (-not $KeepBuildArtifacts) {
-  Remove-Item -Path $stageRoot, $objRoot -Recurse -Force
+  $temporaryPaths = @($stageRoot, $objRoot, $appFilesWxs) | Where-Object { Test-Path $_ }
+  if ($temporaryPaths.Count -gt 0) {
+    Remove-Item -Path $temporaryPaths -Recurse -Force
+  }
+
+  if ((Test-Path $buildRoot) -and -not (Get-ChildItem -Path $buildRoot -Force)) {
+    Remove-Item -Path $buildRoot -Force
+  }
+
   Write-Host "Temporary build artifacts removed from $buildRoot"
 }

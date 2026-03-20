@@ -1,0 +1,202 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const http = require('http');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
+
+const SERVER_ENTRY = path.join(__dirname, '..', 'server', 'server.js');
+const HOST = '127.0.0.1';
+const PORT = 3322;
+const ADMIN_PASSWORD = 'AdminPass123';
+const LOCAL_USER_PASSWORD = 'LocalPass123';
+const LDAP_BIND_PASSWORD = 'SuperSecretBindPassword';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function hashLegacyPassword(password) {
+  return crypto.createHash('sha256').update(password, 'utf8').digest('hex');
+}
+
+function createTempDataDir() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'onlygantt-security-'));
+  ['reparti', 'config', 'utenti', 'log'].forEach((segment) => {
+    fs.mkdirSync(path.join(root, segment), { recursive: true });
+  });
+
+  fs.writeFileSync(path.join(root, 'reparti', 'Demo.json'), JSON.stringify({
+    password: null,
+    projects: [],
+    meta: {
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      updatedBy: 'security-seed',
+      revision: 1
+    }
+  }, null, 2), 'utf8');
+
+  fs.writeFileSync(path.join(root, 'utenti', 'local.user.json'), JSON.stringify({
+    userId: 'local.user',
+    userIdNormalized: 'local.user',
+    type: 'local',
+    displayName: 'Local User',
+    department: 'Demo',
+    passwordHash: hashLegacyPassword(LOCAL_USER_PASSWORD),
+    createdAt: '2026-01-01T00:00:00.000Z',
+    lastLoginAt: null,
+    loginHistory: []
+  }, null, 2), 'utf8');
+
+  return root;
+}
+
+function requestJson(method, requestPath, body = null, headers = {}) {
+  const payload = body == null ? null : JSON.stringify(body);
+
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: HOST,
+      port: PORT,
+      path: requestPath,
+      method,
+      headers: {
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+        ...headers
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        const data = text ? JSON.parse(text) : null;
+        if (res.statusCode >= 400) {
+          const error = new Error(data?.error?.message || `HTTP ${res.statusCode}`);
+          error.status = res.statusCode;
+          error.code = data?.error?.code;
+          error.data = data;
+          reject(error);
+          return;
+        }
+
+        resolve({ status: res.statusCode, data });
+      });
+    });
+
+    req.on('error', reject);
+    if (payload) {
+      req.write(payload);
+    }
+    req.end();
+  });
+}
+
+async function waitForServerReady() {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 15000) {
+    try {
+      await requestJson('GET', '/api/auth/config');
+      return;
+    } catch (err) {
+      await sleep(250);
+    }
+  }
+
+  throw new Error('Server did not start within 15 seconds');
+}
+
+async function main() {
+  const dataDir = createTempDataDir();
+  const server = spawn(process.execPath, [SERVER_ENTRY], {
+    cwd: path.join(__dirname, '..'),
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      ONLYGANTT_DATA_DIR: dataDir,
+      ONLYGANTT_ADMIN_PASSWORD: ADMIN_PASSWORD,
+      LDAP_ENABLED: 'false',
+      LDAP_URL: 'ldap://example.local:389',
+      LDAP_BIND_DN: 'CN=svc-onlygantt,OU=Service Accounts,DC=example,DC=local',
+      LDAP_BIND_PASSWORD,
+      LDAP_BASE_DN: 'DC=example,DC=local',
+      LDAP_USER_FILTER: '(sAMAccountName={{username}})'
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  let stdout = '';
+  let stderr = '';
+  server.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
+  server.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
+
+  try {
+    await waitForServerReady();
+
+    const adminLogin = await requestJson('POST', '/api/admin/login', {
+      userId: 'admin',
+      password: ADMIN_PASSWORD
+    });
+    const adminToken = adminLogin.data?.token;
+    if (!adminToken) {
+      throw new Error('Admin login did not return an admin token');
+    }
+
+    const authHeaders = {
+      Authorization: `Bearer ${adminToken}`
+    };
+
+    const systemConfig = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
+    if (systemConfig.data?.ldap?.bindPasswordSet !== true) {
+      throw new Error('Expected bindPasswordSet to report saved LDAP secret');
+    }
+    if (Object.prototype.hasOwnProperty.call(systemConfig.data?.ldap || {}, 'bindPassword')) {
+      throw new Error('LDAP bind password must not be exposed by /api/admin/system-config');
+    }
+
+    const exportResult = await requestJson('POST', '/api/admin/export', {
+      modules: {
+        departments: false,
+        users: false,
+        settings: true
+      }
+    }, authHeaders);
+
+    const exportedLdapConfig = exportResult.data?.modules?.settings?.data?.systemConfig?.ldap;
+    if (!exportedLdapConfig || exportedLdapConfig.bindPasswordSet !== true) {
+      throw new Error('Expected exported settings to retain bindPasswordSet metadata');
+    }
+    if (Object.prototype.hasOwnProperty.call(exportedLdapConfig, 'bindPassword')) {
+      throw new Error('LDAP bind password must not be exported in modular settings backup');
+    }
+
+    const userLogin = await requestJson('POST', '/api/auth/login', {
+      userId: 'local.user',
+      password: LOCAL_USER_PASSWORD,
+      department: 'Demo'
+    });
+    if (userLogin.data?.authType !== 'local' || !userLogin.data?.token) {
+      throw new Error('Expected local user login to succeed');
+    }
+
+    const storedUser = JSON.parse(fs.readFileSync(path.join(dataDir, 'utenti', 'local.user.json'), 'utf8'));
+    if (!storedUser.passwordHash || typeof storedUser.passwordHash !== 'object' || storedUser.passwordHash.algorithm !== 'scrypt') {
+      throw new Error('Expected successful local login to migrate legacy password hash to scrypt');
+    }
+
+    console.log('Security regression check passed');
+  } finally {
+    server.kill('SIGTERM');
+    await sleep(250);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+    if (server.exitCode && server.exitCode !== 0) {
+      console.error(stdout);
+      console.error(stderr);
+      process.exit(server.exitCode);
+    }
+  }
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

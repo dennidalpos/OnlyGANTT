@@ -408,7 +408,7 @@ function persistAdminUser(adminUser) {
   refreshAdminAuthState();
 }
 
-function buildSystemConfigPayload(config, { includeBindPassword = true } = {}) {
+function buildSystemConfigPayload(config, { includeBindPassword = false } = {}) {
   return {
     server: {
       lockTimeoutMinutes: config.lockTimeoutMinutes,
@@ -422,8 +422,8 @@ function buildSystemConfigPayload(config, { includeBindPassword = true } = {}) {
       log: parseBoolean(config.logLdap),
       url: config.ldapUrl || '',
       bindDn: config.ldapBindDn || '',
-      bindPassword: includeBindPassword ? (config.ldapBindPassword || '') : '',
       bindPasswordSet: !!config.ldapBindPassword,
+      ...(includeBindPassword ? { bindPassword: config.ldapBindPassword || '' } : {}),
       baseDn: config.ldapBaseDn || '',
       userFilter: config.ldapUserFilter || '(sAMAccountName={{username}})',
       requiredGroupDn: config.ldapRequiredGroup || '',
@@ -438,33 +438,8 @@ function buildSystemConfigPayload(config, { includeBindPassword = true } = {}) {
   };
 }
 
-function getSystemConfigState() {
-  return {
-    server: {
-      lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
-      userSessionTtlHours: CONFIG.userSessionTtlHours,
-      adminSessionTtlHours: CONFIG.adminSessionTtlHours,
-      maxUploadBytes: CONFIG.maxUploadBytes,
-      enableBak: parseBoolean(CONFIG.enableBak)
-    },
-    ldap: {
-      enabled: parseBoolean(CONFIG.ldapEnabled),
-      log: parseBoolean(CONFIG.logLdap),
-      url: CONFIG.ldapUrl || '',
-      bindDn: CONFIG.ldapBindDn || '',
-      bindPassword: CONFIG.ldapBindPassword || '',
-      baseDn: CONFIG.ldapBaseDn || '',
-      userFilter: CONFIG.ldapUserFilter || '(sAMAccountName={{username}})',
-      requiredGroupDn: CONFIG.ldapRequiredGroup || '',
-      groupSearchBase: CONFIG.ldapGroupSearchBase || '',
-      localFallback: parseBoolean(CONFIG.ldapLocalFallback)
-    },
-    https: {
-      enabled: parseBoolean(CONFIG.httpsEnabled),
-      keyPath: CONFIG.httpsKeyPath || '',
-      certPath: CONFIG.httpsCertPath || ''
-    }
-  };
+function getSystemConfigState(options = {}) {
+  return buildSystemConfigPayload(CONFIG, options);
 }
 
 function applySystemConfig(configPayload) {
@@ -1618,7 +1593,11 @@ app.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
   try {
     const { config, testUserId } = req.body || {};
     const baseConfig = getLdapConfigForAuth();
-    const mergedConfig = { ...baseConfig, ...(config || {}) };
+    const overrideConfig = { ...(config || {}) };
+    if (Object.prototype.hasOwnProperty.call(overrideConfig, 'bindPassword') && overrideConfig.bindPassword === null) {
+      delete overrideConfig.bindPassword;
+    }
+    const mergedConfig = { ...baseConfig, ...overrideConfig };
     const result = await testLdapConnection({
       configOverride: mergedConfig,
       testUserId: testUserId || null
@@ -1682,7 +1661,7 @@ app.post('/api/admin/system-config', requireAdmin, (req, res) => {
     const ldapPayload = payload.ldap || {};
     const httpsPayload = payload.https || {};
 
-    const currentConfig = getSystemConfigState();
+    const currentConfig = getSystemConfigState({ includeBindPassword: true });
     const nextConfig = {
       server: { ...currentConfig.server },
       ldap: { ...currentConfig.ldap },
@@ -1714,6 +1693,7 @@ app.post('/api/admin/system-config', requireAdmin, (req, res) => {
     if ('keyPath' in httpsPayload) nextConfig.https.keyPath = normalizeSystemConfigValue(httpsPayload.keyPath, currentConfig.https.keyPath);
     if ('certPath' in httpsPayload) nextConfig.https.certPath = normalizeSystemConfigValue(httpsPayload.certPath, currentConfig.https.certPath);
 
+    delete nextConfig.ldap.bindPasswordSet;
     writeSystemConfig(nextConfig);
     applySystemConfig(nextConfig);
 

@@ -244,7 +244,10 @@
       setLdapTesting(true);
       setLdapTestStatus(null);
       try {
-        const result = await api.testLdapConnection(ldapConfig, ldapTestUserId || null, adminToken);
+        const result = await api.testLdapConnection({
+          ...ldapConfig,
+          bindPassword: ldapConfig.bindPassword ? ldapConfig.bindPassword : null
+        }, ldapTestUserId || null, adminToken);
         setLdapTestStatus({
           type: 'success',
           message: result.message || 'Test LDAP completato con successo'

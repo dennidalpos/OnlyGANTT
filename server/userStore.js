@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { isValidHashedSecret, HASHED_SECRET_ALGORITHM } = require('./schema');
 
 function normalizeUserId(userId) {
   if (!userId || typeof userId !== 'string') return null;
@@ -8,8 +9,50 @@ function normalizeUserId(userId) {
   return trimmed ? trimmed : null;
 }
 
+const LEGACY_LOCAL_PASSWORD_REGEX = /^[a-f0-9]{64}$/i;
+
 function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return {
+    algorithm: HASHED_SECRET_ALGORITHM,
+    salt,
+    hash
+  };
+}
+
+function hashLegacyPassword(password) {
   return crypto.createHash('sha256').update(password, 'utf8').digest('hex');
+}
+
+function isLegacyPasswordHash(passwordHash) {
+  return typeof passwordHash === 'string' && LEGACY_LOCAL_PASSWORD_REGEX.test(passwordHash);
+}
+
+function hasValidLocalPasswordHash(passwordHash) {
+  return isValidHashedSecret(passwordHash) || isLegacyPasswordHash(passwordHash);
+}
+
+function verifyPassword(password, passwordHash) {
+  if (typeof password !== 'string' || !password) {
+    return false;
+  }
+
+  if (isValidHashedSecret(passwordHash)) {
+    const actualHash = crypto.scryptSync(password, passwordHash.salt, 64);
+    const expectedHash = Buffer.from(passwordHash.hash, 'hex');
+    if (actualHash.length !== expectedHash.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(actualHash, expectedHash);
+  }
+
+  if (isLegacyPasswordHash(passwordHash)) {
+    return hashLegacyPassword(password) === passwordHash;
+  }
+
+  return false;
 }
 
 function normalizeOptionalString(value) {
@@ -32,7 +75,7 @@ function isValidUserRecord(data) {
     return false;
   }
 
-  if (data.type === 'local' && (!data.passwordHash || typeof data.passwordHash !== 'string')) {
+  if (data.type === 'local' && !hasValidLocalPasswordHash(data.passwordHash)) {
     return false;
   }
 
@@ -161,11 +204,14 @@ function createUserStore({ dataDir, enableBak }) {
     if (!user || user.type !== 'local') {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
-    const expectedHash = user.passwordHash || '';
-    if (!password || hashPassword(password) !== expectedHash) {
+    if (!verifyPassword(password, user.passwordHash)) {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
     const now = new Date().toISOString();
+    if (isLegacyPasswordHash(user.passwordHash)) {
+      user.passwordHash = hashPassword(password);
+      user.passwordUpdatedAt = now;
+    }
     user.lastLoginAt = now;
     const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
     history.push(now);

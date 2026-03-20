@@ -1,87 +1,142 @@
 {
-  "treeview": [
-    ".gitignore",
-    "AGENTS.md",
-    "PROJECT_SPEC.md",
-    "PROJECT_STATUS.json",
-    "README.md",
-    "LICENSE",
-    "package-lock.json",
-    "package.json",
-    "Data/",
-    "Data/config/",
-    "Data/config/.gitkeep",
-    "Data/config/locks.json",
-    "Data/config/system-config.json",
-    "Data/log/",
-    "Data/log/audit.log",
-    "Data/reparti/",
-    "Data/reparti/Demo.json",
-    "Data/utenti/",
-    "Data/utenti/users.json.migrated",
-    "public/",
-    "public/styles/",
-    "public/styles/00-foundation.css",
-    "public/styles/10-forms-auth.css",
-    "public/styles/20-feedback.css",
-    "public/styles/30-gantt.css",
-    "public/styles/40-sidebar.css",
-    "public/index.html",
-    "public/styles.css",
-    "scripts/",
-    "scripts/build-msi.ps1",
-    "scripts/clean.ps1",
-    "scripts/install-service.ps1",
-    "scripts/provision-wix.ps1",
-    "scripts/smoke-check.js",
-    "scripts/uninstall-service.ps1",
-    "server/",
-    "server/auditService.js",
-    "server/httpsService.js",
-    "server/ldapService.js",
-    "server/lockStore.js",
-    "server/schema.js",
-    "server/server.js",
-    "server/serverService.js",
-    "server/userStore.js",
-    "src/",
-    "src/app-config.js",
-    "src/client/",
-    "src/client/api.js",
-    "src/client/app.jsx",
-    "src/client/storage.js",
-    "src/client/components/",
-    "src/client/components/AlertsPanel.jsx",
-    "src/client/components/GanttCanvas.jsx",
-    "src/client/components/GanttControls.jsx",
-    "src/client/components/HeaderBar.jsx",
-    "src/client/components/LoginScreen.jsx",
-    "src/client/components/ProjectForm.jsx",
-    "src/client/components/ProjectList.jsx",
-    "src/client/components/ProjectSidebar.jsx",
-    "src/client/components/SystemSettings.jsx",
-    "src/client/components/UserManagement.jsx",
-    "src/client/hooks/",
-    "src/client/hooks/useDepartmentLock.js",
-    "src/client/hooks/useProjects.js",
-    "src/utils/",
-    "src/utils/easter.js",
-    "src/utils/utils-date.js",
-    "src/utils/utils-gantt.js",
-    "src/utils/utils-logic.js",
-    "tools/",
-    "tools/nssm/",
-    "tools/nssm/win32/",
-    "tools/nssm/win32/nssm.exe",
-    "tools/nssm/win64/",
-    "tools/nssm/win64/nssm.exe",
-    "tools/wix/",
-    "tools/wix/Product.wxs"
+  "schema_version": 1,
+  "repo_type": "single",
+  "stack": [
+    "nodejs",
+    "express",
+    "react-browser",
+    "powershell",
+    "wix",
+    "nssm"
   ],
-  "files_big": [
-    "Data/reparti/Demo.json:1255",
-    "server/server.js:1893",
-    "src/client/app.jsx:1126"
-  ],
-  "tasks": []
+  "artifacts_root": "artifacts",
+  "commands": {
+    "bootstrap": "scripts/bootstrap.ps1",
+    "doctor": "scripts/doctor.ps1",
+    "compile": "scripts/compile.ps1",
+    "build": "scripts/build.ps1",
+    "test": "scripts/test.ps1",
+    "pack": "scripts/pack.ps1",
+    "publish": "scripts/publish.ps1",
+    "clean": "scripts/clean.ps1"
+  },
+  "tasks": [
+    {
+      "id": "api-critical-flows-test-coverage",
+      "type": "infra",
+      "status": "pending",
+      "description": "Aggiungere test automatici per i flussi server piu' rischiosi oggi scoperti o coperti solo dallo smoke test: login admin, login locale, fallback LDAP, cambio/reset password reparto, gestione utenti locali, import/export modulare e aggiornamento system-config.",
+      "files": [
+        "server/server.js",
+        "server/ldapService.js",
+        "server/userStore.js",
+        "tests"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "client-logic-regression-tests",
+      "type": "infra",
+      "status": "pending",
+      "description": "Introdurre test di regressione per la logica client pura piu' densa: calendario festivi, validazione/normalizzazione progetti, percentuali, ritardi e calcolo layout Gantt, oggi priva di copertura dedicata.",
+      "files": [
+        "src/utils/easter.js",
+        "src/utils/utils-date.js",
+        "src/utils/utils-logic.js",
+        "src/utils/utils-gantt.js",
+        "tests"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "modular-integrations-module",
+      "type": "bug",
+      "status": "pending",
+      "description": "Completare oppure rimuovere in modo coerente il modulo `integrations` del backup modulare: il server lo accetta ma in import/export risponde ancora con `Module not supported yet`, mentre la UI lo dichiara non esposto.",
+      "files": [
+        "server/server.js",
+        "src/client/components/SystemSettings.jsx",
+        "src/client/app.jsx"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "legacy-backup-flow-alignment",
+      "type": "drift",
+      "status": "pending",
+      "description": "Allineare o deprecare i flussi legacy `server-backup` e `server-restore`: oggi esistono endpoint e API client dedicati, ma non sono integrati nella UI principale e duplicano parzialmente il backup modulare.",
+      "files": [
+        "server/server.js",
+        "src/client/api.js",
+        "src/client/components/SystemSettings.jsx",
+        "README.md"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "client-runtime-bundling",
+      "type": "refactor",
+      "status": "pending",
+      "description": "Rimuovere la dipendenza runtime da CDN esterni e da Babel standalone in browser, sostituendola con un packaging client locale e ripetibile che funzioni anche offline e sia piu' coerente con gli obiettivi di determinismo del repository.",
+      "files": [
+        "public/index.html",
+        "src/client",
+        "package.json",
+        "scripts"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "gantt-vertical-scroll-sync",
+      "type": "bug",
+      "status": "pending",
+      "description": "Completare o correggere la sincronizzazione verticale tra sidebar e canvas Gantt: `GanttCanvas` contiene logica per viewport e scroll condiviso ma il relativo container verticale non e' agganciato al DOM, quindi lo scorrimento condiviso e il rendering ottimizzato risultano incompleti.",
+      "files": [
+        "src/client/app.jsx",
+        "src/client/components/GanttCanvas.jsx",
+        "src/client/components/ProjectSidebar.jsx"
+      ],
+      "priority": 1
+    },
+    {
+      "id": "blocking-dialogs-to-managed-ui",
+      "type": "refactor",
+      "status": "pending",
+      "description": "Sostituire i flussi basati su `prompt`, `confirm` e `alert` con dialog o form gestiti dalla UI React per rendere i percorsi admin e di editing piu' consistenti, accessibili e testabili.",
+      "files": [
+        "src/client/app.jsx",
+        "src/client/components/HeaderBar.jsx",
+        "src/client/components/LoginScreen.jsx",
+        "src/client/components/ProjectForm.jsx",
+        "src/client/components/SystemSettings.jsx",
+        "src/client/components/UserManagement.jsx"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "root-source-layout-normalization",
+      "type": "drift",
+      "status": "pending",
+      "description": "Valutare una migrazione sicura di `server/` e `public/` sotto una struttura piu' aderente allo standard del repository, senza rompere runtime applicativo, pack MSI e script Windows gia' presenti.",
+      "files": [
+        "server",
+        "public",
+        "src",
+        "tools/wix/Product.wxs"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "runtime-data-root-review",
+      "type": "drift",
+      "status": "pending",
+      "description": "Chiarire se `Data/` debba restare seed/runtime root versionata oppure essere separata meglio tra dati esempio, configurazione seed e file runtime locali non versionati.",
+      "files": [
+        "Data",
+        "README.md",
+        "PROJECT_SPEC.md"
+      ],
+      "priority": 3
+    }
+  ]
 }

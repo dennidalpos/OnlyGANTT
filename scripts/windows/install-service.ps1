@@ -71,7 +71,7 @@ function Remove-NssmService {
   Invoke-Nssm -Executable $Executable -Arguments @('remove', $Name, 'confirm')
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $nodePath = (Get-Command node).Source
 $serverPath = Join-Path $repoRoot 'server\server.js'
 $logDir = Join-Path $repoRoot 'Data\log'
@@ -92,7 +92,7 @@ if (-not (Test-Path $packageJsonPath)) {
 
 $nodeModulesPath = Join-Path $repoRoot 'node_modules'
 if (-not (Test-Path $nodeModulesPath)) {
-  throw "Dependencies not installed. Run 'npm install' in $repoRoot before installing the service."
+  throw "Dependencies not installed. Run 'scripts/bootstrap.ps1' in $repoRoot before installing the service."
 }
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

@@ -1,10 +1,17 @@
 node_modules/
 tools/wix314-binaries/
+artifacts/**
+!artifacts/
+!artifacts/**/
+!artifacts/**/.gitkeep
 build/
 dist/
 out/
 publish/
 tmp/
+Data/config/locks.json
+Data/config/admin-auth.json
+Data/log/*.log
 .vscode/
 .idea/
 .DS_Store

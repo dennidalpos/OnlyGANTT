@@ -53,16 +53,16 @@ function Invoke-Nssm {
   }
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $nssmExe = TryResolve-NssmExecutable -RepoRoot $repoRoot -ExplicitPath $NssmPath
-
-Assert-Administrator
 
 $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($null -eq $service) {
   Write-Host "Service '$ServiceName' not found."
   exit 0
 }
+
+Assert-Administrator
 
 if ($service.Status -ne 'Stopped') {
   Stop-Service -Name $ServiceName -Force

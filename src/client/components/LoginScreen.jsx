@@ -139,6 +139,12 @@
       }
     }, [activeTab, adminToken, userName]);
 
+    useEffect(() => {
+      if (!authConfig.adminResetEnabled || authConfig.adminManagedByEnv) {
+        setShowAdminPasswordReset(false);
+      }
+    }, [authConfig.adminManagedByEnv, authConfig.adminResetEnabled]);
+
     
     const selectedDeptObj = departments.find(d => d.name === selectedDept);
     const effectiveError = error || loginError;
@@ -146,6 +152,7 @@
     const hasDepartments = departments.length > 0;
     const needsPassword = selectedDeptObj?.protected && !adminToken;
     const requiresUserPassword = !adminToken && (authConfig.ldapEnabled || authConfig.localUsers > 0);
+    const canShowAdminPasswordReset = authConfig.adminResetEnabled && !authConfig.adminManagedByEnv;
 
     
     const canSubmitDept = Boolean(
@@ -664,59 +671,69 @@
 
                   {}
                   <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--border-color)' }}>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      style={{ width: '100%', fontSize: '0.85rem' }}
-                      onClick={() => setShowAdminPasswordReset(!showAdminPasswordReset)}
-                      disabled={isLoading}
-                    >
-                      {showAdminPasswordReset ? 'Nascondi reset password' : 'Password dimenticata?'}
-                    </button>
+                    {canShowAdminPasswordReset ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ width: '100%', fontSize: '0.85rem' }}
+                          onClick={() => setShowAdminPasswordReset(!showAdminPasswordReset)}
+                          disabled={isLoading}
+                        >
+                          {showAdminPasswordReset ? 'Nascondi reset password' : 'Password dimenticata?'}
+                        </button>
 
-                    {showAdminPasswordReset && (
-                      <div style={{ marginTop: 'var(--spacing-md)' }}>
-                        <div className="login-section">
-                          <div className="login-section-header">
-                            <span className="login-section-title" style={{ fontSize: '0.8rem' }}>Reset Password Admin</span>
+                        {showAdminPasswordReset && (
+                          <div style={{ marginTop: 'var(--spacing-md)' }}>
+                            <div className="login-section">
+                              <div className="login-section-header">
+                                <span className="login-section-title" style={{ fontSize: '0.8rem' }}>Reset Password Admin</span>
+                              </div>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)' }}>
+                                Usa il codice di reset fornito dall'amministratore di sistema (variabile ambiente ONLYGANTT_ADMIN_RESET_CODE).
+                              </p>
+                              <div className="form-group">
+                                <label htmlFor="admin-reset-code">Codice Reset</label>
+                                <input
+                                  id="admin-reset-code"
+                                  type="text"
+                                  value={adminResetCode}
+                                  onChange={(e) => setAdminResetCode(e.target.value)}
+                                  placeholder="Inserisci codice reset"
+                                  disabled={isLoading}
+                                  autoComplete="off"
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label htmlFor="new-admin-password">Nuova Password Admin</label>
+                                <input
+                                  id="new-admin-password"
+                                  type="password"
+                                  value={newAdminPassword}
+                                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                                  placeholder="Inserisci nuova password"
+                                  disabled={isLoading}
+                                  autoComplete="new-password"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="login-submit btn-success"
+                                onClick={handleAdminPasswordReset}
+                                disabled={!adminResetCode || !newAdminPassword || isLoading}
+                              >
+                                {isLoading ? 'Resettando...' : 'Reimposta Password'}
+                              </button>
+                            </div>
                           </div>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)' }}>
-                            Usa il codice di reset fornito dall'amministratore di sistema (variabile ambiente ONLYGANTT_ADMIN_RESET_CODE).
-                          </p>
-                          <div className="form-group">
-                            <label htmlFor="admin-reset-code">Codice Reset</label>
-                            <input
-                              id="admin-reset-code"
-                              type="text"
-                              value={adminResetCode}
-                              onChange={(e) => setAdminResetCode(e.target.value)}
-                              placeholder="Inserisci codice reset"
-                              disabled={isLoading}
-                              autoComplete="off"
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label htmlFor="new-admin-password">Nuova Password Admin</label>
-                            <input
-                              id="new-admin-password"
-                              type="password"
-                              value={newAdminPassword}
-                              onChange={(e) => setNewAdminPassword(e.target.value)}
-                              placeholder="Inserisci nuova password"
-                              disabled={isLoading}
-                              autoComplete="new-password"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            className="login-submit btn-success"
-                            onClick={handleAdminPasswordReset}
-                            disabled={!adminResetCode || !newAdminPassword || isLoading}
-                          >
-                            {isLoading ? 'Resettando...' : 'Reimposta Password'}
-                          </button>
-                        </div>
-                      </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="input-hint" style={{ margin: 0 }}>
+                        {authConfig.adminManagedByEnv
+                          ? 'Reset password non disponibile: la password admin e\' gestita da variabili ambiente.'
+                          : 'Reset password non disponibile: configurare ONLYGANTT_ADMIN_RESET_CODE per abilitarlo.'}
+                      </p>
                     )}
                   </div>
                 </>
