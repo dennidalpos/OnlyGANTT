@@ -39,7 +39,16 @@ OnlyGANTT è un'applicazione web per la gestione di diagrammi di Gantt con suppo
    ```
 
 ## Build
-Non esiste un build step dedicato. Il server Express serve direttamente i file statici da `public/` e `src/`, e i componenti React/JSX vengono caricati lato browser.
+Non esiste un build step frontend dedicato. Il server Express serve direttamente i file statici da `public/` e `src/`, e i componenti React/JSX vengono caricati lato browser.
+
+Per il packaging Windows è disponibile un build step MSI:
+
+```powershell
+npm run build:msi
+```
+
+Il comando esegue uno staging dei file runtime, genera il fragment WiX e produce un installer MSI x64 in `dist/msi/`.
+Se il toolchain WiX 3.14.1 non è ancora presente nella cache locale `tools/wix314-binaries/`, lo script lo scarica automaticamente dalla release ufficiale `wixtoolset/wix3`.
 
 ## Run
 1. Avvia il server:
@@ -61,16 +70,40 @@ npm run smoke
 Lo smoke check avvia il server su una cartella dati temporanea e verifica i flussi minimi di login admin, lock, logout e migrazione delle password reparto legacy.
 
 ## Publish e packaging
-Il repository non include una pipeline di publish o packaging applicativo. In ambiente Windows sono disponibili gli script operativi:
+Il repository include una pipeline MSI per Windows e gli script operativi per il servizio:
+- `scripts/build-msi.ps1`
 - `scripts/install-service.ps1`
 - `scripts/uninstall-service.ps1`
 
-Prima di installare il servizio Windows, eseguire almeno:
+Prima di generare o installare il pacchetto Windows, eseguire almeno:
 
 ```powershell
 npm install
 npm run smoke
 ```
+
+Per creare l'MSI:
+
+```powershell
+npm run build:msi
+```
+
+Per preprovisionare o rigenerare esplicitamente il toolchain WiX locale:
+
+```powershell
+npm run wix:provision
+```
+
+La directory `tools/wix314-binaries/` è una cache locale ignorata da Git. Lo script di provisioning scarica `wix314-binaries.zip` dalla release ufficiale WiX Toolset `v3.14.1` e la ricrea in modo ripetibile quando manca o quando viene richiesto un refresh.
+
+L'installer MSI:
+- installa l'app in `C:\Program Files\OnlyGANTT`;
+- crea il servizio Windows `OnlyGanttWeb` tramite `nssm.exe`;
+- usa la cartella dati `C:\Program Files\OnlyGANTT\Data`;
+- supporta major upgrade futuri mantenendo lo stesso `UpgradeCode`;
+- in disinstallazione rimuove servizio, chiavi di configurazione NSSM e file residui nelle directory dati note dell'app.
+
+L'MSI richiede Node.js gia' installato nel sistema e legge il path da `HKLM\SOFTWARE\Node.js\InstallPath`.
 
 Gli script di installazione/rimozione del servizio richiedono una sessione PowerShell avviata come amministratore.
 In caso di servizio gia' esistente o installazione NSSM rimasta parziale, usare `scripts/install-service.ps1 -ForceReinstall` dopo aver aperto PowerShell come amministratore.
@@ -80,7 +113,13 @@ Lo script di installazione verifica la presenza delle dipendenze e configura il 
 L'installazione del servizio usa `tools/nssm/win64/nssm.exe` oppure `tools/nssm/win32/nssm.exe` in base all'architettura del sistema, imposta la working directory del repository e scrive i log del servizio in `Data/log/service-stdout.log` e `Data/log/service-stderr.log`.
 
 ## Clean
-Il repository non include uno script `clean` dedicato. La pulizia locale consiste nella rimozione degli artefatti non versionati ignorati da Git, in particolare `node_modules/` e le directory temporanee locali come `build/`, `dist/`, `out/`, `publish/` e `tmp/`.
+E' disponibile uno script `clean` dedicato:
+
+```powershell
+npm run clean
+```
+
+Lo script rimuove gli artefatti locali sotto `build/`, `dist/`, `out/`, `publish/` e `tmp/`. Non elimina `tools/wix314-binaries/`, che è la cache locale del toolchain WiX usata dal packaging MSI.
 
 ## Configurazione
 Le configurazioni principali sono gestite tramite variabili d'ambiente:
@@ -232,6 +271,8 @@ Per abilitare HTTPS:
 - `Data/` contiene dati runtime e file di configurazione locale.
 
 ## Script operativi
+- `scripts/build-msi.ps1` crea un installer MSI x64 dell'applicazione e, se necessario, bootstrapa automaticamente il toolchain WiX locale.
+- `scripts/provision-wix.ps1` scarica la release ufficiale WiX Toolset 3.14.1 (`wix314-binaries.zip`) nella cache locale `tools/wix314-binaries/`.
 - `scripts/install-service.ps1` crea un servizio Windows per `server/server.js` tramite NSSM presente in `tools/nssm/` e configura il restart automatico del processo.
 - `scripts/uninstall-service.ps1` rimuove il servizio Windows creato per l'applicazione tramite NSSM; con `-ForceDelete` effettua fallback a `sc.exe delete` se NSSM non e' disponibile o la configurazione e' corrotta.
 
@@ -242,6 +283,8 @@ Per abilitare HTTPS:
 
 ## Tools
 - `tools/nssm/` contiene `nssm.exe` per `win32` e `win64`, usato dagli script di installazione/rimozione del servizio Windows.
+- `tools/wix/` contiene il sorgente WiX dell'installer MSI.
+- `tools/wix314-binaries/` è una cache locale non versionata dei binari WiX 3.14.1, rigenerabile tramite `npm run wix:provision`.
 
 ## Licenza
 Il progetto e' distribuito con licenza proprietaria. I dettagli sono definiti nel file `LICENSE`.

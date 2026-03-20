@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="OnlyGANTT"
+    Language="1033"
+    Version="$(var.ProductVersion)"
+    Manufacturer="Danny Perondi"
+    UpgradeCode="A4D53FF8-7371-4D14-A5A4-1D28234EFB7E">
+    <Package
+      InstallerVersion="500"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Platform="x64"
+      Description="OnlyGANTT server installer" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of OnlyGANTT is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="NODEINSTALLDIR">
+      <RegistrySearch
+        Id="NodeInstallDirSearch"
+        Root="HKLM"
+        Key="SOFTWARE\Node.js"
+        Name="InstallPath"
+        Type="raw"
+        Win64="yes" />
+    </Property>
+
+    <Condition Message="Node.js must be installed before installing OnlyGANTT.">
+      Installed OR NODEINSTALLDIR
+    </Condition>
+
+    <Feature Id="MainFeature" Title="OnlyGANTT" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="CmpNssmService" />
+      <ComponentRef Id="CmpInstallRootCleanup" />
+      <ComponentRef Id="CmpDataRoot" />
+      <ComponentRef Id="CmpDataConfig" />
+      <ComponentRef Id="CmpDataLog" />
+      <ComponentRef Id="CmpDataDepartments" />
+      <ComponentRef Id="CmpDataUsers" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="OnlyGANTT">
+          <Directory Id="DATADIR" Name="Data">
+            <Directory Id="DATACONFIGDIR" Name="config" />
+            <Directory Id="DATALOGDIR" Name="log" />
+            <Directory Id="DATADEPARTMENTSDIR" Name="reparti" />
+            <Directory Id="DATAUSERSDIR" Name="utenti" />
+          </Directory>
+          <Directory Id="TOOLSDIR" Name="tools">
+            <Directory Id="NSSMDIR" Name="nssm">
+              <Directory Id="NSSMWIN64DIR" Name="win64" />
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="NSSMWIN64DIR">
+      <Component Id="CmpNssmService" Guid="29CD9322-0B8D-430B-BA4E-3A58E8F468C4" Win64="yes">
+        <File Id="FilNssmExe" Source="$(var.NssmSource)" KeyPath="yes" Checksum="yes" />
+
+        <ServiceInstall
+          Id="SvcInstallOnlyGantt"
+          Name="OnlyGanttWeb"
+          DisplayName="OnlyGantt Web Server"
+          Description="OnlyGANTT server service"
+          Type="ownProcess"
+          Start="auto"
+          ErrorControl="normal"
+          Vital="yes"
+          Account="LocalSystem" />
+
+        <ServiceControl
+          Id="SvcControlOnlyGantt"
+          Name="OnlyGanttWeb"
+          Start="install"
+          Stop="both"
+          Remove="both"
+          Wait="yes" />
+
+        <RegistryKey
+          Root="HKLM"
+          Key="SYSTEM\CurrentControlSet\Services\OnlyGanttWeb\Parameters"
+          ForceCreateOnInstall="yes"
+          ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="Application" Type="expandable" Value="[NODEINSTALLDIR]node.exe" />
+          <RegistryValue Name="AppParameters" Type="expandable" Value="&quot;[INSTALLDIR]server\server.js&quot;" />
+          <RegistryValue Name="AppDirectory" Type="expandable" Value="[INSTALLDIR]" />
+          <RegistryValue Name="AppStdout" Type="expandable" Value="[DATALOGDIR]service-stdout.log" />
+          <RegistryValue Name="AppStderr" Type="expandable" Value="[DATALOGDIR]service-stderr.log" />
+          <RegistryValue Name="AppRotateFiles" Type="integer" Value="1" />
+          <RegistryValue Name="AppRotateOnline" Type="integer" Value="1" />
+          <RegistryValue Name="AppRotateBytes" Type="integer" Value="10485760" />
+          <RegistryValue Name="AppThrottle" Type="integer" Value="1500" />
+          <RegistryValue Name="AppEnvironmentExtra" Type="multiString">
+            <MultiStringValue>ONLYGANTT_SERVICE_MANAGER=nssm</MultiStringValue>
+            <MultiStringValue>ONLYGANTT_DATA_DIR=[DATADIR]</MultiStringValue>
+          </RegistryValue>
+        </RegistryKey>
+
+        <RegistryKey
+          Root="HKLM"
+          Key="SYSTEM\CurrentControlSet\Services\OnlyGanttWeb\Parameters\AppExit"
+          ForceCreateOnInstall="yes"
+          ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string" Value="Restart" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="CmpInstallRootCleanup" Guid="D4ED91C9-D34D-4B04-92D5-3F25728BFA03" Win64="yes">
+        <CreateFolder />
+        <RemoveFolder Id="RemoveInstallRootDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="InstallRoot"
+          Type="string"
+          Value="[INSTALLDIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATADIR">
+      <Component Id="CmpDataRoot" Guid="AF520689-7EA0-48C4-BABC-D26274B8FC4A" Win64="yes">
+        <CreateFolder />
+        <RemoveFile Id="RemoveDataRootFiles" Name="*.*" On="uninstall" />
+        <RemoveFolder Id="RemoveDataRootDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="DataRoot"
+          Type="string"
+          Value="[DATADIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATACONFIGDIR">
+      <Component Id="CmpDataConfig" Guid="AEBE1CCC-7100-4161-BC93-81E4F13FE4CF" Win64="yes">
+        <CreateFolder />
+        <RemoveFile Id="RemoveDataConfigFiles" Name="*.*" On="uninstall" />
+        <RemoveFolder Id="RemoveDataConfigDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="DataConfig"
+          Type="string"
+          Value="[DATACONFIGDIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATALOGDIR">
+      <Component Id="CmpDataLog" Guid="57B83069-E6A1-433A-B12C-E0FCB69BC72B" Win64="yes">
+        <CreateFolder />
+        <RemoveFile Id="RemoveDataLogFiles" Name="*.*" On="uninstall" />
+        <RemoveFolder Id="RemoveDataLogDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="DataLog"
+          Type="string"
+          Value="[DATALOGDIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATADEPARTMENTSDIR">
+      <Component Id="CmpDataDepartments" Guid="DFD81D72-C8A5-4BC4-87D7-49CE5BFB4E91" Win64="yes">
+        <CreateFolder />
+        <RemoveFile Id="RemoveDataDepartmentFiles" Name="*.*" On="uninstall" />
+        <RemoveFolder Id="RemoveDataDepartmentsDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="DataDepartments"
+          Type="string"
+          Value="[DATADEPARTMENTSDIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATAUSERSDIR">
+      <Component Id="CmpDataUsers" Guid="6CF40BCC-8B53-4B7E-8C52-BCB77C8C871F" Win64="yes">
+        <CreateFolder />
+        <RemoveFile Id="RemoveDataUserFiles" Name="*.*" On="uninstall" />
+        <RemoveFolder Id="RemoveDataUsersDir" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="DataUsers"
+          Type="string"
+          Value="[DATAUSERSDIR]"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
