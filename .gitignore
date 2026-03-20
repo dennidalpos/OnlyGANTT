@@ -1,4 +1,14 @@
 node_modules/
+build/
+dist/
+out/
+publish/
+tmp/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
 *.bak
 *.tmp
-.DS_Store

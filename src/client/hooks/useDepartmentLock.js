@@ -47,7 +47,7 @@
             scheduleHeartbeat();
           } catch (err) {
             setIsLocked(false);
-            setError({ message: 'Lost lock connection' });
+            setError({ message: err.message || 'Lost lock connection', code: err.code, status: err.status });
             stopHeartbeat();
           }
         }, delay);
@@ -97,18 +97,21 @@
       stopHeartbeat();
       try {
         await api.releaseLock(targetDepartment, targetUserName);
-      } catch (err) {}
+      } catch (err) {
+        setError({ message: err.message || 'Impossibile rilasciare il lock', code: err.code, status: err.status });
+      }
     }, [stopHeartbeat]);
 
     const releaseLock = useCallback(async () => {
       if (!department || !userName) return;
       try {
         await releaseLockFor(department, userName);
+        setError(null);
+      } finally {
         previousLockRef.current = null;
         setLockInfo(null);
         setIsLocked(false);
-        setError(null);
-      } catch (err) {}
+      }
     }, [department, userName, releaseLockFor]);
 
     useEffect(() => {

@@ -8,12 +8,22 @@
 
   function UserManagement({ adminToken, onBack }) {
     const api = window.OnlyGantt.api;
+    const emptyForm = {
+      userId: '',
+      displayName: '',
+      mail: '',
+      department: '',
+      password: ''
+    };
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [ldapError, setLdapError] = useState(null);
     const [ldapEnabled, setLdapEnabled] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [saving, setSaving] = useState(false);
+    const [editingUserId, setEditingUserId] = useState(null);
+    const [localUserForm, setLocalUserForm] = useState(emptyForm);
 
     useEffect(() => {
       if (!adminToken) return undefined;
@@ -91,6 +101,80 @@
       );
     };
 
+    const resetLocalUserForm = () => {
+      setEditingUserId(null);
+      setLocalUserForm(emptyForm);
+    };
+
+    const handleLocalFieldChange = (field, value) => {
+      setLocalUserForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleEditLocalUser = (user) => {
+      setError('');
+      setEditingUserId(user.userId);
+      setLocalUserForm({
+        userId: user.userId || '',
+        displayName: user.displayName || '',
+        mail: user.mail || '',
+        department: user.department || '',
+        password: ''
+      });
+    };
+
+    const handleSaveLocalUser = async () => {
+      if (!adminToken) return;
+
+      if (!localUserForm.userId.trim()) {
+        setError('Username locale obbligatorio');
+        return;
+      }
+
+      if (!editingUserId && localUserForm.password.length < 6) {
+        setError('Password minima di 6 caratteri per i nuovi utenti locali');
+        return;
+      }
+
+      setSaving(true);
+      setError('');
+
+      try {
+        await api.saveLocalUser({
+          userId: localUserForm.userId.trim(),
+          displayName: localUserForm.displayName.trim(),
+          mail: localUserForm.mail.trim(),
+          department: localUserForm.department.trim(),
+          password: localUserForm.password ? localUserForm.password : undefined
+        }, adminToken);
+        resetLocalUserForm();
+        setRefreshKey((prev) => prev + 1);
+      } catch (err) {
+        setError(err.message || 'Errore nel salvataggio utente locale');
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const handleDeleteLocalUser = async (user) => {
+      if (!adminToken || !user?.userId) return;
+      const confirmDelete = confirm(`Eliminare l'utente locale "${user.userId}"?`);
+      if (!confirmDelete) return;
+
+      setSaving(true);
+      setError('');
+      try {
+        await api.deleteLocalUser(user.userId, adminToken);
+        if (editingUserId === user.userId) {
+          resetLocalUserForm();
+        }
+        setRefreshKey((prev) => prev + 1);
+      } catch (err) {
+        setError(err.message || 'Errore nell\'eliminazione utente locale');
+      } finally {
+        setSaving(false);
+      }
+    };
+
     return (
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -109,6 +193,81 @@
           <p className="text-muted">
             Utenti totali: <strong>{counts.total}</strong> · Locali: <strong>{counts.local}</strong> · AD: <strong>{counts.ad}</strong>
           </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <button className="btn-success" onClick={resetLocalUserForm} disabled={saving}>
+              Nuovo utente locale
+            </button>
+            {editingUserId && (
+              <button className="btn-secondary" onClick={resetLocalUserForm} disabled={saving}>
+                Annulla modifica
+              </button>
+            )}
+          </div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <h3 className="card-title">{editingUserId ? `Modifica utente locale: ${editingUserId}` : 'Crea utente locale'}</h3>
+            <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="local-user-id">Username</label>
+                <input
+                  id="local-user-id"
+                  type="text"
+                  value={localUserForm.userId}
+                  onChange={(e) => handleLocalFieldChange('userId', e.target.value)}
+                  disabled={saving || !!editingUserId}
+                  autoComplete="username"
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="local-display-name">Nome visualizzato</label>
+                <input
+                  id="local-display-name"
+                  type="text"
+                  value={localUserForm.displayName}
+                  onChange={(e) => handleLocalFieldChange('displayName', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="local-mail">Email</label>
+                <input
+                  id="local-mail"
+                  type="email"
+                  value={localUserForm.mail}
+                  onChange={(e) => handleLocalFieldChange('mail', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="local-department">Reparto</label>
+                <input
+                  id="local-department"
+                  type="text"
+                  value={localUserForm.department}
+                  onChange={(e) => handleLocalFieldChange('department', e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="local-password">{editingUserId ? 'Nuova password' : 'Password'}</label>
+                <input
+                  id="local-password"
+                  type="password"
+                  value={localUserForm.password}
+                  onChange={(e) => handleLocalFieldChange('password', e.target.value)}
+                  disabled={saving}
+                  autoComplete={editingUserId ? 'new-password' : 'current-password'}
+                />
+                <span className="input-hint">
+                  {editingUserId ? 'Lascia vuoto per mantenere la password corrente.' : 'Minimo 6 caratteri.'}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+              <button className="btn-success" onClick={handleSaveLocalUser} disabled={saving}>
+                {saving ? 'Salvataggio...' : editingUserId ? 'Aggiorna utente locale' : 'Crea utente locale'}
+              </button>
+            </div>
+          </div>
           {!ldapEnabled && (
             <div className="alert-item info">LDAP non abilitato: sono mostrati solo utenti locali.</div>
           )}
@@ -132,12 +291,13 @@
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Reparto</th>
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Tipo</th>
                     <th style={{ textAlign: 'left', padding: '0.5rem' }}>Ultimo accesso</th>
+                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ padding: '0.75rem' }} className="text-muted">
+                      <td colSpan="7" style={{ padding: '0.75rem' }} className="text-muted">
                         Nessun utente trovato.
                       </td>
                     </tr>
@@ -152,6 +312,20 @@
                           {user.userType === 'ad' ? 'AD' : 'Locale'}
                         </td>
                         <td style={{ padding: '0.5rem' }}>{renderLastLogin(user.lastLoginAt)}</td>
+                        <td style={{ padding: '0.5rem' }}>
+                          {user.userType === 'local' ? (
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button className="btn-secondary" onClick={() => handleEditLocalUser(user)} disabled={saving}>
+                                Modifica
+                              </button>
+                              <button className="btn-danger" onClick={() => handleDeleteLocalUser(user)} disabled={saving}>
+                                Elimina
+                              </button>
+                            </div>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

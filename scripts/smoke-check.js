@@ -1,0 +1,181 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const http = require('http');
+const { spawn } = require('child_process');
+
+const SERVER_ENTRY = path.join(__dirname, '..', 'server', 'server.js');
+const HOST = '127.0.0.1';
+const PORT = 3321;
+const ADMIN_PASSWORD = 'SmokePass123';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createTempDataDir() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'onlygantt-smoke-'));
+  ['reparti', 'config', 'utenti', 'log'].forEach((segment) => {
+    fs.mkdirSync(path.join(root, segment), { recursive: true });
+  });
+
+  const legacyDepartmentPath = path.join(root, 'reparti', 'Legacy.json');
+  fs.writeFileSync(legacyDepartmentPath, JSON.stringify({
+    password: 'legacy-pass',
+    projects: [],
+    meta: {
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'smoke-seed',
+      revision: 1
+    }
+  }, null, 2), 'utf8');
+
+  return root;
+}
+
+function requestJson(method, requestPath, body = null, headers = {}) {
+  const payload = body == null ? null : JSON.stringify(body);
+
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: HOST,
+      port: PORT,
+      path: requestPath,
+      method,
+      headers: {
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+        ...headers
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        const data = text ? JSON.parse(text) : null;
+        if (res.statusCode >= 400) {
+          const error = new Error(data?.error?.message || `HTTP ${res.statusCode}`);
+          error.status = res.statusCode;
+          error.code = data?.error?.code;
+          error.data = data;
+          reject(error);
+          return;
+        }
+        resolve({ status: res.statusCode, data });
+      });
+    });
+
+    req.on('error', reject);
+    if (payload) {
+      req.write(payload);
+    }
+    req.end();
+  });
+}
+
+async function waitForServerReady() {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 15000) {
+    try {
+      await requestJson('GET', '/api/auth/config');
+      return;
+    } catch (err) {
+      await sleep(250);
+    }
+  }
+  throw new Error('Server did not start within 15 seconds');
+}
+
+async function main() {
+  const dataDir = createTempDataDir();
+  const server = spawn(process.execPath, [SERVER_ENTRY], {
+    cwd: path.join(__dirname, '..'),
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      ONLYGANTT_DATA_DIR: dataDir,
+      ONLYGANTT_ADMIN_PASSWORD: ADMIN_PASSWORD
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  let stdout = '';
+  let stderr = '';
+  server.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
+  server.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
+
+  try {
+    await waitForServerReady();
+
+    const authConfig = await requestJson('GET', '/api/auth/config');
+    if (!authConfig.data?.adminConfigured) {
+      throw new Error('Expected admin to be configured during smoke run');
+    }
+
+    const adminLogin = await requestJson('POST', '/api/admin/login', {
+      userId: 'admin',
+      password: ADMIN_PASSWORD
+    });
+
+    const userToken = adminLogin.data?.userToken;
+    if (!userToken) {
+      throw new Error('Admin login did not return a user token');
+    }
+
+    await requestJson('POST', '/api/lock/Legacy/acquire', {
+      userName: 'admin',
+      clientHost: 'smoke-check'
+    }, {
+      'X-User-Token': userToken
+    });
+
+    let unauthorizedReleaseStatus = null;
+    try {
+      await requestJson('POST', '/api/lock/Legacy/release', { userName: 'admin' });
+    } catch (err) {
+      unauthorizedReleaseStatus = err.status;
+    }
+    if (unauthorizedReleaseStatus !== 401) {
+      throw new Error(`Expected unauthorized release to return 401, got ${unauthorizedReleaseStatus}`);
+    }
+
+    await requestJson('POST', '/api/lock/Legacy/release', {
+      userName: 'admin'
+    }, {
+      'X-User-Token': userToken
+    });
+
+    await requestJson('POST', '/api/auth/logout', {}, {
+      'X-User-Token': userToken
+    });
+
+    const verifyLegacy = await requestJson('POST', '/api/departments/Legacy/verify', {
+      password: 'legacy-pass'
+    });
+    if (!verifyLegacy.data?.ok) {
+      throw new Error('Legacy department password verification failed');
+    }
+
+    const persistedDepartment = JSON.parse(
+      fs.readFileSync(path.join(dataDir, 'reparti', 'Legacy.json'), 'utf8')
+    );
+    if (!persistedDepartment.password || typeof persistedDepartment.password !== 'object' || !persistedDepartment.password.hash) {
+      throw new Error('Expected migrated hashed department password');
+    }
+
+    console.log('Smoke check passed');
+  } finally {
+    server.kill('SIGTERM');
+    await sleep(250);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+    if (server.exitCode && server.exitCode !== 0) {
+      console.error(stdout);
+      console.error(stderr);
+      process.exit(server.exitCode);
+    }
+  }
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

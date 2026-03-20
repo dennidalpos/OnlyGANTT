@@ -12,6 +12,33 @@ function hashPassword(password) {
   return crypto.createHash('sha256').update(password, 'utf8').digest('hex');
 }
 
+function normalizeOptionalString(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function isValidUserRecord(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return false;
+  }
+
+  if (!normalizeUserId(data.userId) || !normalizeUserId(data.userIdNormalized)) {
+    return false;
+  }
+
+  if (!['local', 'ad'].includes(data.type)) {
+    return false;
+  }
+
+  if (data.type === 'local' && (!data.passwordHash || typeof data.passwordHash !== 'string')) {
+    return false;
+  }
+
+  return true;
+}
+
 function createUserStore({ dataDir, enableBak }) {
   const legacyUsersFilePath = path.join(dataDir, 'users.json');
 
@@ -31,12 +58,18 @@ function createUserStore({ dataDir, enableBak }) {
   const readUserFile = (userId) => {
     const filePath = getUserFilePath(userId);
     if (!filePath || !fs.existsSync(filePath)) return null;
-    const content = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(content);
-    if (!data.userId || !data.userIdNormalized) {
-      throw new Error('Invalid user file structure');
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const data = JSON.parse(content);
+      if (!isValidUserRecord(data)) {
+        console.warn(`[userStore] Invalid user file structure: ${path.basename(filePath)}`);
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.warn(`[userStore] Unable to read user file ${path.basename(filePath)}: ${err.message}`);
+      return null;
     }
-    return data;
   };
 
   const writeUserFileAtPath = (filePath, data) => {
@@ -80,6 +113,9 @@ function createUserStore({ dataDir, enableBak }) {
           userId: user.userId || normalized,
           userIdNormalized: user.userIdNormalized || normalized.toLowerCase()
         };
+        if (!isValidUserRecord(payload)) {
+          return;
+        }
         const userPath = path.join(dataDir, `${payload.userIdNormalized}.json`);
         if (!fs.existsSync(userPath)) {
           writeUserFileAtPath(userPath, payload);
@@ -108,7 +144,7 @@ function createUserStore({ dataDir, enableBak }) {
       try {
         const content = fs.readFileSync(filePath, 'utf8');
         const data = JSON.parse(content);
-        if (data.userId && data.userIdNormalized) {
+        if (isValidUserRecord(data)) {
           users.push(data);
         }
       } catch (err) {
@@ -163,6 +199,11 @@ function createUserStore({ dataDir, enableBak }) {
       };
       wasProvisioned = true;
     } else {
+      if (user.type === 'ad') {
+        user.displayName = profile.displayName || user.displayName || null;
+        user.mail = profile.mail || user.mail || null;
+        user.department = profile.department || user.department || null;
+      }
       if (touchLoginAt) {
         user.lastLoginAt = now;
         const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
@@ -170,9 +211,6 @@ function createUserStore({ dataDir, enableBak }) {
         user.loginHistory = history.slice(-50);
       }
       if (user.type === 'ad' && !user.ldapProvisionedAt) {
-        user.displayName = profile.displayName || user.displayName || null;
-        user.mail = profile.mail || user.mail || null;
-        user.department = profile.department || user.department || null;
         user.ldapProvisionedAt = now;
         wasProvisioned = true;
       }
@@ -254,6 +292,10 @@ function createUserStore({ dataDir, enableBak }) {
           userId: normalized,
           userIdNormalized: normalizedId
         };
+        if (!isValidUserRecord(payload)) {
+          results.skipped.push({ userId: normalized, reason: 'Invalid user payload' });
+          return;
+        }
         writeUserFile(normalized, payload);
         results.imported.push(normalized);
       } catch (err) {
@@ -263,10 +305,87 @@ function createUserStore({ dataDir, enableBak }) {
     return results;
   };
 
+  const upsertLocalUser = (userId, payload = {}) => {
+    ensureStore();
+    const normalized = normalizeUserId(userId);
+    if (!normalized) {
+      return { ok: false, code: 'INVALID_USER', message: 'Invalid user id' };
+    }
+
+    const nextPassword = typeof payload.password === 'string' ? payload.password : null;
+    if (nextPassword !== null && nextPassword.length < 6) {
+      return { ok: false, code: 'INVALID_PASSWORD', message: 'Password must be at least 6 characters' };
+    }
+
+    const existing = readUserFile(normalized);
+    if (existing && existing.type !== 'local') {
+      return { ok: false, code: 'USER_TYPE_CONFLICT', message: 'User exists as non-local account' };
+    }
+
+    if (!existing && !nextPassword) {
+      return { ok: false, code: 'PASSWORD_REQUIRED', message: 'Password is required for new local users' };
+    }
+
+    const now = new Date().toISOString();
+    const user = existing || {
+      userId: normalized,
+      userIdNormalized: normalized.toLowerCase(),
+      type: 'local',
+      createdAt: now,
+      lastLoginAt: null,
+      loginHistory: []
+    };
+
+    user.userId = normalized;
+    user.userIdNormalized = normalized.toLowerCase();
+    user.type = 'local';
+    user.displayName = normalizeOptionalString(payload.displayName) || user.displayName || normalized;
+    user.mail = normalizeOptionalString(payload.mail) || null;
+    user.department = normalizeOptionalString(payload.department) || null;
+    user.updatedAt = now;
+
+    if (nextPassword) {
+      user.passwordHash = hashPassword(nextPassword);
+      user.passwordUpdatedAt = now;
+    }
+
+    if (!user.passwordHash) {
+      return { ok: false, code: 'PASSWORD_REQUIRED', message: 'Password is required for local users' };
+    }
+
+    writeUserFile(normalized, user);
+    return { ok: true, user, created: !existing };
+  };
+
+  const deleteLocalUser = (userId) => {
+    ensureStore();
+    const filePath = getUserFilePath(userId);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { ok: false, code: 'NOT_FOUND', message: 'User not found' };
+    }
+
+    const user = readUserFile(userId);
+    if (!user) {
+      return { ok: false, code: 'NOT_FOUND', message: 'User not found' };
+    }
+    if (user.type !== 'local') {
+      return { ok: false, code: 'USER_TYPE_CONFLICT', message: 'Only local users can be deleted here' };
+    }
+
+    fs.unlinkSync(filePath);
+    const bakPath = `${filePath}.bak`;
+    if (fs.existsSync(bakPath)) {
+      fs.unlinkSync(bakPath);
+    }
+    return { ok: true, userId: user.userId };
+  };
+
   return {
     ensureStore,
     verifyLocalUser,
     upsertLdapUser,
+    upsertLocalUser,
+    deleteLocalUser,
     getAuthSnapshot,
     listLocalUsers,
     listUsers,

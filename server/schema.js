@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const VALID_STATES = ['da_iniziare', 'in_corso', 'in_ritardo', 'completato'];
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HASHED_SECRET_ALGORITHM = 'scrypt';
 
 function isValidDateString(str) {
   if (!str || typeof str !== 'string') return false;
@@ -27,6 +28,17 @@ function isValidDateString(str) {
 
 function isValidUUID(str) {
   return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+function isValidHashedSecret(secret) {
+  return !!secret &&
+    typeof secret === 'object' &&
+    !Array.isArray(secret) &&
+    secret.algorithm === HASHED_SECRET_ALGORITHM &&
+    typeof secret.salt === 'string' &&
+    !!secret.salt &&
+    typeof secret.hash === 'string' &&
+    !!secret.hash;
 }
 
 function validatePhase(phase, index) {
@@ -137,8 +149,13 @@ function validateDepartmentData(data) {
     return ['Data must be an object'];
   }
 
-  if (data.password !== null && data.password !== undefined && typeof data.password !== 'string') {
-    errors.push('password must be null or a string');
+  const hasValidPassword = data.password === null ||
+    data.password === undefined ||
+    typeof data.password === 'string' ||
+    isValidHashedSecret(data.password);
+
+  if (!hasValidPassword) {
+    errors.push('password must be null, a string, or a supported hashed secret object');
   }
 
   if (!Array.isArray(data.projects)) {
@@ -184,5 +201,7 @@ module.exports = {
   validateProject,
   validatePhase,
   ensureIDs,
-  isValidUUID
+  isValidUUID,
+  isValidHashedSecret,
+  HASHED_SECRET_ALGORITHM
 };

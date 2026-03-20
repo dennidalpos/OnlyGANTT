@@ -4,14 +4,15 @@
   "description": "OnlyGANTT - Interactive Gantt chart application with multi-user locking",
   "main": "server/server.js",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "smoke": "node scripts/smoke-check.js"
   },
   "keywords": [
     "gantt",
     "project-management"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Danny Perondi",
+  "license": "UNLICENSED",
   "dependencies": {
     "express": "^4.18.2",
     "ldapts": "^7.2.0",

@@ -31,7 +31,14 @@
     const [deptPassword, setDeptPassword] = useState('');
     const [pendingUserName, setPendingUserName] = useState(userName || '');
     const [userPassword, setUserPassword] = useState('');
-    const [authConfig, setAuthConfig] = useState({ ldapEnabled: false, localFallback: false, localUsers: 0 });
+    const [authConfig, setAuthConfig] = useState({
+      ldapEnabled: false,
+      localFallback: false,
+      localUsers: 0,
+      adminConfigured: true,
+      adminManagedByEnv: false,
+      adminResetEnabled: false
+    });
     const [authLoading, setAuthLoading] = useState(true);
     const [adminId, setAdminId] = useState('');
     const [adminPassword, setAdminPassword] = useState('');
@@ -79,11 +86,21 @@
           setAuthConfig({
             ldapEnabled: !!data.ldapEnabled,
             localFallback: !!data.localFallback,
-            localUsers: data.localUsers || 0
+            localUsers: data.localUsers || 0,
+            adminConfigured: data.adminConfigured !== false,
+            adminManagedByEnv: !!data.adminManagedByEnv,
+            adminResetEnabled: !!data.adminResetEnabled
           });
         } catch (err) {
           if (err.name === 'AbortError') return;
-          setAuthConfig({ ldapEnabled: false, localFallback: false, localUsers: 0 });
+          setAuthConfig({
+            ldapEnabled: false,
+            localFallback: false,
+            localUsers: 0,
+            adminConfigured: true,
+            adminManagedByEnv: false,
+            adminResetEnabled: false
+          });
         } finally {
           setAuthLoading(false);
         }
@@ -124,6 +141,7 @@
 
     
     const selectedDeptObj = departments.find(d => d.name === selectedDept);
+    const effectiveError = error || loginError;
     const isUserNameValid = pendingUserName.trim().length >= 2;
     const hasDepartments = departments.length > 0;
     const needsPassword = selectedDeptObj?.protected && !adminToken;
@@ -207,29 +225,34 @@
 
     const handleDeptLogin = async () => {
       if (!selectedDept) {
+        setLoginError('');
         setError('Seleziona un reparto');
         deptSelectRef.current?.focus();
         return;
       }
 
       if (!adminToken && !isUserNameValid) {
+        setLoginError('');
         setError('Inserisci un nome utente valido (min. 2 caratteri)');
         userNameRef.current?.focus();
         return;
       }
 
       if (requiresUserPassword && !userPassword) {
+        setLoginError('');
         setError('Inserisci la password utente');
         userPasswordRef.current?.focus();
         return;
       }
 
       if (authLoading) {
+        setLoginError('');
         setError('Configurazione autenticazione in caricamento');
         return;
       }
 
       setError('');
+      setLoginError('');
       setIsLoading(true);
 
       try {
@@ -281,18 +304,21 @@
 
     const handleAdminLogin = async () => {
       if (!adminId.trim()) {
+        setLoginError('');
         setError('Inserisci l\'ID admin');
         adminIdRef.current?.focus();
         return;
       }
 
       if (!adminPassword) {
+        setLoginError('');
         setError('Inserisci la password admin');
         adminPasswordRef.current?.focus();
         return;
       }
 
       setError('');
+      setLoginError('');
       setIsLoading(true);
 
       try {
@@ -301,7 +327,13 @@
         setAdminId('');
         setAdminPassword('');
       } catch (err) {
-        setError(err.message || 'Credenziali admin non valide');
+        if (err.code === 'ADMIN_PASSWORD_NOT_CONFIGURED') {
+          setError('Password admin non configurata. Imposta ONLYGANTT_ADMIN_PASSWORD oppure usa il codice reset.');
+        } else if (err.code === 'ADMIN_PASSWORD_MANAGED_BY_ENV') {
+          setError('Password admin gestita da variabili ambiente e non modificabile dalla UI.');
+        } else {
+          setError(err.message || 'Credenziali admin non valide');
+        }
         setAdminPassword('');
         adminPasswordRef.current?.focus();
       } finally {
@@ -317,6 +349,7 @@
     const handleTabChange = (tab) => {
       setActiveTab(tab);
       setError('');
+      setLoginError('');
     };
 
     const handleAdminPasswordReset = async () => {
@@ -373,10 +406,10 @@
           </div>
 
           {}
-          {error && (
+          {effectiveError && (
             <div className="login-error">
               <span className="login-error-icon">!</span>
-              <span className="login-error-text">{error}</span>
+              <span className="login-error-text">{effectiveError}</span>
             </div>
           )}
 
@@ -395,7 +428,10 @@
                     id="login-username"
                     type="text"
                     value={pendingUserName}
-                    onChange={(e) => setPendingUserName(e.target.value)}
+                    onChange={(e) => {
+                      setLoginError('');
+                      setPendingUserName(e.target.value);
+                    }}
                     onBlur={handleUserNameBlur}
                     onKeyDown={handleUserNameKeyDown}
                     placeholder="Il tuo nome (min. 2 caratteri)"
@@ -418,7 +454,10 @@
                       id="login-user-password"
                       type="password"
                       value={userPassword}
-                      onChange={(e) => setUserPassword(e.target.value)}
+                      onChange={(e) => {
+                        setLoginError('');
+                        setUserPassword(e.target.value);
+                      }}
                       onKeyDown={handleUserPasswordKeyDown}
                       placeholder="Inserisci password utente"
                       disabled={isLoading}
@@ -445,7 +484,10 @@
                       ref={deptSelectRef}
                       id="login-department"
                       value={selectedDept}
-                      onChange={(e) => setSelectedDept(e.target.value)}
+                      onChange={(e) => {
+                        setLoginError('');
+                        setSelectedDept(e.target.value);
+                      }}
                       onKeyDown={handleDeptSelectKeyDown}
                       disabled={isLoading || !hasDepartments}
                     >
@@ -474,7 +516,10 @@
                       id="login-dept-password"
                       type="password"
                       value={deptPassword}
-                      onChange={(e) => setDeptPassword(e.target.value)}
+                      onChange={(e) => {
+                        setLoginError('');
+                        setDeptPassword(e.target.value);
+                      }}
                       onKeyDown={handleDeptPasswordKeyDown}
                       placeholder="Inserisci password"
                       disabled={isLoading}
@@ -520,8 +565,11 @@
                         <select
                           ref={deptSelectRef}
                           id="login-admin-department"
-                          value={selectedDept}
-                          onChange={(e) => setSelectedDept(e.target.value)}
+                        value={selectedDept}
+                          onChange={(e) => {
+                            setLoginError('');
+                            setSelectedDept(e.target.value);
+                          }}
                           onKeyDown={handleDeptSelectKeyDown}
                           disabled={isLoading || !hasDepartments}
                         >
@@ -570,7 +618,10 @@
                         id="login-admin-id"
                         type="text"
                         value={adminId}
-                        onChange={(e) => setAdminId(e.target.value)}
+                        onChange={(e) => {
+                          setLoginError('');
+                          setAdminId(e.target.value);
+                        }}
                         onKeyDown={handleAdminIdKeyDown}
                         placeholder="Inserisci ID admin"
                         disabled={isLoading}
@@ -584,7 +635,10 @@
                         id="login-admin-password"
                         type="password"
                         value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
+                        onChange={(e) => {
+                          setLoginError('');
+                          setAdminPassword(e.target.value);
+                        }}
                         onKeyDown={handleAdminPasswordKeyDown}
                         placeholder="Inserisci password admin"
                         disabled={isLoading}
@@ -601,6 +655,12 @@
                   >
                     {isLoading ? 'Autenticazione...' : 'Accedi come admin'}
                   </button>
+
+                  {!authConfig.adminConfigured && (
+                    <p className="input-hint warning" style={{ marginTop: 'var(--spacing-sm)' }}>
+                      Password admin non configurata. Imposta `ONLYGANTT_ADMIN_PASSWORD` oppure usa il reset code per inizializzarla.
+                    </p>
+                  )}
 
                   {}
                   <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--border-color)' }}>

@@ -1,4 +1,11 @@
 {
+  "server": {
+    "lockTimeoutMinutes": 60,
+    "userSessionTtlHours": 8,
+    "adminSessionTtlHours": 8,
+    "maxUploadBytes": 2000000,
+    "enableBak": true
+  },
   "ldap": {
     "enabled": false,
     "log": false,

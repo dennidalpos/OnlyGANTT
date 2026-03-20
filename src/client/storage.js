@@ -4,6 +4,7 @@
   window.OnlyGantt = window.OnlyGantt || {};
 
   const USER_KEY = 'currentUser';
+  const sessionPasswords = new Map();
 
   function getHostnameKey() {
     return window.location.host.toLowerCase();
@@ -28,24 +29,15 @@
 
   function getPasswords(userName) {
     if (!userName) return {};
-
     const key = getPasswordsKey(userName);
-    const data = localStorage.getItem(key);
-
-    if (!data) return {};
-
-    try {
-      return JSON.parse(data);
-    } catch (err) {
-      return {};
-    }
+    return { ...(sessionPasswords.get(key) || {}) };
   }
 
   function savePasswords(userName, passwords) {
     if (!userName) return;
 
     const key = getPasswordsKey(userName);
-    localStorage.setItem(key, JSON.stringify(passwords));
+    sessionPasswords.set(key, { ...(passwords || {}) });
   }
 
   function getPassword(userName, department) {

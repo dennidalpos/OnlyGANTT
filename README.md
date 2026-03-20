@@ -5,14 +5,21 @@ OnlyGANTT è un'applicazione web per la gestione di diagrammi di Gantt con suppo
 ## Indice
 - [Panoramica](#panoramica)
 - [Requisiti](#requisiti)
-- [Avvio rapido](#avvio-rapido)
+- [Setup](#setup)
+- [Build](#build)
+- [Run](#run)
+- [Test](#test)
+- [Publish e packaging](#publish-e-packaging)
+- [Clean](#clean)
 - [Configurazione](#configurazione)
 - [Struttura dati](#struttura-dati)
+- [Struttura essenziale](#struttura-essenziale)
 - [API principali](#api-principali)
 - [Backup e import/export](#backup-e-importexport)
 - [Autenticazione e utenti](#autenticazione-e-utenti)
 - [Lock e concorrenza](#lock-e-concorrenza)
 - [HTTPS](#https)
+- [Licenza](#licenza)
 - [Troubleshooting](#troubleshooting)
 
 ## Panoramica
@@ -25,21 +32,55 @@ OnlyGANTT è un'applicazione web per la gestione di diagrammi di Gantt con suppo
 - **Node.js >= 18** (vedi `package.json`).
 - Ambiente con accesso al filesystem per salvare i dati.
 
-## Avvio rapido
+## Setup
 1. Installa le dipendenze:
    ```powershell
    npm install
    ```
-2. Avvia il server:
+
+## Build
+Non esiste un build step dedicato. Il server Express serve direttamente i file statici da `public/` e `src/`, e i componenti React/JSX vengono caricati lato browser.
+
+## Run
+1. Avvia il server:
    ```powershell
    npm start
    ```
-3. Apri il browser su:
+2. Apri il browser su:
    ```
    http://localhost:3000
    ```
 
-> Il server serve automaticamente i file statici da `public/` e `src/`.
+## Test
+Il repository non include una suite completa di test automatizzati, ma fornisce uno smoke check riproducibile del runtime:
+
+```powershell
+npm run smoke
+```
+
+Lo smoke check avvia il server su una cartella dati temporanea e verifica i flussi minimi di login admin, lock, logout e migrazione delle password reparto legacy.
+
+## Publish e packaging
+Il repository non include una pipeline di publish o packaging applicativo. In ambiente Windows sono disponibili gli script operativi:
+- `scripts/install-service.ps1`
+- `scripts/uninstall-service.ps1`
+
+Prima di installare il servizio Windows, eseguire almeno:
+
+```powershell
+npm install
+npm run smoke
+```
+
+Gli script di installazione/rimozione del servizio richiedono una sessione PowerShell avviata come amministratore.
+In caso di servizio gia' esistente o installazione NSSM rimasta parziale, usare `scripts/install-service.ps1 -ForceReinstall` dopo aver aperto PowerShell come amministratore.
+Per rimuovere un servizio registrato ma non piu' gestibile via NSSM, usare `scripts/uninstall-service.ps1 -ForceDelete`.
+
+Lo script di installazione verifica la presenza delle dipendenze e configura il riavvio automatico del servizio in caso di errore.
+L'installazione del servizio usa `tools/nssm/win64/nssm.exe` oppure `tools/nssm/win32/nssm.exe` in base all'architettura del sistema, imposta la working directory del repository e scrive i log del servizio in `Data/log/service-stdout.log` e `Data/log/service-stderr.log`.
+
+## Clean
+Il repository non include uno script `clean` dedicato. La pulizia locale consiste nella rimozione degli artefatti non versionati ignorati da Git, in particolare `node_modules/` e le directory temporanee locali come `build/`, `dist/`, `out/`, `publish/` e `tmp/`.
 
 ## Configurazione
 Le configurazioni principali sono gestite tramite variabili d'ambiente:
@@ -50,10 +91,11 @@ Le configurazioni principali sono gestite tramite variabili d'ambiente:
 | `ONLYGANTT_DATA_DIR` | Cartella dati (reparti, utenti, config) | `Data` |
 | `ONLYGANTT_ENABLE_BAK` | Abilita backup `.bak` dei file JSON | `true` |
 | `ONLYGANTT_LOCK_TIMEOUT_MINUTES` | Timeout lock reparto | `60` |
+| `ONLYGANTT_USER_SESSION_TTL_HOURS` | Durata sessione utente con rinnovo ad attivita' | `8` |
 | `ONLYGANTT_ADMIN_TTL_HOURS` | Durata sessione admin | `8` |
 | `ONLYGANTT_MAX_UPLOAD_BYTES` | Dimensione massima upload JSON | `2000000` |
 | `ONLYGANTT_ADMIN_USER` | Username admin | `admin` |
-| `ONLYGANTT_ADMIN_PASSWORD` | Password admin | `admin123` |
+| `ONLYGANTT_ADMIN_PASSWORD` | Password admin esplicita; se assente non esiste alcun default insicuro | non impostata |
 | `ONLYGANTT_ADMIN_RESET_CODE` | Codice reset admin (opzionale) | `null` |
 | `LDAP_ENABLED` | Abilita autenticazione LDAP | `false` |
 | `LDAP_URL` | URL server LDAP | `""` |
@@ -70,6 +112,8 @@ Le configurazioni principali sono gestite tramite variabili d'ambiente:
 
 ### Configurazione da UI
 Alcune impostazioni (LDAP/HTTPS) possono essere lette e aggiornate tramite le API admin e sono persistite in `Data/config/system-config.json`.
+Le credenziali admin persistite fuori dalle variabili d'ambiente sono salvate in `Data/config/admin-auth.json` con password hashata. Se `ONLYGANTT_ADMIN_PASSWORD` e' impostata, la password admin e' gestita dall'ambiente e la UI non puo' sovrascriverla.
+`system-config.json` puo' includere anche i parametri runtime del server (timeout lock, TTL sessioni, limite upload, `enableBak`), che vengono riapplicati al bootstrap e inclusi nei backup impostazioni.
 
 ## Struttura dati
 La cartella dati (di default `Data/`) contiene:
@@ -77,6 +121,7 @@ La cartella dati (di default `Data/`) contiene:
 ```
 Data/
   config/
+    admin-auth.json
     system-config.json
     locks.json
   log/
@@ -88,6 +133,8 @@ Data/
 ```
 
 `users.json` e' il formato legacy importato automaticamente verso file utente separati (`<user>.json`) quando contiene dati validi.
+Nel repository e' presente `Data/utenti/users.json.migrated` come artefatto di migrazione legacy.
+Le password reparto persistite nei file `reparti/*.json` non sono mantenute in chiaro: i file aggiornati usano un record hashato compatibile con la migrazione automatica dei formati legacy.
 
 ### Reparto (`reparti/<nome>.json`)
 Esempio minimale:
@@ -146,17 +193,21 @@ Esempi di endpoint (prefisso `/api`):
 
 ## Backup e import/export
 - **Legacy backup**: esporta reparti e configurazioni base.
-- **Modular backup**: esporta reparti, utenti e impostazioni selezionate.
+- **Modular backup**: esporta reparti, utenti e impostazioni selezionate, incluse le configurazioni persistite LDAP/HTTPS/runtime presenti in `system-config.json`.
+
+L'endpoint di export reparto non include il segreto della password reparto: l'import di un export applicativo mantiene la password gia' esistente se il payload non ne contiene una nuova.
 
 Dal pannello admin è possibile:
 - esportare i dati in formato JSON;
 - importare backup con opzione di sovrascrittura.
 
 ## Autenticazione e utenti
-- **Admin**: credenziali configurate via env; accesso tramite `/api/admin/login`.
+- **Admin**: credenziali configurate via `ONLYGANTT_ADMIN_PASSWORD` oppure persistite in `Data/config/admin-auth.json`; nessuna password di default hardcoded. Se la password e' gestita da env, il cambio/reset da UI viene rifiutato per evitare drift.
 - **Utenti locali**: salvati in `Data/utenti/*.json`.
+- **Provisioning utenti locali**: disponibile da UI admin nella sezione Gestione utenti, con creazione, aggiornamento metadati/password ed eliminazione senza editing manuale dei file JSON.
 - **LDAP**: supporto a bind, filtri personalizzabili e gruppo richiesto.
 - **Fallback locale**: opzionale se LDAP non disponibile.
+- **Sessioni utente**: token con TTL configurabile (`ONLYGANTT_USER_SESSION_TTL_HOURS`), rinnovo all'attivita' e logout esplicito tramite API.
 
 ## Lock e concorrenza
 Le modifiche ai progetti richiedono un lock sul reparto:
@@ -165,6 +216,7 @@ Le modifiche ai progetti richiedono un lock sul reparto:
 3. Rilasciare lock quando finito.
 
 Il server rimuove lock scaduti automaticamente.
+Il rilascio lock richiede la stessa sessione utente valida usata per acquire/heartbeat; heartbeat e release falliti vengono ora riportati al client.
 
 ## HTTPS
 Per abilitare HTTPS:
@@ -172,14 +224,27 @@ Per abilitare HTTPS:
 2. Configurare `HTTPS_KEY_PATH` e `HTTPS_CERT_PATH`.
 3. Riavviare il server.
 
+## Struttura essenziale
+- `server/` contiene backend Express, API REST e servizi di supporto.
+- `src/` contiene configurazione client, componenti React/JSX, hook e utility.
+- `public/` contiene shell HTML e fogli di stile serviti staticamente.
+- `scripts/` contiene script PowerShell operativi per Windows.
+- `Data/` contiene dati runtime e file di configurazione locale.
+
 ## Script operativi
-- `scripts/install-service.ps1` crea un servizio Windows per `server/server.js`.
-- `scripts/uninstall-service.ps1` rimuove il servizio Windows creato per l'applicazione.
+- `scripts/install-service.ps1` crea un servizio Windows per `server/server.js` tramite NSSM presente in `tools/nssm/` e configura il restart automatico del processo.
+- `scripts/uninstall-service.ps1` rimuove il servizio Windows creato per l'applicazione tramite NSSM; con `-ForceDelete` effettua fallback a `sc.exe delete` se NSSM non e' disponibile o la configurazione e' corrotta.
 
 ## Documentation
 - `PROJECT_SPEC.md`
 - `PROJECT_STATUS.json`
 - `AGENTS.md`
+
+## Tools
+- `tools/nssm/` contiene `nssm.exe` per `win32` e `win64`, usato dagli script di installazione/rimozione del servizio Windows.
+
+## Licenza
+Il progetto e' distribuito con licenza proprietaria. I dettagli sono definiti nel file `LICENSE`.
 
 ## Troubleshooting
 - **Errore LDAP_CONFIG_ERROR**: verificare URL e BASE_DN.

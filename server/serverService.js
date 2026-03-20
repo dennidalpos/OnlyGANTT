@@ -1,4 +1,8 @@
+const path = require('path');
 const { spawn } = require('child_process');
+
+const repoRoot = path.resolve(__dirname, '..');
+const serverEntry = path.join(repoRoot, 'server', 'server.js');
 
 function logRestartDiagnostic(message) {
   const timestamp = new Date().toISOString();
@@ -6,24 +10,21 @@ function logRestartDiagnostic(message) {
 }
 
 function restartServer() {
-  logRestartDiagnostic('Restart requested');
-
-  if (process.platform === 'win32') {
-    const child = spawn('cmd', ['/c', `taskkill /PID ${process.pid} /F && npm start`], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    child.unref();
-    logRestartDiagnostic(`Windows restart dispatched (child pid ${child.pid})`);
+  if ((process.env.ONLYGANTT_SERVICE_MANAGER || '').toLowerCase() === 'nssm') {
+    logRestartDiagnostic('Restart delegated to NSSM service manager');
+    process.exit(0);
     return;
   }
 
-  const child = spawn('sh', ['-c', 'npm start'], {
+  logRestartDiagnostic('Restart requested');
+  const child = spawn(process.execPath, [serverEntry], {
+    cwd: repoRoot,
+    env: { ...process.env },
     detached: true,
     stdio: 'ignore'
   });
   child.unref();
-  logRestartDiagnostic(`Unix restart dispatched (child pid ${child.pid})`);
+  logRestartDiagnostic(`Restart dispatched (child pid ${child.pid})`);
   process.kill(process.pid, 'SIGTERM');
 }
 

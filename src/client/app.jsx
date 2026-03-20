@@ -177,6 +177,22 @@
       api.setUserToken(userToken);
     }, [userToken]);
 
+    useEffect(() => {
+      const handleUserSessionInvalid = async (event) => {
+        setLoginError(event.detail?.message || 'Sessione utente scaduta. Effettua nuovamente l\'accesso.');
+        pushNotification({
+          type: 'warning',
+          message: event.detail?.message || 'Sessione utente scaduta. Effettua nuovamente l\'accesso.'
+        });
+        await resetSessionState({ nextUserName: '', nextAdminToken: null });
+      };
+
+      window.addEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
+      return () => {
+        window.removeEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
+      };
+    }, []);
+
     const initialScrollDoneRef = useRef(null);
 
     useEffect(() => {
@@ -477,10 +493,10 @@
       setSelectedProjectIds(new Set());
       setDepartmentValidationErrors([]);
       setFocusedProjectId(null);
+      setShowScreensaver(false);
       setAdminToken(nextAdminToken);
       setUserName(nextUserName);
       setUserToken(null);
-      setLoginError('');
     };
 
     const handleUserNameChange = async (nextUserName) => {
@@ -853,8 +869,13 @@
         try {
           await api.adminLogout(adminToken);
         } catch (err) {}
+      } else if (userToken) {
+        try {
+          await api.authLogout();
+        } catch (err) {}
       }
 
+      setLoginError('');
       await resetSessionState({ nextUserName: '', nextAdminToken: null });
     };
 
@@ -1021,6 +1042,12 @@
             {new Date(lockError.lockedAt).toLocaleString('it-IT')}
             {' '}fino a{' '}
             {new Date(lockError.expiresAt).toLocaleString('it-IT')}
+          </div>
+        )}
+
+        {lockError && !lockError.lockedBy && lockError.message && (
+          <div className="lock-banner">
+            {lockError.message}
           </div>
         )}
 

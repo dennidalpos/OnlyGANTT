@@ -6,6 +6,15 @@
   const BASE_URL = '';
   let userToken = null;
 
+  function notifyUserSessionInvalid(error) {
+    window.dispatchEvent(new CustomEvent('onlygantt:user-session-invalid', {
+      detail: {
+        message: error?.message || 'Sessione utente non valida o scaduta',
+        code: error?.code || 'UNAUTHORIZED'
+      }
+    }));
+  }
+
   function setUserToken(token) {
     userToken = token || null;
   }
@@ -31,11 +40,12 @@
   }
 
   async function fetchJSON(url, options = {}) {
+    const { userSession = false, ...fetchOptions } = options;
     const response = await fetch(BASE_URL + url, {
-      ...options,
+      ...fetchOptions,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers
+        ...fetchOptions.headers
       }
     });
 
@@ -52,6 +62,9 @@
       error.code = data?.error?.code;
       error.details = data?.error?.details;
       error.data = data;
+      if (userSession && response.status === 401 && error.code === 'UNAUTHORIZED') {
+        notifyUserSessionInvalid(error);
+      }
       throw error;
     }
 
@@ -112,6 +125,7 @@
       method: 'POST',
       body: JSON.stringify(buildUserPayload({ data, userName })),
       headers: buildUserHeaders(),
+      userSession: true,
       signal
     });
   }
@@ -152,6 +166,7 @@
       method: 'POST',
       body: JSON.stringify(buildUserPayload({ projects, expectedRevision, userName })),
       headers: buildUserHeaders(),
+      userSession: true,
       signal
     });
   }
@@ -179,6 +194,9 @@
       error.code = data.error?.code;
       error.details = data.error?.details;
       error.data = data;
+      if (response.status === 401 && error.code === 'UNAUTHORIZED') {
+        notifyUserSessionInvalid(error);
+      }
       throw error;
     }
 
@@ -208,6 +226,9 @@
       const error = new Error(data.error?.message || 'Lock acquire failed');
       error.status = response.status;
       error.code = data.error?.code;
+      if (response.status === 401 && error.code === 'UNAUTHORIZED') {
+        notifyUserSessionInvalid(error);
+      }
       throw error;
     }
 
@@ -215,12 +236,13 @@
   }
 
   async function releaseLock(department, userName) {
-    await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/release`, {
+    return fetchJSON(`/api/lock/${encodeURIComponent(department)}/release`, {
       method: 'POST',
       headers: buildUserHeaders({
         'Content-Type': 'application/json'
       }),
-      body: JSON.stringify(buildUserPayload({ userName }))
+      body: JSON.stringify(buildUserPayload({ userName })),
+      userSession: true
     });
   }
 
@@ -229,12 +251,13 @@
   }
 
   async function heartbeatLock(department, userName, signal) {
-    await fetch(`${BASE_URL}/api/lock/${encodeURIComponent(department)}/heartbeat`, {
+    return fetchJSON(`/api/lock/${encodeURIComponent(department)}/heartbeat`, {
       method: 'POST',
       headers: buildUserHeaders({
         'Content-Type': 'application/json'
       }),
       body: JSON.stringify(buildUserPayload({ userName })),
+      userSession: true,
       signal
     });
   }
@@ -253,6 +276,16 @@
     return fetchJSON('/api/admin/login', {
       method: 'POST',
       body: JSON.stringify({ userId, password }),
+      signal
+    });
+  }
+
+  async function authLogout(signal) {
+    await fetchJSON('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify(buildUserPayload({})),
+      headers: buildUserHeaders(),
+      userSession: true,
       signal
     });
   }
@@ -318,6 +351,27 @@
 
   async function getAdminUsers(token, signal) {
     return fetchJSON('/api/admin/users', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
+  async function saveLocalUser(user, token, signal) {
+    return fetchJSON('/api/admin/users/local', {
+      method: 'POST',
+      body: JSON.stringify(user),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      signal
+    });
+  }
+
+  async function deleteLocalUser(userId, token, signal) {
+    return fetchJSON(`/api/admin/users/local/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
       },
@@ -428,10 +482,13 @@
     adminReleaseLock,
     getAuthConfig,
     authLogin,
+    authLogout,
     adminLogin,
     adminLogout,
     getAdminDepartments,
     getAdminUsers,
+    saveLocalUser,
+    deleteLocalUser,
     adminResetPassword,
     adminChangePassword,
     adminServerBackup,
