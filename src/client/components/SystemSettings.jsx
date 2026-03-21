@@ -10,8 +10,6 @@
     onBack,
     onAdminModularExport,
     onAdminModularImport,
-    onAdminLegacyExport,
-    onAdminLegacyImport,
     adminToken,
     dialogApi,
     pushNotification
@@ -58,6 +56,7 @@
       keyPath: '',
       certPath: ''
     });
+    const hasLocalConfigEditsRef = useRef(false);
     const restartTimeoutRef = useRef(null);
     const restartIntervalRef = useRef(null);
     const RESTART_DELAY_SECONDS = 5;
@@ -91,6 +90,9 @@
         setConfigStatus(null);
         try {
           const data = await api.getSystemConfig(adminToken, controller.signal);
+          if (hasLocalConfigEditsRef.current) {
+            return;
+          }
           setLdapConfig({
             enabled: !!data.ldap?.enabled,
             log: !!data.ldap?.log,
@@ -164,14 +166,17 @@
     }, []);
 
     const handleLdapFieldChange = (field, value) => {
+      hasLocalConfigEditsRef.current = true;
       setLdapConfig((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleHttpsFieldChange = (field, value) => {
+      hasLocalConfigEditsRef.current = true;
       setHttpsConfig((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleServerFieldChange = (field, value) => {
+      hasLocalConfigEditsRef.current = true;
       setServerConfig((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -207,6 +212,7 @@
           }
         };
         const result = await api.updateSystemConfig(payload, adminToken);
+        hasLocalConfigEditsRef.current = false;
         setServerConfig({
           lockTimeoutMinutes: result.server?.lockTimeoutMinutes ?? serverConfig.lockTimeoutMinutes,
           userSessionTtlHours: result.server?.userSessionTtlHours ?? serverConfig.userSessionTtlHours,
@@ -363,35 +369,6 @@
       } catch (err) {
         if (pushNotification) {
           pushNotification({ type: 'error', message: `Errore nella lettura del file: ${err.message}` });
-        }
-      }
-    };
-
-    const handleLegacyExport = async () => {
-      if (!adminToken || !onAdminLegacyExport) return;
-      await onAdminLegacyExport();
-    };
-
-    const handleLegacyImport = async (file) => {
-      if (!file || !adminToken || !onAdminLegacyImport || !dialogApi) return;
-      try {
-        const text = await readFileAsText(file);
-        const backup = JSON.parse(text);
-        const overwrite = await dialogApi.confirm({
-          title: 'Importa backup legacy',
-          message:
-            'Questo flusso ripristina reparti e, se presenti nel file, anche impostazioni globali di compatibilita\'.\n' +
-            'I dati esistenti verranno sovrascritti. Confermi l\'import?',
-          confirmLabel: 'Importa backup legacy',
-          cancelLabel: 'Annulla',
-          confirmTone: 'danger'
-        });
-        if (overwrite) {
-          await onAdminLegacyImport({ backup, overwriteExisting: true });
-        }
-      } catch (err) {
-        if (pushNotification) {
-          pushNotification({ type: 'error', message: `Errore nella lettura del file legacy: ${err.message}` });
         }
       }
     };
@@ -867,35 +844,6 @@
                   const file = event.target.files[0];
                   if (file) {
                     handleModularImport(file);
-                    event.target.value = '';
-                  }
-                }}
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
-          <h4 className="settings-section-subtitle" style={{ marginTop: '1rem' }}>Compatibilita' legacy</h4>
-          <p className="settings-section-description text-muted">
-            Flusso storico di backup completo server-side. Preferire il backup modulare per i casi nuovi; usare questo formato solo quando serve compatibilita' con esportazioni legacy.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-            <button
-              className="btn-secondary"
-              onClick={handleLegacyExport}
-              disabled={!adminToken}
-            >
-              Esporta backup legacy
-            </button>
-            <label className="btn-secondary" style={{ margin: 0, cursor: adminToken ? 'pointer' : 'default', opacity: adminToken ? 1 : 0.6 }}>
-              Importa backup legacy
-              <input
-                type="file"
-                accept=".json"
-                disabled={!adminToken}
-                onChange={(event) => {
-                  const file = event.target.files[0];
-                  if (file) {
-                    handleLegacyImport(file);
                     event.target.value = '';
                   }
                 }}

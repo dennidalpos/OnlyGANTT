@@ -718,9 +718,6 @@
     };
 
     const buildExportFileName = () => `OnlyGANTT-${formatExportTimestamp()}.json`;
-    const buildLegacyExportFileName = () => `OnlyGANTT-legacy-${formatExportTimestamp()}.json`;
-
-    const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.users && !modules?.settings;
 
     const handleAdminModularExport = async (modules) => {
       if (!adminToken) return;
@@ -744,30 +741,6 @@
         });
       } catch (err) {
         pushNotification({ type: 'error', message: err.message || 'Export impostazioni fallito' });
-      }
-    };
-
-    const handleAdminLegacyExport = async () => {
-      if (!adminToken) return;
-      try {
-        const backup = await api.adminServerBackup(adminToken);
-        const dataStr = JSON.stringify(backup, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = buildLegacyExportFileName();
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        pushNotification({
-          type: 'success',
-          message: 'Backup legacy completo esportato'
-        });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Export legacy fallito' });
       }
     };
 
@@ -810,41 +783,6 @@
         }
       } catch (err) {
         pushNotification({ type: 'error', message: err.message || 'Import impostazioni fallito' });
-      }
-    };
-
-    const handleAdminLegacyImport = async ({ backup, overwriteExisting }) => {
-      if (!adminToken) return;
-      try {
-        const result = await api.adminServerRestore(backup, overwriteExisting, adminToken);
-        const settingsApplied = result.summary?.settingsApplied || 0;
-        await showDetailsDialog({
-          title: 'Esito import legacy',
-          message: 'Il ripristino legacy lato server e\' terminato.',
-          details:
-            `Import legacy completato\n` +
-            `- Reparti importati: ${result.summary?.imported ?? 0}\n` +
-            `- Reparti saltati: ${result.summary?.skipped ?? 0}\n` +
-            `- Errori: ${result.summary?.errors ?? 0}\n` +
-            `- Blocchi impostazioni applicati: ${settingsApplied}`,
-          badge: {
-            type: (result.summary?.errors ?? 0) > 0 ? 'warning' : 'success',
-            label: (result.summary?.errors ?? 0) > 0 ? 'Completato con errori' : 'Completato'
-          }
-        });
-
-        if ((result.summary?.imported ?? 0) > 0 || settingsApplied > 0) {
-          pushNotification({
-            type: 'success',
-            message: 'Import legacy completato'
-          });
-
-          if (department) {
-            await handleDepartmentChange(null);
-          }
-        }
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Import legacy fallito' });
       }
     };
 
@@ -1267,8 +1205,6 @@
               onBack={() => handleViewChange('gantt')}
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
-              onAdminLegacyExport={handleAdminLegacyExport}
-              onAdminLegacyImport={handleAdminLegacyImport}
               adminToken={adminToken}
               dialogApi={dialogApi}
               pushNotification={pushNotification}
@@ -1423,7 +1359,7 @@
                   {showProjectForm && (
                     <div style={{ marginTop: '1rem' }}>
                       <ProjectForm
-                        project={projectDraft}
+                        project={editingProject}
                         onSave={handleSaveProject}
                         onDelete={handleDeleteProject}
                         onCancel={handleCancelProjectForm}

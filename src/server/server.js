@@ -191,9 +191,6 @@ function verifyHashedSecret(secret, record) {
 
 function hasDepartmentPassword(data) {
   const secret = data?.password;
-  if (typeof secret === 'string') {
-    return !!secret.trim();
-  }
   return isValidHashedSecret(secret);
 }
 
@@ -204,7 +201,6 @@ function setDepartmentPassword(data, password) {
 
 function verifyDepartmentPassword(data, password) {
   const normalizedPassword = normalizeNonEmptyString(password, { trim: true });
-  const secret = data?.password;
 
   if (!hasDepartmentPassword(data)) {
     return true;
@@ -214,11 +210,7 @@ function verifyDepartmentPassword(data, password) {
     return false;
   }
 
-  if (typeof secret === 'string') {
-    return secret === normalizedPassword;
-  }
-
-  return verifyHashedSecret(normalizedPassword, secret);
+  return verifyHashedSecret(normalizedPassword, data?.password);
 }
 
 function normalizeDepartmentDataForWrite(data) {
@@ -226,9 +218,7 @@ function normalizeDepartmentDataForWrite(data) {
     return data;
   }
 
-  if (typeof data.password === 'string') {
-    setDepartmentPassword(data, data.password);
-  } else if (data.password !== null && data.password !== undefined && !isValidHashedSecret(data.password)) {
+  if (data.password !== null && data.password !== undefined && !isValidHashedSecret(data.password)) {
     data.password = null;
   }
 
@@ -766,25 +756,6 @@ function validateExistingDepartments() {
 
 validateExistingDepartments();
 
-function migrateExistingDepartmentPasswords() {
-  try {
-    const files = fs.readdirSync(PATHS.departments);
-    files.forEach((file) => {
-      if (!isDepartmentFile(file)) return;
-      const deptName = file.replace('.json', '');
-      const { data, error } = readDepartmentData(deptName);
-      if (error || !data || typeof data.password !== 'string' || !data.password.trim()) {
-        return;
-      }
-      writeDepartmentData(deptName, data);
-    });
-  } catch (err) {
-    console.warn('Failed to migrate department passwords:', err.message);
-  }
-}
-
-migrateExistingDepartmentPasswords();
-
 function normalizeModules(modules = {}) {
   return {
     departments: !!modules.departments,
@@ -795,10 +766,6 @@ function normalizeModules(modules = {}) {
 
 function hasSelectedModules(modules) {
   return Object.values(modules).some(Boolean);
-}
-
-function isOnlyDepartments(modules) {
-  return modules.departments && !modules.users && !modules.settings;
 }
 
 function collectDepartmentBackups() {
@@ -822,25 +789,6 @@ function collectDepartmentBackups() {
   }
 
   return departments;
-}
-
-function buildLegacyBackup() {
-  return {
-    version: '1.0',
-    exportedAt: new Date().toISOString(),
-    systemConfig: getSystemConfigState(),
-    serverConfig: {
-      lockTimeoutMinutes: CONFIG.lockTimeoutMinutes,
-      userSessionTtlHours: CONFIG.userSessionTtlHours,
-      adminSessionTtlHours: CONFIG.adminSessionTtlHours,
-      maxUploadBytes: CONFIG.maxUploadBytes,
-      enableBak: CONFIG.enableBak
-    },
-    adminCredentials: {
-      adminUser: CONFIG.adminUser
-    },
-    departments: collectDepartmentBackups()
-  };
 }
 
 function buildModularBackup(modules) {
@@ -1944,57 +1892,6 @@ app.post('/api/admin/server-restart', requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/admin/server-backup', requireAdmin, (req, res) => {
-  try {
-    const backup = buildLegacyBackup();
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="onlygantt-backup-${new Date().toISOString().split('T')[0]}.json"`);
-    res.json(backup);
-  } catch (err) {
-    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
-  }
-});
-
-app.post('/api/admin/server-restore', requireAdmin, (req, res) => {
-  try {
-    const { backup, overwriteExisting = false } = req.body;
-
-    if (!backup || typeof backup !== 'object') {
-      return errorResponse(res, 400, 'INVALID_REQUEST', 'backup data is required');
-    }
-
-    if (!backup.departments || !Array.isArray(backup.departments)) {
-      return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: departments array missing');
-    }
-
-    const results = importDepartmentsBackup(backup.departments, overwriteExisting);
-    const appliedSettings = (backup.systemConfig || backup.serverConfig || backup.adminCredentials)
-      ? applyImportedSettings({
-          systemConfig: backup.systemConfig || null,
-          serverConfig: backup.serverConfig || {},
-          adminCredentials: backup.adminCredentials || {}
-        })
-      : {};
-
-    res.json({
-      ok: true,
-      results,
-      settings: {
-        applied: appliedSettings
-      },
-      summary: {
-        total: backup.departments.length,
-        imported: results.imported.length,
-        skipped: results.skipped.length,
-        errors: results.errors.length,
-        settingsApplied: Object.keys(appliedSettings).length
-      }
-    });
-  } catch (err) {
-    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
-  }
-});
-
 app.post('/api/admin/export', requireAdmin, (req, res) => {
   try {
     const modules = normalizeModules(req.body?.modules);
@@ -2002,11 +1899,7 @@ app.post('/api/admin/export', requireAdmin, (req, res) => {
       return errorResponse(res, 400, 'INVALID_REQUEST', 'At least one module must be selected');
     }
 
-    const backup = isOnlyDepartments(modules)
-      ? buildLegacyBackup()
-      : buildModularBackup(modules);
-
-    res.json(backup);
+    res.json(buildModularBackup(modules));
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
   }
@@ -2030,9 +1923,7 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     let settingsPayload = null;
 
     if (modules.departments) {
-      if (Array.isArray(backup.departments)) {
-        departmentPayload = backup.departments;
-      } else if (Array.isArray(backup.modules?.departments?.data)) {
+      if (Array.isArray(backup.modules?.departments?.data)) {
         departmentPayload = backup.modules.departments.data;
       } else {
         return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: departments data missing');
@@ -2042,8 +1933,6 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     if (modules.users) {
       if (Array.isArray(backup.modules?.users?.data)) {
         userPayload = backup.modules.users.data;
-      } else if (Array.isArray(backup.users)) {
-        userPayload = backup.users;
       } else {
         return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: users data missing');
       }
@@ -2052,12 +1941,6 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     if (modules.settings) {
       if (backup.modules?.settings?.data) {
         settingsPayload = backup.modules.settings.data;
-      } else if (backup.serverConfig || backup.adminCredentials || backup.systemConfig) {
-        settingsPayload = {
-          systemConfig: backup.systemConfig || null,
-          serverConfig: backup.serverConfig || {},
-          adminCredentials: backup.adminCredentials || {}
-        };
       } else {
         return errorResponse(res, 400, 'INVALID_BACKUP', 'Invalid backup format: settings data missing');
       }

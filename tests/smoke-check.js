@@ -19,9 +19,9 @@ function createTempDataDir() {
     fs.mkdirSync(path.join(root, segment), { recursive: true });
   });
 
-  const legacyDepartmentPath = path.join(root, 'reparti', 'Legacy.json');
-  fs.writeFileSync(legacyDepartmentPath, JSON.stringify({
-    password: 'legacy-pass',
+  const demoDepartmentPath = path.join(root, 'reparti', 'Demo.json');
+  fs.writeFileSync(demoDepartmentPath, JSON.stringify({
+    password: null,
     projects: [],
     meta: {
       updatedAt: new Date().toISOString(),
@@ -163,7 +163,13 @@ async function main() {
       throw new Error('Admin login did not return a user token');
     }
 
-    await requestJson('POST', '/api/lock/Legacy/acquire', {
+    await requestJson('POST', '/api/departments/Demo/reset-password', {
+      newPassword: 'demo-pass'
+    }, {
+      Authorization: `Bearer ${adminLogin.data?.token}`
+    });
+
+    await requestJson('POST', '/api/lock/Demo/acquire', {
       userName: 'admin',
       clientHost: 'smoke-check'
     }, {
@@ -172,7 +178,7 @@ async function main() {
 
     let unauthorizedReleaseStatus = null;
     try {
-      await requestJson('POST', '/api/lock/Legacy/release', { userName: 'admin' });
+      await requestJson('POST', '/api/lock/Demo/release', { userName: 'admin' });
     } catch (err) {
       unauthorizedReleaseStatus = err.status;
     }
@@ -180,7 +186,7 @@ async function main() {
       throw new Error(`Expected unauthorized release to return 401, got ${unauthorizedReleaseStatus}`);
     }
 
-    await requestJson('POST', '/api/lock/Legacy/release', {
+    await requestJson('POST', '/api/lock/Demo/release', {
       userName: 'admin'
     }, {
       'X-User-Token': userToken
@@ -190,18 +196,18 @@ async function main() {
       'X-User-Token': userToken
     });
 
-    const verifyLegacy = await requestJson('POST', '/api/departments/Legacy/verify', {
-      password: 'legacy-pass'
+    const verifyDepartment = await requestJson('POST', '/api/departments/Demo/verify', {
+      password: 'demo-pass'
     });
-    if (!verifyLegacy.data?.ok) {
-      throw new Error('Legacy department password verification failed');
+    if (!verifyDepartment.data?.ok) {
+      throw new Error('Department password verification failed');
     }
 
     const persistedDepartment = JSON.parse(
-      fs.readFileSync(path.join(dataDir, 'reparti', 'Legacy.json'), 'utf8')
+      fs.readFileSync(path.join(dataDir, 'reparti', 'Demo.json'), 'utf8')
     );
     if (!persistedDepartment.password || typeof persistedDepartment.password !== 'object' || !persistedDepartment.password.hash) {
-      throw new Error('Expected migrated hashed department password');
+      throw new Error('Expected hashed department password');
     }
 
     console.log('Smoke check passed');

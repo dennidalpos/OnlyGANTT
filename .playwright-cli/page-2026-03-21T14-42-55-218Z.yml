@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "OnlyGANTT" [level=1] [ref=e6]
+    - generic [ref=e7]:
+      - button "Attiva screensaver" [ref=e9] [cursor=pointer]: ☀️
+      - button "Apri menu" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ☰
+  - main [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "OnlyGANTT" [level=1] [ref=e16]
+        - paragraph [ref=e17]: Accedi per gestire i progetti
+      - generic [ref=e18]:
+        - button "👤 Reparto" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: 👤
+          - generic [ref=e21]: Reparto
+        - button "🔒 Admin" [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: 🔒
+          - generic [ref=e24]: Admin
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: "1"
+            - generic [ref=e46]: Credenziali admin
+          - generic [ref=e47]:
+            - generic [ref=e48]: ID Admin
+            - textbox "ID Admin" [active] [ref=e49]:
+              - /placeholder: Inserisci ID admin
+          - generic [ref=e50]:
+            - generic [ref=e51]: Password Admin
+            - textbox "Password Admin" [ref=e52]:
+              - /placeholder: Inserisci password admin
+        - button "Accedi come admin" [disabled] [ref=e53]
+        - paragraph [ref=e55]: "Reset password non disponibile: la password admin e' gestita da variabili ambiente."
+      - generic [ref=e41]: OnlyGANTT - Timeline Progetti

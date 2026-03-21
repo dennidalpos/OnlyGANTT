@@ -19,7 +19,6 @@ Data/reparti/*.tmp
 Data/utenti/*.json
 Data/utenti/*.bak
 Data/utenti/*.tmp
-Data/utenti/*.migrated
 Data/log/*.log
 .vscode/
 .idea/

@@ -27,8 +27,6 @@ function normalizeUserId(userId) {
   return trimmed;
 }
 
-const LEGACY_LOCAL_PASSWORD_REGEX = /^[a-f0-9]{64}$/i;
-
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync(password, salt, 64).toString('hex');
@@ -39,16 +37,8 @@ function hashPassword(password) {
   };
 }
 
-function hashLegacyPassword(password) {
-  return crypto.createHash('sha256').update(password, 'utf8').digest('hex');
-}
-
-function isLegacyPasswordHash(passwordHash) {
-  return typeof passwordHash === 'string' && LEGACY_LOCAL_PASSWORD_REGEX.test(passwordHash);
-}
-
 function hasValidLocalPasswordHash(passwordHash) {
-  return isValidHashedSecret(passwordHash) || isLegacyPasswordHash(passwordHash);
+  return isValidHashedSecret(passwordHash);
 }
 
 function verifyPassword(password, passwordHash) {
@@ -64,10 +54,6 @@ function verifyPassword(password, passwordHash) {
     }
 
     return crypto.timingSafeEqual(actualHash, expectedHash);
-  }
-
-  if (isLegacyPasswordHash(passwordHash)) {
-    return hashLegacyPassword(password) === passwordHash;
   }
 
   return false;
@@ -101,13 +87,10 @@ function isValidUserRecord(data) {
 }
 
 function createUserStore({ dataDir, enableBak }) {
-  const legacyUsersFilePath = path.join(dataDir, 'users.json');
-
   const ensureStore = () => {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    migrateLegacyStore();
   };
 
   const getUserFilePath = (userId) => {
@@ -158,39 +141,6 @@ function createUserStore({ dataDir, enableBak }) {
     writeUserFileAtPath(filePath, data);
   };
 
-  const migrateLegacyStore = () => {
-    if (!fs.existsSync(legacyUsersFilePath)) return;
-    try {
-      const content = fs.readFileSync(legacyUsersFilePath, 'utf8');
-      const data = JSON.parse(content);
-      if (!data.users || !Array.isArray(data.users)) {
-        return;
-      }
-      data.users.forEach((user) => {
-        const normalized = normalizeUserId(user.userId || user.userIdNormalized);
-        if (!normalized) return;
-        const payload = {
-          ...user,
-          userId: user.userId || normalized,
-          userIdNormalized: user.userIdNormalized || normalized.toLowerCase()
-        };
-        if (!isValidUserRecord(payload)) {
-          return;
-        }
-        const userPath = path.join(dataDir, `${payload.userIdNormalized}.json`);
-        if (!fs.existsSync(userPath)) {
-          writeUserFileAtPath(userPath, payload);
-        }
-      });
-      const migratedPath = `${legacyUsersFilePath}.migrated`;
-      if (!fs.existsSync(migratedPath)) {
-        fs.renameSync(legacyUsersFilePath, migratedPath);
-      }
-    } catch (err) {
-      return;
-    }
-  };
-
   const listUserFiles = () => {
     ensureStore();
     return fs.readdirSync(dataDir)
@@ -226,10 +176,6 @@ function createUserStore({ dataDir, enableBak }) {
       return { ok: false, code: 'INVALID_CREDENTIALS' };
     }
     const now = new Date().toISOString();
-    if (isLegacyPasswordHash(user.passwordHash)) {
-      user.passwordHash = hashPassword(password);
-      user.passwordUpdatedAt = now;
-    }
     user.lastLoginAt = now;
     const history = Array.isArray(user.loginHistory) ? user.loginHistory : [];
     history.push(now);

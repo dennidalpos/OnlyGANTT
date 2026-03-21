@@ -15,6 +15,8 @@ npm run bootstrap
 npm run doctor
 ```
 
+Per una procedura guidata piu' semplice per Windows, con primo avvio del server e gestione delle prime credenziali, vedi [docs/windows-server-quickstart.md](docs/windows-server-quickstart.md).
+
 ## Comandi principali
 
 ```powershell
@@ -55,15 +57,15 @@ Lo smoke test verifica almeno:
 - login admin;
 - acquire/release dei lock;
 - logout;
-- migrazione della password reparto legacy.
+- verifica della password reparto protetta da hash persistito.
 
 Il controllo di regressione sicurezza verifica almeno:
 
 - mancata esposizione della bind password LDAP in `/api/admin/system-config`;
 - mancata inclusione della bind password LDAP negli export impostazioni;
 - persistenza della bind password LDAP solo nel sidecar locale ignorato `Data/config/system-config.local.json`;
-- coerenza del backup completo legacy (`/api/admin/server-backup` e `/api/admin/server-restore`) anche sul ripristino impostazioni;
-- migrazione automatica degli hash legacy degli utenti locali dopo login riuscito.
+- coerenza dell'import/export modulare delle impostazioni sensibili;
+- login locale con hash password persistito in formato supportato.
 
 Il controllo flussi admin/locali verifica almeno:
 
@@ -73,8 +75,6 @@ Il controllo flussi admin/locali verifica almeno:
 - fallback locale quando LDAP e' attivo ma non raggiungibile;
 - reset e cambio password reparto;
 - import/export modulare del modulo utenti.
-
-Nel pannello admin `Impostazioni di sistema` sono esposti sia il backup modulare consigliato sia il flusso `Compatibilita' legacy` per export/import completi storici lato server.
 
 Il controllo logica client verifica almeno:
 
@@ -146,7 +146,7 @@ La gestione del servizio usa `tools/nssm/` come host del processo Node.js.
 - svuota `artifacts/build`, `artifacts/test-results`, `artifacts/packages`, `artifacts/publish` e `artifacts/logs`;
 - rimuove eventuali sottocartelle extra sotto `artifacts/` lasciate da test o tooling locale;
 - esegue la cleanup del servizio Windows `OnlyGanttWeb` se presente;
-- rimuove eventuali output legacy in `build/`, `dist/`, `out/`, `publish/`, `tmp/`;
+- rimuove eventuali output locali non gestiti in `build/`, `dist/`, `out/`, `publish/`, `tmp/`;
 - elimina i file runtime locali non versionabili come `Data/config/locks.json`, `Data/config/admin-auth.json`, `Data/config/system-config.local.json`, gli store utenti locali in `Data/utenti/*.json` e i log in `Data/log/`.
 
 ## Struttura essenziale
@@ -192,7 +192,7 @@ Variabili principali:
 
 Il file dati locale di riferimento e' `Data/`.
 
-`Data/` contiene oggi sia seed versionati sia file runtime locali. I residui locali come lock, log, file `.bak`, `.tmp`, store legacy migrati e store utenti locali `Data/utenti/*.json` non fanno parte del seed sorgente, sono ignorati da Git quando pertinente e vengono rimossi da `npm run clean`.
+`Data/` contiene oggi sia seed versionati sia file runtime locali. I residui locali come lock, log, file `.bak`, `.tmp` e store utenti locali `Data/utenti/*.json` non fanno parte del seed sorgente, sono ignorati da Git quando pertinente e vengono rimossi da `npm run clean`.
 
 La bind password LDAP non viene piu' salvata nel seed versionato `Data/config/system-config.json`: quando impostata via pannello admin viene persistita solo nel sidecar locale ignorato `Data/config/system-config.local.json`.
 

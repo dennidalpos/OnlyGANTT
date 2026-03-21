@@ -35,7 +35,7 @@ Fornire un'applicazione web per la pianificazione e gestione di diagrammi di Gan
 - I flussi utente/admin che richiedono conferme o input contestuali devono usare dialog o form gestiti dalla UI React, non dialog nativi bloccanti del browser.
 - Gli entrypoint operativi canonici sono esposti in `scripts/` e richiamabili in modo uniforme anche da `npm run`.
 - Gli output di compile, test, pack e publish sono confinati sotto `artifacts/`.
-- I residui runtime locali sotto `Data/` come lock, file `.bak`, `.tmp` e store legacy migrati non fanno parte del seed versionato e devono essere rimossi da `clean`.
+- I residui runtime locali sotto `Data/` come lock, file `.bak` e `.tmp` non fanno parte del seed versionato e devono essere rimossi da `clean`.
 - Gli store utenti locali sotto `Data/utenti/*.json` sono dati runtime locali e non fanno parte del seed versionato del repository.
 - I secret LDAP persistiti localmente non devono essere versionati: `system-config.json` resta un seed senza bind password e l'eventuale secret runtime vive solo nel sidecar locale ignorato.
 

@@ -1,0 +1,187 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "OnlyGANTT" [level=1] [ref=e6]
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: "Reparto:"
+          - generic [ref=e75]: Demo
+        - generic [ref=e76]: "|"
+        - generic [ref=e77]:
+          - generic [ref=e78]: "Utente:"
+          - generic [ref=e79]: admin
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - button "🔒 Lock" [ref=e466] [cursor=pointer]:
+          - generic [ref=e81]: 🔒
+          - generic [ref=e82]: Lock
+        - generic "Modalità amministratore" [ref=e56]:
+          - generic [ref=e57]: ⚙
+          - generic [ref=e58]: Admin
+        - button "Attiva screensaver" [ref=e9] [cursor=pointer]: ☀️
+      - button "Apri menu" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ☰
+  - main [ref=e12]:
+    - generic [ref=e408]:
+      - heading "Timeline Progetti" [level=2] [ref=e409]
+      - generic [ref=e411]:
+        - button "Vai a Oggi" [ref=e412] [cursor=pointer]
+        - generic [ref=e413]:
+          - button "Ridotta" [ref=e414] [cursor=pointer]
+          - button "Completa" [ref=e415] [cursor=pointer]
+        - button "PNG" [ref=e416] [cursor=pointer]
+        - button "▼ Filtri 13/15" [ref=e417] [cursor=pointer]:
+          - text: ▼ Filtri
+          - generic [ref=e418]: 13/15
+      - generic [ref=e421]:
+        - generic [ref=e422]:
+          - generic [ref=e423]:
+            - button "Riduci sidebar" [ref=e424] [cursor=pointer]:
+              - generic [ref=e425]: ✕
+            - button "Blocca sidebar aperta" [ref=e426] [cursor=pointer]:
+              - generic [ref=e427]: 📍
+          - generic [ref=e428]:
+            - text: Progetti
+            - generic [ref=e429]: "0"
+        - generic [ref=e432]: Nessun progetto
+    - generic [ref=e443]:
+      - generic [ref=e444]:
+        - generic [ref=e445]:
+          - generic [ref=e446]:
+            - heading "Gestione Progetto" [level=2] [ref=e447]
+            - generic [ref=e469]: Modifiche non salvate
+          - generic [ref=e448]:
+            - button "Nuovo Progetto" [ref=e449] [cursor=pointer]
+            - button "Salva progetto e chiudi" [ref=e470] [cursor=pointer]
+            - button "Elimina progetto" [ref=e471] [cursor=pointer]
+            - button "Annulla modifiche" [ref=e522] [cursor=pointer]
+        - generic [ref=e473]:
+          - heading "Modifica Progetto" [level=2] [ref=e474]
+          - generic [ref=e475]:
+            - generic [ref=e476]: Nome Progetto *
+            - textbox [ref=e477]
+          - generic [ref=e478]:
+            - generic [ref=e479]:
+              - generic [ref=e480]: Colore
+              - textbox [ref=e481] [cursor=pointer]: "#3b82f6"
+            - generic [ref=e482]:
+              - generic [ref=e483]: Stato
+              - combobox [ref=e484]:
+                - option "Da iniziare" [selected]
+                - option "In corso"
+                - option "In ritardo"
+                - option "Completato"
+          - generic [ref=e485]:
+            - generic [ref=e486]:
+              - generic [ref=e487]: Data Inizio
+              - textbox [ref=e488]
+            - generic [ref=e489]:
+              - generic [ref=e490]: Data Fine
+              - textbox [ref=e491]
+          - generic [ref=e492]:
+            - generic [ref=e493]: Percentuale Completamento
+            - generic [ref=e494]:
+              - spinbutton [ref=e495]: "0"
+              - generic [ref=e496] [cursor=pointer]:
+                - checkbox "Auto" [ref=e497]
+                - text: Auto
+          - heading "Fasi" [level=3] [ref=e498]
+          - generic [ref=e499]:
+            - generic [ref=e500]: "Fasi Preset:"
+            - generic [ref=e501]:
+              - button "+ Analisi" [ref=e502] [cursor=pointer]
+              - button "+ Progettazione" [ref=e503] [cursor=pointer]
+              - button "+ Sviluppo" [ref=e504] [cursor=pointer]
+              - button "+ Test" [ref=e505] [cursor=pointer]
+              - button "+ Deploy" [ref=e506] [cursor=pointer]
+              - button "+ Documentazione" [ref=e507] [cursor=pointer]
+              - button "+ Review" [ref=e508] [cursor=pointer]
+              - button "+ Pianificazione" [ref=e509] [cursor=pointer]
+              - button "+ Prototipazione" [ref=e510] [cursor=pointer]
+              - button "+ Integrazione" [ref=e511] [cursor=pointer]
+              - button "+ Validazione" [ref=e512] [cursor=pointer]
+              - button "+ Formazione" [ref=e513] [cursor=pointer]
+              - button "+ Manutenzione" [ref=e514] [cursor=pointer]
+              - button "+ Migrazione" [ref=e515] [cursor=pointer]
+              - button "+ Ottimizzazione" [ref=e516] [cursor=pointer]
+              - button "+ Personalizzata" [ref=e517] [cursor=pointer]
+          - generic [ref=e523]:
+            - generic [ref=e524]:
+              - strong [ref=e525]: Fase 1
+              - generic [ref=e526]:
+                - button "Salva" [ref=e527] [cursor=pointer]
+                - button "Elimina" [ref=e528] [cursor=pointer]
+            - generic [ref=e529]:
+              - generic [ref=e530]: Nome Fase *
+              - generic [ref=e531]:
+                - 'generic "Colore: #3b82f6" [ref=e532]'
+                - textbox [ref=e533]: Analisi
+            - generic [ref=e534]:
+              - generic [ref=e535]:
+                - generic [ref=e536]: Data Inizio
+                - textbox [ref=e537]
+              - generic [ref=e538]:
+                - generic [ref=e539]: Data Fine
+                - textbox [ref=e540]
+            - generic [ref=e541]:
+              - generic [ref=e542]:
+                - generic [ref=e543]: Stato
+                - combobox [ref=e544]:
+                  - option "Da iniziare" [selected]
+                  - option "In corso"
+                  - option "In ritardo"
+                  - option "Completato"
+              - generic [ref=e545]:
+                - generic [ref=e546]: Completamento (%)
+                - generic [ref=e547]:
+                  - spinbutton [disabled] [ref=e548]
+                  - generic [ref=e549] [cursor=pointer]:
+                    - checkbox "Auto" [checked] [ref=e550]
+                    - text: Auto
+            - generic [ref=e552] [cursor=pointer]:
+              - checkbox "Milestone" [checked] [ref=e553]
+              - text: Milestone
+            - generic [ref=e555] [cursor=pointer]:
+              - checkbox "Include festività e weekend" [checked] [active] [ref=e556]
+              - text: Include festività e weekend
+            - generic [ref=e557]:
+              - generic [ref=e558]: Note
+              - textbox [ref=e559]
+          - generic [ref=e560]:
+            - generic [ref=e561]: Inserisci fase
+            - generic [ref=e562]:
+              - button "+ Analisi" [ref=e563] [cursor=pointer]
+              - button "+ Progettazione" [ref=e564] [cursor=pointer]
+              - button "+ Sviluppo" [ref=e565] [cursor=pointer]
+              - button "+ Test" [ref=e566] [cursor=pointer]
+              - button "+ Deploy" [ref=e567] [cursor=pointer]
+              - button "+ Documentazione" [ref=e568] [cursor=pointer]
+              - button "+ Review" [ref=e569] [cursor=pointer]
+              - button "+ Pianificazione" [ref=e570] [cursor=pointer]
+              - button "+ Prototipazione" [ref=e571] [cursor=pointer]
+              - button "+ Integrazione" [ref=e572] [cursor=pointer]
+              - button "+ Validazione" [ref=e573] [cursor=pointer]
+              - button "+ Formazione" [ref=e574] [cursor=pointer]
+              - button "+ Manutenzione" [ref=e575] [cursor=pointer]
+              - button "+ Migrazione" [ref=e576] [cursor=pointer]
+              - button "+ Ottimizzazione" [ref=e577] [cursor=pointer]
+              - button "+ Personalizzata" [ref=e578] [cursor=pointer]
+          - generic [ref=e518]:
+            - button "Salva progetto e chiudi" [ref=e519] [cursor=pointer]
+            - button "Elimina progetto" [ref=e520] [cursor=pointer]
+            - button "Torna indietro" [ref=e521] [cursor=pointer]
+      - generic [ref=e451]:
+        - heading "Elenco Progetti" [level=2] [ref=e452]
+        - generic [ref=e453]:
+          - heading "Strumenti" [level=3] [ref=e454]
+          - generic [ref=e455]: Import/Export progetti per trasferirli su un altro reparto.
+          - generic [ref=e457] [cursor=pointer]:
+            - checkbox "Visualizza tutti i progetti su diagramma" [disabled] [ref=e458]
+            - text: Visualizza tutti i progetti su diagramma
+          - generic [ref=e459]:
+            - generic [ref=e467] [cursor=pointer]: Importa progetti
+            - button "Export Progetti" [ref=e460] [cursor=pointer]
+        - paragraph [ref=e461]: Nessun progetto
+      - generic [ref=e463]:
+        - heading "Alert (0)" [level=2] [ref=e464]
+        - paragraph [ref=e465]: Nessun alert

@@ -41,7 +41,7 @@ Get-ChildItem -Path $artifactsRoot -Force -ErrorAction SilentlyContinue |
     Write-Host "Removed extra artifact path $($_.FullName)"
   }
 
-$legacyPathsToClean = @(
+$stalePathsToClean = @(
   'build',
   'dist',
   'out',
@@ -49,10 +49,10 @@ $legacyPathsToClean = @(
   'tmp'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 
-foreach ($path in $legacyPathsToClean) {
+foreach ($path in $stalePathsToClean) {
   if (Test-Path $path) {
     Remove-Item -Path $path -Recurse -Force
-    Write-Host "Removed legacy output $path"
+    Write-Host "Removed stale output $path"
   }
 }
 
@@ -79,8 +79,7 @@ $runtimePatternsToClean = @(
   'Data\reparti\*.tmp',
   'Data\utenti\*.json',
   'Data\utenti\*.bak',
-  'Data\utenti\*.tmp',
-  'Data\utenti\*.migrated'
+  'Data\utenti\*.tmp'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 
 foreach ($pattern in $runtimePatternsToClean) {

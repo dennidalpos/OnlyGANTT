@@ -1,0 +1,39 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "OnlyGANTT" [level=1] [ref=e6]
+    - generic [ref=e7]:
+      - button "Attiva screensaver" [ref=e9] [cursor=pointer]: ☀️
+      - button "Apri menu" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ☰
+  - main [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "OnlyGANTT" [level=1] [ref=e16]
+        - paragraph [ref=e17]: Accedi per gestire i progetti
+      - generic [ref=e18]:
+        - button "👤 Reparto" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: 👤
+          - generic [ref=e21]: Reparto
+        - button "🔒 Admin" [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: 🔒
+          - generic [ref=e24]: Admin
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]: "1"
+            - generic [ref=e29]: Identificati
+          - generic [ref=e30]:
+            - generic [ref=e31]: Nome utente
+            - textbox "Nome utente" [active] [ref=e32]:
+              - /placeholder: Il tuo nome (min. 2 caratteri)
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: "2"
+            - generic [ref=e36]: Seleziona reparto
+          - generic [ref=e37]:
+            - generic [ref=e38]: Reparto
+            - combobox "Reparto" [ref=e39]:
+              - option "-- Seleziona reparto --" [selected]
+              - option "Demo"
+        - button "Accedi al reparto" [disabled] [ref=e40]
+      - generic [ref=e41]: OnlyGANTT - Timeline Progetti

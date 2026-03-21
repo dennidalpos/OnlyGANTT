@@ -16,8 +16,14 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function hashLegacyPassword(password) {
-  return crypto.createHash('sha256').update(password, 'utf8').digest('hex');
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return {
+    algorithm: 'scrypt',
+    salt,
+    hash
+  };
 }
 
 function createTempDataDir() {
@@ -42,7 +48,7 @@ function createTempDataDir() {
     type: 'local',
     displayName: 'Local User',
     department: 'Demo',
-    passwordHash: hashLegacyPassword(LOCAL_USER_PASSWORD),
+    passwordHash: hashPassword(LOCAL_USER_PASSWORD),
     createdAt: '2026-01-01T00:00:00.000Z',
     lastLoginAt: null,
     loginHistory: []
@@ -210,14 +216,6 @@ async function main() {
       throw new Error('LDAP bind password must not be exported in modular settings backup');
     }
 
-    const legacyBackup = await requestJson('GET', '/api/admin/server-backup', null, authHeaders);
-    if (!Array.isArray(legacyBackup.data?.departments)) {
-      throw new Error('Expected legacy server backup to include departments');
-    }
-    if (legacyBackup.data?.serverConfig?.lockTimeoutMinutes !== 45) {
-      throw new Error('Expected legacy server backup to include persisted server settings');
-    }
-
     let unsupportedModuleError = null;
     try {
       await requestJson('POST', '/api/admin/export', {
@@ -252,49 +250,6 @@ async function main() {
       throw new Error('Expected local LDAP bind password sidecar to survive settings import');
     }
 
-    await requestJson('POST', '/api/admin/system-config', {
-      server: {
-        lockTimeoutMinutes: 99,
-        userSessionTtlHours: 12,
-        adminSessionTtlHours: 10,
-        maxUploadBytes: 1048576,
-        enableBak: false
-      },
-      ldap: {
-        enabled: false,
-        log: false,
-        url: 'ldap://mutated.example.local:389',
-        bindDn: 'CN=mutated,DC=example,DC=local',
-        bindPassword: LDAP_BIND_PASSWORD,
-        baseDn: 'DC=example,DC=local',
-        userFilter: '(uid={{username}})',
-        requiredGroupDn: '',
-        groupSearchBase: '',
-        localFallback: false
-      },
-      https: {
-        enabled: false,
-        keyPath: '',
-        certPath: ''
-      }
-    }, authHeaders);
-
-    const legacyRestore = await requestJson('POST', '/api/admin/server-restore', {
-      backup: legacyBackup.data,
-      overwriteExisting: true
-    }, authHeaders);
-    if ((legacyRestore.data?.summary?.settingsApplied || 0) < 1) {
-      throw new Error('Expected legacy server restore to re-apply stored settings');
-    }
-
-    const restoredFromLegacy = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
-    if (restoredFromLegacy.data?.server?.lockTimeoutMinutes !== 45) {
-      throw new Error('Expected legacy restore to roll back server settings to the backup snapshot');
-    }
-    if (restoredFromLegacy.data?.ldap?.bindPasswordSet !== true) {
-      throw new Error('Expected legacy restore to preserve LDAP bind password metadata');
-    }
-
     let invalidUserError = null;
     try {
       await requestJson('POST', '/api/admin/users/local', {
@@ -322,7 +277,7 @@ async function main() {
               userIdNormalized: '../escape',
               type: 'local',
               displayName: 'Escape',
-              passwordHash: hashLegacyPassword('EscapePass123')
+              passwordHash: hashPassword('EscapePass123')
             }]
           }
         }
@@ -348,11 +303,6 @@ async function main() {
     });
     if (userLogin.data?.authType !== 'local' || !userLogin.data?.token) {
       throw new Error('Expected local user login to succeed');
-    }
-
-    const storedUser = JSON.parse(fs.readFileSync(path.join(dataDir, 'utenti', 'local.user.json'), 'utf8'));
-    if (!storedUser.passwordHash || typeof storedUser.passwordHash !== 'object' || storedUser.passwordHash.algorithm !== 'scrypt') {
-      throw new Error('Expected successful local login to migrate legacy password hash to scrypt');
     }
 
     console.log('Security regression check passed');

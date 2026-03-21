@@ -398,37 +398,6 @@
     });
   }
 
-  async function adminServerBackup(adminToken, signal) {
-    const response = await fetch(`${BASE_URL}/api/admin/server-backup`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${adminToken}`
-      },
-      signal
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      const error = new Error(data.error?.message || 'Server backup failed');
-      error.status = response.status;
-      error.code = data.error?.code;
-      throw error;
-    }
-
-    return response.json();
-  }
-
-  async function adminServerRestore(backup, overwriteExisting, adminToken, signal) {
-    return fetchJSON('/api/admin/server-restore', {
-      method: 'POST',
-      body: JSON.stringify({ backup, overwriteExisting }),
-      headers: {
-        'Authorization': `Bearer ${adminToken}`
-      },
-      signal
-    });
-  }
-
   async function adminServerRestart(adminToken, signal) {
     return fetchJSON('/api/admin/server-restart', {
       method: 'POST',
@@ -491,8 +460,6 @@
     deleteLocalUser,
     adminResetPassword,
     adminChangePassword,
-    adminServerBackup,
-    adminServerRestore,
     adminServerRestart,
     adminExportModules,
     adminImportModules,

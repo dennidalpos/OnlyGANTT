@@ -1,0 +1,140 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "OnlyGANTT" [level=1] [ref=e6]
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - generic [ref=e74]: "Reparto:"
+          - generic [ref=e75]: Demo
+        - generic [ref=e76]: "|"
+        - generic [ref=e77]:
+          - generic [ref=e78]: "Utente:"
+          - generic [ref=e79]: admin
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - button "🔓 Libero" [disabled] [ref=e80]:
+          - generic [ref=e81]: 🔓
+          - generic [ref=e82]: Libero
+        - generic "Modalità amministratore" [ref=e56]:
+          - generic [ref=e57]: ⚙
+          - generic [ref=e58]: Admin
+        - button "Attiva screensaver" [ref=e9] [cursor=pointer]: ☀️
+      - button "Apri menu" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ☰
+  - main [ref=e12]:
+    - generic [ref=e84]:
+      - heading "Timeline Progetti" [level=2] [ref=e85]
+      - generic [ref=e86]:
+        - generic [ref=e87]:
+          - button "Vai a Oggi" [ref=e88] [cursor=pointer]
+          - generic [ref=e89]:
+            - button "Ridotta" [ref=e90] [cursor=pointer]
+            - button "Completa" [ref=e91] [cursor=pointer]
+          - button "PNG" [ref=e92] [cursor=pointer]
+          - button "▲ Filtri 13/15" [active] [ref=e142] [cursor=pointer]:
+            - text: ▲ Filtri
+            - generic [ref=e94]: 13/15
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - button "Attiva tutti" [ref=e145] [cursor=pointer]
+            - button "Default ridotta" [ref=e146] [cursor=pointer]
+          - generic [ref=e147]:
+            - generic [ref=e148]:
+              - generic [ref=e149]:
+                - generic [ref=e150]: 📅
+                - generic [ref=e151]: Timeline
+                - button "5/5" [ref=e152] [cursor=pointer]
+              - generic [ref=e153]:
+                - generic [ref=e154] [cursor=pointer]:
+                  - checkbox "Anni" [checked] [ref=e155]
+                  - generic [ref=e156]: Anni
+                - generic [ref=e157] [cursor=pointer]:
+                  - checkbox "Mesi" [checked] [ref=e158]
+                  - generic [ref=e159]: Mesi
+                - generic [ref=e160] [cursor=pointer]:
+                  - checkbox "N° sett." [checked] [ref=e161]
+                  - generic [ref=e162]: N° sett.
+                - generic [ref=e163] [cursor=pointer]:
+                  - checkbox "N° giorni" [checked] [ref=e164]
+                  - generic [ref=e165]: N° giorni
+                - generic [ref=e166] [cursor=pointer]:
+                  - checkbox "Lett. giorni" [checked] [ref=e167]
+                  - generic [ref=e168]: Lett. giorni
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - generic [ref=e171]: 📏
+                - generic [ref=e172]: Divisorie
+                - button "4/4" [ref=e173] [cursor=pointer]
+              - generic [ref=e174]:
+                - generic [ref=e175] [cursor=pointer]:
+                  - checkbox "Anni" [checked] [ref=e176]
+                  - generic [ref=e177]: Anni
+                - generic [ref=e178] [cursor=pointer]:
+                  - checkbox "Mesi" [checked] [ref=e179]
+                  - generic [ref=e180]: Mesi
+                - generic [ref=e181] [cursor=pointer]:
+                  - checkbox "Settimane" [checked] [ref=e182]
+                  - generic [ref=e183]: Settimane
+                - generic [ref=e184] [cursor=pointer]:
+                  - checkbox "Giorni" [checked] [ref=e185]
+                  - generic [ref=e186]: Giorni
+            - generic [ref=e187]:
+              - generic [ref=e188]:
+                - generic [ref=e189]: 📋
+                - generic [ref=e190]: Contenuti
+                - button "2/3" [ref=e191] [cursor=pointer]
+              - generic [ref=e192]:
+                - generic [ref=e193] [cursor=pointer]:
+                  - checkbox "Nomi fasi" [checked] [ref=e194]
+                  - generic [ref=e195]: Nomi fasi
+                - generic [ref=e196] [cursor=pointer]:
+                  - checkbox "Percentuali" [checked] [ref=e197]
+                  - generic [ref=e198]: Percentuali
+                - generic [ref=e199] [cursor=pointer]:
+                  - checkbox "Solo milestone" [ref=e200]
+                  - generic [ref=e201]: Solo milestone
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - generic [ref=e204]: 🎨
+                - generic [ref=e205]: Evidenziazioni
+                - button "2/3" [ref=e206] [cursor=pointer]
+              - generic [ref=e207]:
+                - generic [ref=e208] [cursor=pointer]:
+                  - checkbox "Weekend" [ref=e209]
+                  - generic [ref=e210]: Weekend
+                - generic [ref=e211] [cursor=pointer]:
+                  - checkbox "Festivi" [checked] [ref=e212]
+                  - generic [ref=e213]: Festivi
+                - generic [ref=e214] [cursor=pointer]:
+                  - checkbox "Ritardi" [checked] [ref=e215]
+                  - generic [ref=e216]: Ritardi
+      - generic [ref=e97]:
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - button "Riduci sidebar" [ref=e100] [cursor=pointer]:
+              - generic [ref=e101]: ✕
+            - button "Blocca sidebar aperta" [ref=e102] [cursor=pointer]:
+              - generic [ref=e103]: 📍
+          - generic [ref=e104]:
+            - text: Progetti
+            - generic [ref=e105]: "0"
+        - generic [ref=e108]: Nessun progetto
+    - generic [ref=e119]:
+      - generic [ref=e121]:
+        - heading "Gestione Progetto" [level=2] [ref=e123]
+        - button "Nuovo Progetto" [disabled] [ref=e125]
+      - generic [ref=e127]:
+        - heading "Elenco Progetti" [level=2] [ref=e128]
+        - generic [ref=e129]:
+          - heading "Strumenti" [level=3] [ref=e130]
+          - generic [ref=e131]: Import/Export progetti per trasferirli su un altro reparto.
+          - generic [ref=e133] [cursor=pointer]:
+            - checkbox "Visualizza tutti i progetti su diagramma" [disabled] [ref=e134]
+            - text: Visualizza tutti i progetti su diagramma
+          - generic [ref=e135]:
+            - generic: Importa progetti
+            - button "Export Progetti" [ref=e136] [cursor=pointer]
+        - paragraph [ref=e137]: Nessun progetto
+      - generic [ref=e139]:
+        - heading "Alert (0)" [level=2] [ref=e140]
+        - paragraph [ref=e141]: Nessun alert
