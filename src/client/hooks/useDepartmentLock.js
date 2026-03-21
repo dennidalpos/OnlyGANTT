@@ -132,7 +132,8 @@
       if (enabled) {
         acquireLock();
       } else {
-        releaseLock();
+        setLockInfo(null);
+        setIsLocked(false);
       }
 
       return () => {

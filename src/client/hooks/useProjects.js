@@ -37,7 +37,8 @@
     });
   }
 
-  function useProjects(department, readOnly) {
+  function useProjects(department, readOnly, options = {}) {
+    const { requestProjectFixConfirmation } = options;
     const [projects, setProjects] = useState([]);
     const [meta, setMeta] = useState(null);
     const [isDirty, setIsDirty] = useState(false);
@@ -45,22 +46,22 @@
     const [error, setError] = useState(null);
     const [validationErrors, setValidationErrors] = useState([]);
 
-    const validateProjects = (rawProjects, contextLabel) => {
+    const validateProjects = useCallback(async (rawProjects, contextLabel) => {
       const { errors, projects: fixedProjects } = logic.validateAndFixProjects(rawProjects);
       if (errors.length === 0) {
         return { projects: fixedProjects, fixed: false, errors };
       }
 
-      const confirmFix = confirm(
-        `${contextLabel}: rilevati ${errors.length} errori nei dati. Vuoi applicare il fix automatico per continuare?`
-      );
+      const confirmFix = requestProjectFixConfirmation
+        ? await requestProjectFixConfirmation({ contextLabel, errors })
+        : false;
 
       if (!confirmFix) {
         throw new Error('Operazione annullata: dati non corretti.');
       }
 
       return { projects: fixedProjects, fixed: true, errors };
-    };
+    }, [requestProjectFixConfirmation]);
 
     const loadProjects = useCallback(async () => {
       if (!department) return;
@@ -70,7 +71,7 @@
 
       try {
         const data = await api.getProjects(department);
-        const { projects: fixedProjects, fixed, errors: fixErrors } = validateProjects(data.projects || [], 'Caricamento progetti');
+        const { projects: fixedProjects, fixed, errors: fixErrors } = await validateProjects(data.projects || [], 'Caricamento progetti');
         const serverErrors = Array.isArray(data.validationErrors) ? data.validationErrors : [];
         setValidationErrors([...serverErrors, ...fixErrors]);
         setProjects(ensureIds(fixedProjects));
@@ -84,7 +85,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [department]);
+    }, [department, validateProjects]);
 
     const saveProjects = useCallback(async (userName, projectsOverride = null) => {
       if (!department || readOnly) {
@@ -129,7 +130,7 @@
         throw new Error('JSON non valido');
       }
 
-      const { projects: fixedProjects, errors: fixErrors } = validateProjects(parsedData.projects || [], 'Import JSON');
+      const { projects: fixedProjects, errors: fixErrors } = await validateProjects(parsedData.projects || [], 'Import JSON');
       const payload = {
         ...parsedData,
         projects: ensureIds(fixedProjects)
@@ -145,7 +146,7 @@
         return Array.from(new Set([...existing, ...fixErrors]));
       });
       return result;
-    }, [department, readOnly, loadProjects]);
+    }, [department, readOnly, loadProjects, validateProjects]);
 
     useEffect(() => {
       loadProjects();

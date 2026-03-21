@@ -53,6 +53,116 @@
   background-color: var(--bg-hover);
 }
 
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  background-color: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.dialog-card {
+  width: min(100%, 560px);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
+  padding: var(--spacing-lg);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.dialog-message {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.dialog-message-line {
+  margin: 0 0 0.5rem;
+}
+
+.dialog-message-line:last-child {
+  margin-bottom: 0;
+}
+
+.dialog-details {
+  margin: 0 0 var(--spacing-md);
+  padding: var(--spacing-sm);
+  background-color: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dialog-fields {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dialog-field {
+  margin-bottom: 0;
+}
+
+.dialog-checkbox {
+  margin-bottom: 0;
+}
+
+.dialog-validation {
+  margin-top: var(--spacing-md);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: var(--spacing-lg);
+}
+
+@media (max-width: 640px) {
+  .dialog-overlay {
+    padding: var(--spacing-md);
+    align-items: flex-end;
+  }
+
+  .dialog-card {
+    width: 100%;
+    max-height: 92vh;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .dialog-actions {
+    justify-content: stretch;
+  }
+
+  .dialog-actions > button {
+    width: 100%;
+  }
+}
+
 
 @media (min-width: 1920px) {
   :root {

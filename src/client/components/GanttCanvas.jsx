@@ -25,6 +25,7 @@
   }) {
     const canvasRef = useRef(null);
     const wrapperRef = useRef(null);
+    const viewportRef = useRef(null);
     const topScrollbarRef = useRef(null);
     const bottomScrollbarRef = useRef(null);
     const [tooltip, setTooltip] = useState(null);
@@ -48,6 +49,9 @@
     }, [verticalScrollTop]);
 
     const scrollTimeoutRef = useRef(null);
+    const currentVerticalScrollTop = viewportRef.current
+      ? viewportRef.current.scrollTop
+      : (verticalScrollTop || 0);
 
     const handleVerticalScroll = useCallback((e) => {
       isVerticalScrollingRef.current = true;
@@ -108,7 +112,7 @@
     const render = useCallback(() => {
       const canvas = canvasRef.current;
       const wrapper = wrapperRef.current;
-      const verticalContainer = verticalScrollContainerRef.current;
+      const verticalContainer = viewportRef.current;
       if (!canvas || !wrapper) return;
 
       const ctx = canvas.getContext('2d');
@@ -125,37 +129,45 @@
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const viewport = verticalContainer ? {
-        top: verticalContainer.scrollTop,
-        bottom: verticalContainer.scrollTop + verticalContainer.clientHeight
+      const viewportTop = verticalContainer ? verticalContainer.scrollTop : (verticalScrollTop || 0);
+      const viewportHeight = verticalContainer ? verticalContainer.clientHeight : 0;
+      const viewport = viewportHeight > 0 ? {
+        top: viewportTop,
+        bottom: viewportTop + viewportHeight
       } : null;
 
       const hideProjectLabels = sidebarCollapsed === false;
       gantt.render(ctx, newLayout, { hoveredProjectId, hideProjectLabels, viewport });
 
       updateScrollbars(newLayout);
-    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed, hoveredProjectId]);
+    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed, hoveredProjectId, verticalScrollTop]);
 
     const prevHoveredProjectIdRef = useRef(null);
 
     const redraw = useCallback(() => {
       const canvas = canvasRef.current;
-      const verticalContainer = verticalScrollContainerRef.current;
+      const verticalContainer = viewportRef.current;
       if (!canvas || !layout) return;
 
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const viewport = verticalContainer ? {
-        top: verticalContainer.scrollTop,
-        bottom: verticalContainer.scrollTop + verticalContainer.clientHeight
+      const viewportTop = verticalContainer ? verticalContainer.scrollTop : (verticalScrollTop || 0);
+      const viewportHeight = verticalContainer ? verticalContainer.clientHeight : 0;
+      const viewport = viewportHeight > 0 ? {
+        top: viewportTop,
+        bottom: viewportTop + viewportHeight
       } : null;
 
       const hideProjectLabels = sidebarCollapsed === false;
       gantt.render(ctx, layout, { hoveredProjectId, hideProjectLabels, viewport });
       prevHoveredProjectIdRef.current = hoveredProjectId;
-    }, [layout, hoveredProjectId, sidebarCollapsed]);
+    }, [layout, hoveredProjectId, sidebarCollapsed, verticalScrollTop]);
+
+    useEffect(() => {
+      redraw();
+    }, [verticalScrollTop, redraw]);
 
     const initialRenderDoneRef = useRef(false);
     const prevSidebarCollapsedRef = useRef(sidebarCollapsed);
@@ -520,19 +532,28 @@
 
         <div ref={wrapperRef} className="gantt-canvas-container-fixed">
           <div
-            className="gantt-canvas-inner"
-            style={{
-              transform: `translateX(-${scrollLeft}px)`,
-              willChange: 'transform'
+            ref={(node) => {
+              viewportRef.current = node;
+              verticalScrollContainerRef.current = node;
             }}
+            className="gantt-canvas-viewport"
+            onScroll={handleVerticalScroll}
           >
-            <canvas
-              ref={canvasRef}
-              className="gantt-canvas"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
-              onContextMenu={handleContextMenu}
-            />
+            <div
+              className="gantt-canvas-inner"
+              style={{
+                transform: `translateX(-${scrollLeft}px)`,
+                willChange: 'transform'
+              }}
+            >
+              <canvas
+                ref={canvasRef}
+                className="gantt-canvas"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                onContextMenu={handleContextMenu}
+              />
+            </div>
           </div>
         </div>
 
@@ -548,6 +569,7 @@
             className="gantt-scroll-label"
             style={{
               top: `${label.y}px`,
+              transform: `translateY(-${currentVerticalScrollTop}px)`,
               left: '24px',
               height: `${label.height}px`,
               backgroundColor: label.color,

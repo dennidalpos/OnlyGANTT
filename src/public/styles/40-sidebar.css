@@ -7,12 +7,16 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background-color: var(--bg-secondary);
+  align-items: stretch;
+  height: clamp(320px, 68vh, 960px);
 }
 
 .gantt-main-area {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
 }
 
 
@@ -25,6 +29,8 @@
   transition: width 0.2s ease;
   overflow: hidden;
   z-index: 10;
+  height: 100%;
+  min-height: 0;
 }
 
 .project-sidebar.expanded {

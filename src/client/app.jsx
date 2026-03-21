@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useState, useEffect, useRef, useMemo } = React;
+  const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
   const config = window.AppConfig;
   const storage = window.OnlyGantt.storage;
@@ -19,6 +19,7 @@
   const LoginScreen = window.OnlyGantt.components.LoginScreen;
   const SystemSettings = window.OnlyGantt.components.SystemSettings;
   const UserManagement = window.OnlyGantt.components.UserManagement;
+  const DialogHost = window.OnlyGantt.components.DialogHost;
 
   const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
   const useProjects = window.OnlyGantt.hooks.useProjects;
@@ -68,9 +69,13 @@
 
     const [screensaverEnabled, setScreensaverEnabled] = useState(false);
     const [showScreensaver, setShowScreensaver] = useState(false);
+    const [screensaverPassword, setScreensaverPassword] = useState('');
+    const [screensaverError, setScreensaverError] = useState('');
+    const [screensaverUnlocking, setScreensaverUnlocking] = useState(false);
     const lastActivityRef = useRef(Date.now());
     const isVerifyingPasswordRef = useRef(false);
     const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
+    const [dialogState, setDialogState] = useState(null);
 
     const [viewMode, setViewMode] = useState('4months');
     const [activeView, setActiveView] = useState('gantt');
@@ -132,19 +137,6 @@
       }
     }, [department, shouldUseLock, isLocked, lockEnabled]);
 
-    const {
-      projects,
-      meta,
-      isDirty,
-      isLoading,
-      validationErrors,
-      error: projectsError,
-      loadProjects,
-      saveProjects,
-      updateProjects,
-      uploadJSON
-    } = useProjects(department, readOnlyDepartment);
-
     const stripProjectIds = (project) => {
       if (!project) return null;
       return {
@@ -168,6 +160,117 @@
         setNotifications(prev => prev.filter(item => item.id !== id));
       }, 5000);
     };
+
+    const resolveDialog = useCallback((result) => {
+      setDialogState((currentDialog) => {
+        if (currentDialog?.resolve) {
+          currentDialog.resolve(result);
+        }
+        return null;
+      });
+    }, []);
+
+    const openDialog = useCallback((config) => new Promise((resolve) => {
+      setDialogState((currentDialog) => {
+        if (currentDialog?.resolve) {
+          currentDialog.resolve({ action: 'cancel', values: {} });
+        }
+        return {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          ...config,
+          resolve
+        };
+      });
+    }), []);
+
+    const showConfirmDialog = useCallback(async ({
+      title = 'Conferma operazione',
+      message,
+      confirmLabel = 'Conferma',
+      cancelLabel = 'Annulla',
+      confirmTone = 'danger'
+    }) => {
+      const result = await openDialog({
+        title,
+        message,
+        actions: [
+          { key: 'cancel', label: cancelLabel, className: 'btn-secondary' },
+          { key: 'confirm', label: confirmLabel, className: confirmTone === 'danger' ? 'btn-danger' : 'btn-success' }
+        ]
+      });
+      return result?.action === 'confirm';
+    }, [openDialog]);
+
+    const showDetailsDialog = useCallback(async ({
+      title = 'Dettagli',
+      message,
+      details,
+      closeLabel = 'Chiudi',
+      badge
+    }) => {
+      await openDialog({
+        title,
+        message,
+        details,
+        badge,
+        actions: [
+          { key: 'close', label: closeLabel, className: 'btn-secondary' }
+        ]
+      });
+    }, [openDialog]);
+
+    const showFormDialog = useCallback(async ({
+      title,
+      message,
+      fields,
+      submitLabel = 'Conferma',
+      cancelLabel = 'Annulla',
+      submitTone = 'success',
+      badge
+    }) => {
+      const result = await openDialog({
+        title,
+        message,
+        fields,
+        badge,
+        actions: [
+          { key: 'cancel', label: cancelLabel, className: 'btn-secondary' },
+          { key: 'submit', label: submitLabel, className: submitTone === 'danger' ? 'btn-danger' : 'btn-success', submits: true }
+        ]
+      });
+      return result?.action === 'submit' ? result.values : null;
+    }, [openDialog]);
+
+    const confirmProjectFix = useCallback(async ({ contextLabel, errors }) => (
+      showConfirmDialog({
+        title: 'Correzione automatica dati',
+        message: `${contextLabel}: rilevati ${errors.length} errori nei dati.\nVuoi applicare il fix automatico per continuare?`,
+        confirmLabel: 'Applica fix',
+        cancelLabel: 'Annulla',
+        confirmTone: 'success'
+      })
+    ), [showConfirmDialog]);
+
+    const {
+      projects,
+      meta,
+      isDirty,
+      isLoading,
+      validationErrors,
+      error: projectsError,
+      loadProjects,
+      saveProjects,
+      updateProjects,
+      uploadJSON
+    } = useProjects(department, readOnlyDepartment, {
+      requestProjectFixConfirmation: confirmProjectFix
+    });
+
+    const dialogApi = useMemo(() => ({
+      confirm: showConfirmDialog,
+      details: showDetailsDialog,
+      form: showFormDialog
+    }), [showConfirmDialog, showDetailsDialog, showFormDialog]);
 
     useEffect(() => {
       storage.setCurrentUser(userName);
@@ -230,39 +333,18 @@
     }, [projectDraft, editingProject]);
 
     useEffect(() => {
-      const handleActivity = async (event) => {
+      if (!showScreensaver) {
+        setScreensaverPassword('');
+        setScreensaverError('');
+        setScreensaverUnlocking(false);
+      }
+    }, [showScreensaver]);
+
+    useEffect(() => {
+      const handleActivity = (event) => {
         lastActivityRef.current = Date.now();
 
         if (showScreensaver && isDepartmentProtected && department && !adminToken) {
-          if (isVerifyingPasswordRef.current) {
-            return;
-          }
-
-          isVerifyingPasswordRef.current = true;
-          event?.preventDefault?.();
-          event?.stopPropagation?.();
-
-          const password = prompt('Inserisci la password del reparto per continuare:');
-
-          if (password === null || password === '') {
-            isVerifyingPasswordRef.current = false;
-            return;
-          }
-
-          try {
-            const result = await api.verifyPassword(department, password);
-            if (!result.ok) {
-              alert('Password errata');
-              isVerifyingPasswordRef.current = false;
-              return;
-            }
-            storage.setPassword(userName, department, password);
-            setShowScreensaver(false);
-          } catch (err) {
-            alert('Errore durante la verifica della password');
-          } finally {
-            isVerifyingPasswordRef.current = false;
-          }
           return;
         }
 
@@ -312,6 +394,37 @@
       return () => clearInterval(interval);
     }, [screensaverEnabled]);
 
+    const handleUnlockScreensaver = async () => {
+      if (!department || !isDepartmentProtected || !screensaverPassword) {
+        setScreensaverError('Inserisci la password del reparto per continuare.');
+        return;
+      }
+
+      if (isVerifyingPasswordRef.current) {
+        return;
+      }
+
+      isVerifyingPasswordRef.current = true;
+      setScreensaverUnlocking(true);
+      setScreensaverError('');
+
+      try {
+        const result = await api.verifyPassword(department, screensaverPassword);
+        if (!result.ok) {
+          setScreensaverError('Password reparto errata.');
+          return;
+        }
+
+        storage.setPassword(userName, department, screensaverPassword);
+        setShowScreensaver(false);
+      } catch (err) {
+        setScreensaverError('Errore durante la verifica della password.');
+      } finally {
+        isVerifyingPasswordRef.current = false;
+        setScreensaverUnlocking(false);
+      }
+    };
+
     useEffect(() => {
       gantt.invalidateCache();
     }, [filters, viewMode]);
@@ -349,10 +462,20 @@
     const confirmPendingChanges = async (actionLabel) => {
       if (!hasUnsavedChanges) return true;
 
-      const shouldSave = confirm(`Hai modifiche non salvate. Vuoi salvarle prima di ${actionLabel}?`);
-      if (shouldSave) {
+      const result = await openDialog({
+        title: 'Modifiche non salvate',
+        message: `Hai modifiche non salvate prima di ${actionLabel}.\nScegli se salvarle, scartarle o annullare l'operazione.`,
+        badge: { type: 'warning', label: 'Attenzione' },
+        actions: [
+          { key: 'cancel', label: 'Resta qui', className: 'btn-secondary' },
+          { key: 'discard', label: 'Scarta modifiche', className: 'btn-danger' },
+          { key: 'save', label: 'Salva e continua', className: 'btn-success' }
+        ]
+      });
+
+      if (result?.action === 'save') {
         if (!effectiveUserName) {
-          alert('Inserisci il tuo nome');
+          pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
           return false;
         }
 
@@ -371,14 +494,14 @@
         }
       }
 
-      const shouldDiscard = confirm('Vuoi annullare le modifiche non salvate?');
-      if (!shouldDiscard) {
+      if (result?.action !== 'discard') {
         return false;
       }
 
       setShowProjectForm(false);
       setEditingProject(null);
       setProjectDraft(null);
+      setHasDraftChanges(false);
       return true;
     };
 
@@ -595,6 +718,7 @@
     };
 
     const buildExportFileName = () => `OnlyGANTT-${formatExportTimestamp()}.json`;
+    const buildLegacyExportFileName = () => `OnlyGANTT-legacy-${formatExportTimestamp()}.json`;
 
     const isOnlyDepartmentsModule = (modules) => modules?.departments && !modules?.users && !modules?.settings;
 
@@ -623,6 +747,30 @@
       }
     };
 
+    const handleAdminLegacyExport = async () => {
+      if (!adminToken) return;
+      try {
+        const backup = await api.adminServerBackup(adminToken);
+        const dataStr = JSON.stringify(backup, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = buildLegacyExportFileName();
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        pushNotification({
+          type: 'success',
+          message: 'Backup legacy completo esportato'
+        });
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Export legacy fallito' });
+      }
+    };
+
     const handleAdminModularImport = async ({ backup, modules, overwriteExisting }) => {
       if (!adminToken) return;
       try {
@@ -630,17 +778,25 @@
         const { summary } = result;
         const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
 
-        let message = `Import impostazioni completato:\n` +
+        let details = `Import impostazioni completato\n` +
           `Moduli: ${moduleSummary}\n` +
           `- Importati: ${summary.imported}\n` +
           `- Saltati: ${summary.skipped}\n` +
           `- Errori: ${summary.errors}`;
 
         if (summary.errors > 0 && result.results?.departments?.errors?.length > 0) {
-          message += `\n\nErrori:\n${result.results.departments.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
+          details += `\n\nErrori:\n${result.results.departments.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
         }
 
-        alert(message);
+        await showDetailsDialog({
+          title: 'Esito import impostazioni',
+          message: 'Il server ha completato l\'import dei moduli richiesti.',
+          details,
+          badge: {
+            type: summary.errors > 0 ? 'warning' : 'success',
+            label: summary.errors > 0 ? 'Completato con errori' : 'Completato'
+          }
+        });
 
         if (summary.imported > 0) {
           pushNotification({
@@ -654,6 +810,41 @@
         }
       } catch (err) {
         pushNotification({ type: 'error', message: err.message || 'Import impostazioni fallito' });
+      }
+    };
+
+    const handleAdminLegacyImport = async ({ backup, overwriteExisting }) => {
+      if (!adminToken) return;
+      try {
+        const result = await api.adminServerRestore(backup, overwriteExisting, adminToken);
+        const settingsApplied = result.summary?.settingsApplied || 0;
+        await showDetailsDialog({
+          title: 'Esito import legacy',
+          message: 'Il ripristino legacy lato server e\' terminato.',
+          details:
+            `Import legacy completato\n` +
+            `- Reparti importati: ${result.summary?.imported ?? 0}\n` +
+            `- Reparti saltati: ${result.summary?.skipped ?? 0}\n` +
+            `- Errori: ${result.summary?.errors ?? 0}\n` +
+            `- Blocchi impostazioni applicati: ${settingsApplied}`,
+          badge: {
+            type: (result.summary?.errors ?? 0) > 0 ? 'warning' : 'success',
+            label: (result.summary?.errors ?? 0) > 0 ? 'Completato con errori' : 'Completato'
+          }
+        });
+
+        if ((result.summary?.imported ?? 0) > 0 || settingsApplied > 0) {
+          pushNotification({
+            type: 'success',
+            message: 'Import legacy completato'
+          });
+
+          if (department) {
+            await handleDepartmentChange(null);
+          }
+        }
+      } catch (err) {
+        pushNotification({ type: 'error', message: err.message || 'Import legacy fallito' });
       }
     };
 
@@ -791,9 +982,15 @@
       return saveOk;
     };
 
-    const handleCancelProjectForm = () => {
+    const handleCancelProjectForm = async () => {
       if (hasDraftChanges) {
-        const shouldDiscard = confirm('Vuoi annullare le modifiche apportate?');
+        const shouldDiscard = await showConfirmDialog({
+          title: 'Annulla modifiche',
+          message: 'Vuoi annullare le modifiche apportate al progetto corrente?',
+          confirmLabel: 'Scarta modifiche',
+          cancelLabel: 'Continua a modificare',
+          confirmTone: 'danger'
+        });
         if (!shouldDiscard) {
           return;
         }
@@ -812,7 +1009,14 @@
         return;
       }
 
-      if (!confirm('Eliminare questo progetto?')) {
+      const shouldDelete = await showConfirmDialog({
+        title: 'Elimina progetto',
+        message: 'Eliminare questo progetto dal reparto corrente?',
+        confirmLabel: 'Elimina progetto',
+        cancelLabel: 'Mantieni progetto',
+        confirmTone: 'danger'
+      });
+      if (!shouldDelete) {
         return;
       }
 
@@ -968,9 +1172,13 @@
         const { errors, projects: fixedProjects } = logic.validateAndFixProjects(parsed.projects || []);
 
         if (errors.length > 0) {
-          const confirmFix = confirm(
-            `Import reparto: rilevati ${errors.length} errori nei dati. Vuoi applicare il fix automatico per continuare?`
-          );
+          const confirmFix = await showConfirmDialog({
+            title: 'Correzione automatica import reparto',
+            message: `Import reparto: rilevati ${errors.length} errori nei dati.\nVuoi applicare il fix automatico per continuare?`,
+            confirmLabel: 'Applica fix',
+            cancelLabel: 'Annulla import',
+            confirmTone: 'success'
+          });
           if (!confirmFix) {
             pushNotification({ type: 'warning', message: 'Import annullato: dati non corretti.' });
             return;
@@ -1034,6 +1242,8 @@
           onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
           onNavigateSystemSettings={() => handleViewChange('systemSettings')}
           onNavigateUserManagement={() => handleViewChange('userManagement')}
+          dialogApi={dialogApi}
+          pushNotification={pushNotification}
         />
 
         {lockError && lockError.lockedBy && (
@@ -1057,12 +1267,17 @@
               onBack={() => handleViewChange('gantt')}
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
+              onAdminLegacyExport={handleAdminLegacyExport}
+              onAdminLegacyImport={handleAdminLegacyImport}
               adminToken={adminToken}
+              dialogApi={dialogApi}
+              pushNotification={pushNotification}
             />
           ) : activeView === 'userManagement' && adminToken ? (
             <UserManagement
               adminToken={adminToken}
               onBack={() => handleViewChange('gantt')}
+              dialogApi={dialogApi}
             />
           ) : !department ? (
             <LoginScreen
@@ -1075,6 +1290,7 @@
               onUserTokenChange={setUserToken}
               loginError={loginError}
               setLoginError={setLoginError}
+              pushNotification={pushNotification}
             />
           ) : (
             <>
@@ -1214,6 +1430,8 @@
                         readOnly={readOnlyDepartment}
                         isSaving={isSavingProject}
                         onDraftChange={setProjectDraft}
+                        dialogApi={dialogApi}
+                        pushNotification={pushNotification}
                       />
                     </div>
                   )}
@@ -1267,10 +1485,51 @@
           <div className="screensaver-overlay">
             <div className="screensaver-card">
               <h1 className="screensaver-title">OnlyGANTT</h1>
-              <p className="screensaver-subtitle">Premi un tasto per continuare</p>
+              {isDepartmentProtected && department && !adminToken ? (
+                <>
+                  <p className="screensaver-subtitle">Inserisci la password del reparto per continuare</p>
+                  <div className="form-group" style={{ margin: '1rem 0 0', textAlign: 'left' }}>
+                    <label htmlFor="screensaver-password">Password reparto</label>
+                    <input
+                      id="screensaver-password"
+                      type="password"
+                      value={screensaverPassword}
+                      onChange={(event) => setScreensaverPassword(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          handleUnlockScreensaver();
+                        }
+                      }}
+                      placeholder="Inserisci password"
+                      autoComplete="current-password"
+                      autoFocus
+                      disabled={screensaverUnlocking}
+                    />
+                  </div>
+                  {screensaverError && (
+                    <div className="alert-item warning" style={{ marginTop: '0.75rem', textAlign: 'left' }}>
+                      {screensaverError}
+                    </div>
+                  )}
+                  <div className="dialog-actions" style={{ marginTop: '1rem', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn-success"
+                      onClick={handleUnlockScreensaver}
+                      disabled={screensaverUnlocking}
+                    >
+                      {screensaverUnlocking ? 'Verifica in corso...' : 'Sblocca'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="screensaver-subtitle">Premi un tasto per continuare</p>
+              )}
             </div>
           </div>
         )}
+
+        <DialogHost dialog={dialogState} onResolve={resolveDialog} />
       </div>
     );
   }

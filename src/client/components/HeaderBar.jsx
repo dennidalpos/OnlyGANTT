@@ -32,7 +32,9 @@
     screensaverEnabled,
     onToggleScreensaver,
     onNavigateSystemSettings,
-    onNavigateUserManagement
+    onNavigateUserManagement,
+    dialogApi,
+    pushNotification
   }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
@@ -69,49 +71,124 @@
     };
 
     const handlePasswordChange = async () => {
-      if (!department || readOnlyDepartment) return;
-      const oldPasswordInput = prompt('Vecchia password (lascia vuoto se non richiesta)');
-      if (oldPasswordInput === null) return;
-      const newPasswordInput = prompt('Nuova password');
-      if (newPasswordInput === null) return;
-      if (!newPasswordInput.trim()) return;
-      await onChangePassword({ oldPassword: oldPasswordInput, newPassword: newPasswordInput });
+      if (!department || readOnlyDepartment || !dialogApi) return;
+      const values = await dialogApi.form({
+        title: 'Cambia password reparto',
+        message: `Aggiorna la password del reparto ${department}.`,
+        submitLabel: 'Aggiorna password',
+        fields: [
+          {
+            name: 'oldPassword',
+            label: 'Password attuale',
+            type: 'password',
+            helperText: 'Lascia vuoto se non richiesta.'
+          },
+          {
+            name: 'newPassword',
+            label: 'Nuova password',
+            type: 'password',
+            required: true,
+            autoFocus: true
+          }
+        ]
+      });
+      if (!values) return;
+      await onChangePassword({
+        oldPassword: values.oldPassword || '',
+        newPassword: (values.newPassword || '').trim()
+      });
     };
 
     const handleAdminPasswordReset = async () => {
-      if (!department || !adminToken) return;
-      const newPasswordInput = prompt('Nuova password reparto (vuoto per rimuovere)');
-      if (newPasswordInput === null) return;
-      await onAdminResetPassword({ department, newPassword: newPasswordInput.trim() || null });
+      if (!department || !adminToken || !dialogApi) return;
+      const values = await dialogApi.form({
+        title: 'Imposta password reparto',
+        message: `Definisci la password del reparto ${department}. Lascia vuoto per rimuoverla.`,
+        submitLabel: 'Salva password',
+        fields: [
+          {
+            name: 'newPassword',
+            label: 'Nuova password reparto',
+            type: 'password',
+            autoFocus: true
+          }
+        ]
+      });
+      if (!values) return;
+      await onAdminResetPassword({ department, newPassword: (values.newPassword || '').trim() || null });
     };
 
     const handleAdminCreate = async () => {
-      if (!adminToken) return;
-      const name = prompt('Nome nuovo reparto');
-      if (!name || !name.trim()) return;
-      const password = prompt('Password reparto (opzionale)');
-      if (password === null) return;
-      await onAdminCreateDepartment({ name: name.trim(), password: password.trim() || null });
+      if (!adminToken || !dialogApi) return;
+      const values = await dialogApi.form({
+        title: 'Crea reparto',
+        message: 'Inserisci il nome del nuovo reparto e, se serve, una password iniziale.',
+        submitLabel: 'Crea reparto',
+        fields: [
+          {
+            name: 'name',
+            label: 'Nome reparto',
+            required: true,
+            autoFocus: true
+          },
+          {
+            name: 'password',
+            label: 'Password reparto iniziale',
+            type: 'password',
+            helperText: 'Opzionale.'
+          }
+        ]
+      });
+      if (!values) return;
+      await onAdminCreateDepartment({
+        name: values.name.trim(),
+        password: (values.password || '').trim() || null
+      });
     };
 
     const handleAdminDelete = async () => {
-      if (!adminToken || !department) return;
-      const confirmDelete = confirm(`Eliminare il reparto ${department}?`);
+      if (!adminToken || !department || !dialogApi) return;
+      const confirmDelete = await dialogApi.confirm({
+        title: 'Elimina reparto',
+        message: `Eliminare il reparto ${department}?`,
+        confirmLabel: 'Elimina reparto',
+        cancelLabel: 'Mantieni reparto',
+        confirmTone: 'danger'
+      });
       if (!confirmDelete) return;
       await onAdminDeleteDepartment({ department });
     };
 
     const handleAdminChangePassword = async () => {
-      if (!adminToken) return;
-      const oldPasswordInput = prompt('Password admin attuale');
-      if (oldPasswordInput === null) return;
-      const newPasswordInput = prompt('Nuova password admin (minimo 6 caratteri)');
-      if (newPasswordInput === null) return;
-      if (!newPasswordInput.trim() || newPasswordInput.trim().length < 6) {
-        alert('La password deve essere di almeno 6 caratteri');
-        return;
-      }
-      await onAdminChangePassword({ oldPassword: oldPasswordInput, newPassword: newPasswordInput.trim() });
+      if (!adminToken || !dialogApi) return;
+      const values = await dialogApi.form({
+        title: 'Cambia password admin',
+        message: 'Aggiorna la password dell\'account amministrativo.',
+        submitLabel: 'Aggiorna password admin',
+        fields: [
+          {
+            name: 'oldPassword',
+            label: 'Password admin attuale',
+            type: 'password',
+            required: true
+          },
+          {
+            name: 'newPassword',
+            label: 'Nuova password admin',
+            type: 'password',
+            required: true,
+            minLength: 6,
+            minLengthMessage: 'La password admin deve contenere almeno 6 caratteri',
+            helperText: 'Minimo 6 caratteri.',
+            autoFocus: true
+          }
+        ]
+      });
+      if (!values) return;
+      await onAdminChangePassword({
+        oldPassword: values.oldPassword,
+        newPassword: values.newPassword.trim()
+      });
     };
 
     const isLockedByOther = !!(lockInfo?.locked && !isLocked);

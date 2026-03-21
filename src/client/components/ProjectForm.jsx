@@ -16,20 +16,25 @@
     onCancel,
     readOnly,
     isSaving,
-    onDraftChange
+    onDraftChange,
+    dialogApi,
+    pushNotification
   }) {
     const [formData, setFormData] = useState(null);
+    const [formStatus, setFormStatus] = useState(null);
 
     useEffect(() => {
       if (project) {
         const cloned = JSON.parse(JSON.stringify(project));
         setFormData(cloned);
+        setFormStatus(null);
         if (onDraftChange) {
           onDraftChange(cloned);
         }
       } else {
         const newProject = logic.createNewProject();
         setFormData(newProject);
+        setFormStatus(null);
         if (onDraftChange) {
           onDraftChange(newProject);
         }
@@ -40,6 +45,9 @@
 
     const updateFormData = (nextData) => {
       setFormData(nextData);
+      if (formStatus) {
+        setFormStatus(null);
+      }
       if (onDraftChange) {
         onDraftChange(nextData);
       }
@@ -90,19 +98,30 @@
       });
     };
 
-    const removePhase = (index) => {
-      if (confirm('Eliminare questa fase?')) {
-        const newFasi = formData.fasi.filter((_, i) => i !== index);
-        updateFormData({
-          ...formData,
-          fasi: newFasi
-        });
-      }
+    const removePhase = async (index) => {
+      if (!dialogApi) return;
+      const shouldDelete = await dialogApi.confirm({
+        title: 'Elimina fase',
+        message: 'Eliminare questa fase dal progetto corrente?',
+        confirmLabel: 'Elimina fase',
+        cancelLabel: 'Mantieni fase',
+        confirmTone: 'danger'
+      });
+      if (!shouldDelete) return;
+
+      const newFasi = formData.fasi.filter((_, i) => i !== index);
+      updateFormData({
+        ...formData,
+        fasi: newFasi
+      });
     };
 
     const handleSave = (keepEditing = false) => {
       if (!formData.nome || !formData.nome.trim()) {
-        alert('Nome progetto obbligatorio');
+        setFormStatus({ type: 'warning', message: 'Nome progetto obbligatorio' });
+        if (pushNotification) {
+          pushNotification({ type: 'warning', message: 'Nome progetto obbligatorio' });
+        }
         return;
       }
 
@@ -119,6 +138,12 @@
         <h2 className="card-title">
           {project ? 'Modifica Progetto' : 'Nuovo Progetto'}
         </h2>
+
+        {formStatus && (
+          <div className={`alert-item ${formStatus.type}`} style={{ marginBottom: '1rem' }}>
+            {formStatus.message}
+          </div>
+        )}
 
         <div className="form-group">
           <label>Nome Progetto *</label>

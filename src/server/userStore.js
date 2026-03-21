@@ -3,10 +3,28 @@ const path = require('path');
 const crypto = require('crypto');
 const { isValidHashedSecret, HASHED_SECRET_ALGORITHM } = require('./schema');
 
+const RESERVED_WINDOWS_FILE_NAMES = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+]);
+
 function normalizeUserId(userId) {
   if (!userId || typeof userId !== 'string') return null;
   const trimmed = userId.trim();
-  return trimmed ? trimmed : null;
+  if (!trimmed) return null;
+  if (trimmed.length > 128) return null;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._@-]*$/.test(trimmed)) return null;
+  if (trimmed.includes('..')) return null;
+  if (trimmed.endsWith('.')) return null;
+
+  const normalizedUpper = trimmed.toUpperCase();
+  const reservedCandidate = trimmed.split('.')[0].toUpperCase();
+  if (RESERVED_WINDOWS_FILE_NAMES.has(normalizedUpper) || RESERVED_WINDOWS_FILE_NAMES.has(reservedCandidate)) {
+    return null;
+  }
+
+  return trimmed;
 }
 
 const LEGACY_LOCAL_PASSWORD_REGEX = /^[a-f0-9]{64}$/i;

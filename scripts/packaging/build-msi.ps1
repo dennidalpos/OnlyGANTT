@@ -317,8 +317,6 @@ $stageTargets = @(
   @{ Source = 'package.json'; Destination = 'package.json' },
   @{ Source = 'README.md'; Destination = 'README.md' },
   @{ Source = 'LICENSE'; Destination = 'LICENSE' },
-  @{ Source = 'public'; Destination = 'public' },
-  @{ Source = 'server'; Destination = 'server' },
   @{ Source = 'src'; Destination = 'src' },
   @{ Source = 'node_modules'; Destination = 'node_modules' },
   @{ Source = 'scripts\windows'; Destination = 'scripts\windows' }

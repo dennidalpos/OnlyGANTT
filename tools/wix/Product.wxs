@@ -93,7 +93,7 @@
           ForceCreateOnInstall="yes"
           ForceDeleteOnUninstall="yes">
           <RegistryValue Name="Application" Type="expandable" Value="[NODEINSTALLDIR]node.exe" />
-          <RegistryValue Name="AppParameters" Type="expandable" Value="&quot;[INSTALLDIR]server\server.js&quot;" />
+          <RegistryValue Name="AppParameters" Type="expandable" Value="&quot;[INSTALLDIR]src\server\server.js&quot;" />
           <RegistryValue Name="AppDirectory" Type="expandable" Value="[INSTALLDIR]" />
           <RegistryValue Name="AppStdout" Type="expandable" Value="[DATALOGDIR]service-stdout.log" />
           <RegistryValue Name="AppStderr" Type="expandable" Value="[DATALOGDIR]service-stderr.log" />

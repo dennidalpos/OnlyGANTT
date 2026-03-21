@@ -1,8 +1,8 @@
 const path = require('path');
 const { spawn } = require('child_process');
 
-const repoRoot = path.resolve(__dirname, '..');
-const serverEntry = path.join(repoRoot, 'server', 'server.js');
+const repoRoot = path.resolve(__dirname, '..', '..');
+const serverEntry = path.join(repoRoot, 'src', 'server', 'server.js');
 
 function logRestartDiagnostic(message) {
   const timestamp = new Date().toISOString();

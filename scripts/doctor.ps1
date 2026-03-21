@@ -15,9 +15,10 @@ if ($nodeVersion.Major -lt 18) {
 $requiredPaths = @(
   @{ Path = (Join-Path $repoRoot 'package.json'); Label = 'package.json' },
   @{ Path = (Join-Path $repoRoot 'package-lock.json'); Label = 'package-lock.json' },
-  @{ Path = (Join-Path $repoRoot 'server\server.js'); Label = 'server entrypoint' },
-  @{ Path = (Join-Path $repoRoot 'public\index.html'); Label = 'public shell' },
-  @{ Path = (Join-Path $repoRoot 'src\client\app.jsx'); Label = 'client entrypoint' },
+  @{ Path = (Join-Path $repoRoot 'src\server\server.js'); Label = 'server entrypoint' },
+  @{ Path = (Join-Path $repoRoot 'src\public\index.html'); Label = 'public shell' },
+  @{ Path = (Join-Path $repoRoot 'src\client\bundle-entry.jsx'); Label = 'client bundle entrypoint' },
+  @{ Path = (Join-Path $repoRoot 'scripts\helpers\build-client-bundle.mjs'); Label = 'client bundler helper' },
   @{ Path = (Join-Path $repoRoot 'tests\smoke-check.js'); Label = 'smoke test' },
   @{ Path = (Join-Path $repoRoot 'tools\wix\Product.wxs'); Label = 'WiX source' },
   @{ Path = (Join-Path $repoRoot 'tools\nssm\win64\nssm.exe'); Label = 'NSSM x64 binary' }

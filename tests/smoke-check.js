@@ -4,7 +4,7 @@ const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
 
-const SERVER_ENTRY = path.join(__dirname, '..', 'server', 'server.js');
+const SERVER_ENTRY = path.join(__dirname, '..', 'src', 'server', 'server.js');
 const HOST = '127.0.0.1';
 const PORT = 3321;
 const ADMIN_PASSWORD = 'SmokePass123';
@@ -72,6 +72,35 @@ function requestJson(method, requestPath, body = null, headers = {}) {
   });
 }
 
+function requestText(method, requestPath, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: HOST,
+      port: PORT,
+      path: requestPath,
+      method,
+      headers
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode >= 400) {
+          const error = new Error(`HTTP ${res.statusCode}`);
+          error.status = res.statusCode;
+          error.body = text;
+          reject(error);
+          return;
+        }
+        resolve({ status: res.statusCode, text });
+      });
+    });
+
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 async function waitForServerReady() {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 15000) {
@@ -105,6 +134,19 @@ async function main() {
 
   try {
     await waitForServerReady();
+
+    const landingPage = await requestText('GET', '/');
+    if (!landingPage.text.includes('/assets/app.bundle.js')) {
+      throw new Error('Expected landing page to reference the local bundled client asset');
+    }
+    if (landingPage.text.includes('unpkg.com') || landingPage.text.includes('@babel/standalone')) {
+      throw new Error('Landing page must not depend on CDN assets or Babel standalone at runtime');
+    }
+
+    const clientBundle = await requestText('GET', '/assets/app.bundle.js');
+    if (!clientBundle.text.includes('OnlyGantt')) {
+      throw new Error('Expected local client bundle to be served by the application runtime');
+    }
 
     const authConfig = await requestJson('GET', '/api/auth/config');
     if (!authConfig.data?.adminConfigured) {

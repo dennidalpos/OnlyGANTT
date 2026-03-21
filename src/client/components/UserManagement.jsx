@@ -6,7 +6,7 @@
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
 
-  function UserManagement({ adminToken, onBack }) {
+  function UserManagement({ adminToken, onBack, dialogApi }) {
     const api = window.OnlyGantt.api;
     const emptyForm = {
       userId: '',
@@ -157,7 +157,14 @@
 
     const handleDeleteLocalUser = async (user) => {
       if (!adminToken || !user?.userId) return;
-      const confirmDelete = confirm(`Eliminare l'utente locale "${user.userId}"?`);
+      if (!dialogApi) return;
+      const confirmDelete = await dialogApi.confirm({
+        title: 'Elimina utente locale',
+        message: `Eliminare l'utente locale "${user.userId}"?`,
+        confirmLabel: 'Elimina utente',
+        cancelLabel: 'Mantieni utente',
+        confirmTone: 'danger'
+      });
       if (!confirmDelete) return;
 
       setSaving(true);

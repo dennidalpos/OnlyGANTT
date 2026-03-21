@@ -23,6 +23,24 @@ foreach ($path in $managedArtifactRoots) {
   Reset-ManagedDirectory -Path $path
 }
 
+$artifactsRoot = Join-Path $repoRoot 'artifacts'
+$managedArtifactNames = @('build', 'test-results', 'packages', 'publish', 'logs')
+
+Get-ChildItem -Path $artifactsRoot -Force -ErrorAction SilentlyContinue |
+  Sort-Object Name |
+  ForEach-Object {
+    if ($_.Name -eq '.gitkeep') {
+      return
+    }
+
+    if ($managedArtifactNames -contains $_.Name) {
+      return
+    }
+
+    Remove-Item -Path $_.FullName -Recurse -Force
+    Write-Host "Removed extra artifact path $($_.FullName)"
+  }
+
 $legacyPathsToClean = @(
   'build',
   'dist',
@@ -41,6 +59,7 @@ foreach ($path in $legacyPathsToClean) {
 $runtimeFilesToClean = @(
   'Data\config\locks.json',
   'Data\config\admin-auth.json',
+  'Data\config\system-config.local.json',
   'Data\log\audit.log',
   'Data\log\service-stdout.log',
   'Data\log\service-stderr.log'
@@ -51,4 +70,24 @@ foreach ($path in $runtimeFilesToClean) {
     Remove-Item -Path $path -Force
     Write-Host "Removed runtime file $path"
   }
+}
+
+$runtimePatternsToClean = @(
+  'Data\config\*.bak',
+  'Data\config\*.tmp',
+  'Data\reparti\*.bak',
+  'Data\reparti\*.tmp',
+  'Data\utenti\*.json',
+  'Data\utenti\*.bak',
+  'Data\utenti\*.tmp',
+  'Data\utenti\*.migrated'
+) | ForEach-Object { Join-Path $repoRoot $_ }
+
+foreach ($pattern in $runtimePatternsToClean) {
+  Get-ChildItem -Path $pattern -File -Force -ErrorAction SilentlyContinue |
+    Sort-Object FullName |
+    ForEach-Object {
+      Remove-Item -Path $_.FullName -Force
+      Write-Host "Removed runtime file $($_.FullName)"
+    }
 }

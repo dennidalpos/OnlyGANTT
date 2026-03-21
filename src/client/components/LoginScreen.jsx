@@ -22,7 +22,8 @@
     onAdminLogout,
     onUserTokenChange,
     loginError,
-    setLoginError
+    setLoginError,
+    pushNotification
   }) {
     
     const [activeTab, setActiveTab] = useState(adminToken ? 'admin' : 'user');
@@ -374,7 +375,12 @@
         setNewAdminPassword('');
         setShowAdminPasswordReset(false);
         setError('');
-        alert('Password admin reimpostata con successo. Usa le nuove credenziali per accedere.');
+        if (pushNotification) {
+          pushNotification({
+            type: 'success',
+            message: 'Password admin reimpostata con successo. Usa le nuove credenziali per accedere.'
+          });
+        }
       } catch (err) {
         setError(err.message || 'Codice reset non valido');
       } finally {

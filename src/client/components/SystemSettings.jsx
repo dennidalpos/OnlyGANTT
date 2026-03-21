@@ -10,7 +10,11 @@
     onBack,
     onAdminModularExport,
     onAdminModularImport,
-    adminToken
+    onAdminLegacyExport,
+    onAdminLegacyImport,
+    adminToken,
+    dialogApi,
+    pushNotification
   }) {
     const api = window.OnlyGantt.api;
     const [modules, setModules] = useState({
@@ -42,6 +46,13 @@
     const [systemStatus, setSystemStatus] = useState(null);
     const [systemStatusLoading, setSystemStatusLoading] = useState(false);
     const [systemStatusError, setSystemStatusError] = useState(null);
+    const [serverConfig, setServerConfig] = useState({
+      lockTimeoutMinutes: 60,
+      userSessionTtlHours: 8,
+      adminSessionTtlHours: 8,
+      maxUploadBytes: 2000000,
+      enableBak: true
+    });
     const [httpsConfig, setHttpsConfig] = useState({
       enabled: false,
       keyPath: '',
@@ -91,6 +102,13 @@
             requiredGroupDn: data.ldap?.requiredGroupDn || '',
             groupSearchBase: data.ldap?.groupSearchBase || '',
             localFallback: !!data.ldap?.localFallback
+          });
+          setServerConfig({
+            lockTimeoutMinutes: data.server?.lockTimeoutMinutes ?? 60,
+            userSessionTtlHours: data.server?.userSessionTtlHours ?? 8,
+            adminSessionTtlHours: data.server?.adminSessionTtlHours ?? 8,
+            maxUploadBytes: data.server?.maxUploadBytes ?? 2000000,
+            enableBak: data.server?.enableBak !== false
           });
           setHttpsConfig({
             enabled: !!data.https?.enabled,
@@ -153,12 +171,23 @@
       setHttpsConfig((prev) => ({ ...prev, [field]: value }));
     };
 
+    const handleServerFieldChange = (field, value) => {
+      setServerConfig((prev) => ({ ...prev, [field]: value }));
+    };
+
     const handleSaveSystemConfig = async () => {
       if (!adminToken) return;
       setConfigSaving(true);
       setConfigStatus(null);
       try {
         const payload = {
+          server: {
+            lockTimeoutMinutes: serverConfig.lockTimeoutMinutes,
+            userSessionTtlHours: serverConfig.userSessionTtlHours,
+            adminSessionTtlHours: serverConfig.adminSessionTtlHours,
+            maxUploadBytes: serverConfig.maxUploadBytes,
+            enableBak: serverConfig.enableBak
+          },
           ldap: {
             enabled: ldapConfig.enabled,
             log: ldapConfig.log,
@@ -178,8 +207,32 @@
           }
         };
         const result = await api.updateSystemConfig(payload, adminToken);
+        setServerConfig({
+          lockTimeoutMinutes: result.server?.lockTimeoutMinutes ?? serverConfig.lockTimeoutMinutes,
+          userSessionTtlHours: result.server?.userSessionTtlHours ?? serverConfig.userSessionTtlHours,
+          adminSessionTtlHours: result.server?.adminSessionTtlHours ?? serverConfig.adminSessionTtlHours,
+          maxUploadBytes: result.server?.maxUploadBytes ?? serverConfig.maxUploadBytes,
+          enableBak: result.server?.enableBak !== false
+        });
         setLdapHasSavedBindPassword(!!result.ldap?.bindPasswordSet);
-        setLdapConfig((prev) => ({ ...prev, bindPassword: '' }));
+        setLdapConfig((prev) => ({
+          ...prev,
+          enabled: !!result.ldap?.enabled,
+          log: !!result.ldap?.log,
+          url: result.ldap?.url || '',
+          bindDn: result.ldap?.bindDn || '',
+          bindPassword: '',
+          baseDn: result.ldap?.baseDn || '',
+          userFilter: result.ldap?.userFilter || '(sAMAccountName={{username}})',
+          requiredGroupDn: result.ldap?.requiredGroupDn || '',
+          groupSearchBase: result.ldap?.groupSearchBase || '',
+          localFallback: !!result.ldap?.localFallback
+        }));
+        setHttpsConfig({
+          enabled: !!result.https?.enabled,
+          keyPath: result.https?.keyPath || '',
+          certPath: result.https?.certPath || ''
+        });
         setConfigStatus({ type: 'success', message: 'Configurazioni salvate in modo persistente' });
       } catch (err) {
         setConfigStatus({ type: 'error', message: err.message || 'Salvataggio configurazioni fallito' });
@@ -200,10 +253,14 @@
     };
 
     const handleServerRestart = async () => {
-      if (!adminToken) return;
-      const confirmed = confirm(
-        'Confermi il riavvio del server? La UI verrà ricaricata automaticamente.'
-      );
+      if (!adminToken || !dialogApi) return;
+      const confirmed = await dialogApi.confirm({
+        title: 'Riavvia server',
+        message: 'Confermi il riavvio del server? La UI verra\' ricaricata automaticamente.',
+        confirmLabel: 'Riavvia server',
+        cancelLabel: 'Annulla',
+        confirmTone: 'danger'
+      });
       if (!confirmed) return;
       clearRestartTimers();
       setRestartStatus(null);
@@ -287,21 +344,55 @@
     };
 
     const handleModularImport = async (file) => {
-      if (!file || !canUseModules) return;
+      if (!file || !canUseModules || !dialogApi) return;
       try {
         const text = await readFileAsText(file);
         const backup = JSON.parse(text);
-        const overwrite = confirm(
-          `Importare le impostazioni selezionate?\n\n` +
-          `Moduli: ${modulesSummary}\n` +
-          `ATTENZIONE: i dati importati sovrascriveranno quelli esistenti.\n\n` +
-          `Confermi l'import?`
-        );
+        const overwrite = await dialogApi.confirm({
+          title: 'Importa impostazioni',
+          message:
+            `Moduli selezionati: ${modulesSummary}\n` +
+            'I dati importati sovrascriveranno quelli esistenti. Confermi l\'import?',
+          confirmLabel: 'Importa e sovrascrivi',
+          cancelLabel: 'Annulla',
+          confirmTone: 'danger'
+        });
         if (overwrite) {
           await onAdminModularImport({ backup, modules, overwriteExisting: true });
         }
       } catch (err) {
-        alert(`Errore nella lettura del file: ${err.message}`);
+        if (pushNotification) {
+          pushNotification({ type: 'error', message: `Errore nella lettura del file: ${err.message}` });
+        }
+      }
+    };
+
+    const handleLegacyExport = async () => {
+      if (!adminToken || !onAdminLegacyExport) return;
+      await onAdminLegacyExport();
+    };
+
+    const handleLegacyImport = async (file) => {
+      if (!file || !adminToken || !onAdminLegacyImport || !dialogApi) return;
+      try {
+        const text = await readFileAsText(file);
+        const backup = JSON.parse(text);
+        const overwrite = await dialogApi.confirm({
+          title: 'Importa backup legacy',
+          message:
+            'Questo flusso ripristina reparti e, se presenti nel file, anche impostazioni globali di compatibilita\'.\n' +
+            'I dati esistenti verranno sovrascritti. Confermi l\'import?',
+          confirmLabel: 'Importa backup legacy',
+          cancelLabel: 'Annulla',
+          confirmTone: 'danger'
+        });
+        if (overwrite) {
+          await onAdminLegacyImport({ backup, overwriteExisting: true });
+        }
+      } catch (err) {
+        if (pushNotification) {
+          pushNotification({ type: 'error', message: `Errore nella lettura del file legacy: ${err.message}` });
+        }
       }
     };
 
@@ -450,6 +541,71 @@
                 {formatBytes(systemStatus?.environment?.freeMemory)} / {formatBytes(systemStatus?.environment?.totalMemory)}
               </span>
             </div>
+          </div>
+        </div>
+
+        <div className="card-section settings-section">
+          <h3 className="settings-section-title">Server applicativo</h3>
+          <p className="settings-section-description text-muted">
+            Configura timeout, limiti runtime e gestione dei file `.bak` persistiti dal backend.
+          </p>
+          <div className="form-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            <div>
+              <label htmlFor="server-lock-timeout">Timeout lock minuti (ONLYGANTT_LOCK_TIMEOUT_MINUTES)</label>
+              <input
+                id="server-lock-timeout"
+                type="number"
+                min="1"
+                value={serverConfig.lockTimeoutMinutes}
+                onChange={(e) => handleServerFieldChange('lockTimeoutMinutes', e.target.value)}
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="server-user-ttl">TTL sessione utente ore (ONLYGANTT_USER_SESSION_TTL_HOURS)</label>
+              <input
+                id="server-user-ttl"
+                type="number"
+                min="1"
+                value={serverConfig.userSessionTtlHours}
+                onChange={(e) => handleServerFieldChange('userSessionTtlHours', e.target.value)}
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="server-admin-ttl">TTL sessione admin ore (ONLYGANTT_ADMIN_TTL_HOURS)</label>
+              <input
+                id="server-admin-ttl"
+                type="number"
+                min="1"
+                value={serverConfig.adminSessionTtlHours}
+                onChange={(e) => handleServerFieldChange('adminSessionTtlHours', e.target.value)}
+                disabled={ldapLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="server-max-upload">Max upload bytes (ONLYGANTT_MAX_UPLOAD_BYTES)</label>
+              <input
+                id="server-max-upload"
+                type="number"
+                min="1024"
+                step="1024"
+                value={serverConfig.maxUploadBytes}
+                onChange={(e) => handleServerFieldChange('maxUploadBytes', e.target.value)}
+                disabled={ldapLoading}
+              />
+            </div>
+          </div>
+          <div className="form-group" style={{ marginTop: '0.75rem' }}>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={serverConfig.enableBak}
+                onChange={(e) => handleServerFieldChange('enableBak', e.target.checked)}
+                disabled={ldapLoading}
+              />
+              Backup `.bak` abilitati (ONLYGANTT_ENABLE_BAK)
+            </label>
           </div>
         </div>
 
@@ -690,8 +846,8 @@
           <div className="alert-item info" style={{ marginTop: '0.75rem' }}>
             Moduli selezionati: {modulesSummary}
           </div>
-          <div className="alert-item warning" style={{ marginTop: '0.75rem' }}>
-            Import disponibile per reparti, utenti e impostazioni. Le integrazioni non sono esposte.
+          <div className="alert-item info" style={{ marginTop: '0.75rem' }}>
+            Moduli supportati dal backup modulare: reparti, utenti e impostazioni.
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
             <button
@@ -711,6 +867,35 @@
                   const file = event.target.files[0];
                   if (file) {
                     handleModularImport(file);
+                    event.target.value = '';
+                  }
+                }}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
+          <h4 className="settings-section-subtitle" style={{ marginTop: '1rem' }}>Compatibilita' legacy</h4>
+          <p className="settings-section-description text-muted">
+            Flusso storico di backup completo server-side. Preferire il backup modulare per i casi nuovi; usare questo formato solo quando serve compatibilita' con esportazioni legacy.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+            <button
+              className="btn-secondary"
+              onClick={handleLegacyExport}
+              disabled={!adminToken}
+            >
+              Esporta backup legacy
+            </button>
+            <label className="btn-secondary" style={{ margin: 0, cursor: adminToken ? 'pointer' : 'default', opacity: adminToken ? 1 : 0.6 }}>
+              Importa backup legacy
+              <input
+                type="file"
+                accept=".json"
+                disabled={!adminToken}
+                onChange={(event) => {
+                  const file = event.target.files[0];
+                  if (file) {
+                    handleLegacyImport(file);
                     event.target.value = '';
                   }
                 }}

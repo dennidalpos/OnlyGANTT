@@ -228,8 +228,8 @@ function Assert-OnlyGanttInstalled {
   }
 
   foreach ($relativePath in @(
-    'server\server.js',
-    'public\index.html',
+    'src\server\server.js',
+    'src\public\index.html',
     'tools\nssm\win64\nssm.exe'
   )) {
     $targetPath = Join-Path $resolvedInstallRoot $relativePath

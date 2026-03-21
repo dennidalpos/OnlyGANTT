@@ -73,7 +73,7 @@ function Remove-NssmService {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $nodePath = (Get-Command node).Source
-$serverPath = Join-Path $repoRoot 'server\server.js'
+$serverPath = Join-Path $repoRoot 'src\server\server.js'
 $logDir = Join-Path $repoRoot 'Data\log'
 $stdoutLog = Join-Path $logDir 'service-stdout.log'
 $stderrLog = Join-Path $logDir 'service-stderr.log'

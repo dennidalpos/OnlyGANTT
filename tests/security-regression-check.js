@@ -5,7 +5,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const SERVER_ENTRY = path.join(__dirname, '..', 'server', 'server.js');
+const SERVER_ENTRY = path.join(__dirname, '..', 'src', 'server', 'server.js');
 const HOST = '127.0.0.1';
 const PORT = 3322;
 const ADMIN_PASSWORD = 'AdminPass123';
@@ -107,6 +107,8 @@ async function waitForServerReady() {
 
 async function main() {
   const dataDir = createTempDataDir();
+  const systemConfigPath = path.join(dataDir, 'config', 'system-config.json');
+  const systemConfigLocalPath = path.join(dataDir, 'config', 'system-config.local.json');
   const server = spawn(process.execPath, [SERVER_ENTRY], {
     cwd: path.join(__dirname, '..'),
     env: {
@@ -117,7 +119,6 @@ async function main() {
       LDAP_ENABLED: 'false',
       LDAP_URL: 'ldap://example.local:389',
       LDAP_BIND_DN: 'CN=svc-onlygantt,OU=Service Accounts,DC=example,DC=local',
-      LDAP_BIND_PASSWORD,
       LDAP_BASE_DN: 'DC=example,DC=local',
       LDAP_USER_FILTER: '(sAMAccountName={{username}})'
     },
@@ -145,12 +146,52 @@ async function main() {
       Authorization: `Bearer ${adminToken}`
     };
 
+    const updatedConfig = await requestJson('POST', '/api/admin/system-config', {
+      server: {
+        lockTimeoutMinutes: 45,
+        userSessionTtlHours: 6,
+        adminSessionTtlHours: 4,
+        maxUploadBytes: 3145728,
+        enableBak: true
+      },
+      ldap: {
+        enabled: false,
+        log: false,
+        url: 'ldap://example.local:389',
+        bindDn: 'CN=svc-onlygantt,OU=Service Accounts,DC=example,DC=local',
+        bindPassword: LDAP_BIND_PASSWORD,
+        baseDn: 'DC=example,DC=local',
+        userFilter: '(sAMAccountName={{username}})',
+        requiredGroupDn: '',
+        groupSearchBase: '',
+        localFallback: false
+      },
+      https: {
+        enabled: false,
+        keyPath: '',
+        certPath: ''
+      }
+    }, authHeaders);
+    if (updatedConfig.data?.server?.lockTimeoutMinutes !== 45) {
+      throw new Error('Expected server settings update to persist via /api/admin/system-config');
+    }
+
     const systemConfig = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
     if (systemConfig.data?.ldap?.bindPasswordSet !== true) {
       throw new Error('Expected bindPasswordSet to report saved LDAP secret');
     }
     if (Object.prototype.hasOwnProperty.call(systemConfig.data?.ldap || {}, 'bindPassword')) {
       throw new Error('LDAP bind password must not be exposed by /api/admin/system-config');
+    }
+
+    const persistedSystemConfig = JSON.parse(fs.readFileSync(systemConfigPath, 'utf8'));
+    if (Object.prototype.hasOwnProperty.call(persistedSystemConfig.ldap || {}, 'bindPassword')) {
+      throw new Error('Tracked system-config.json must not persist the LDAP bind password');
+    }
+
+    const persistedLocalSystemConfig = JSON.parse(fs.readFileSync(systemConfigLocalPath, 'utf8'));
+    if (persistedLocalSystemConfig?.ldap?.bindPassword !== LDAP_BIND_PASSWORD) {
+      throw new Error('Expected local system config sidecar to retain the LDAP bind password');
     }
 
     const exportResult = await requestJson('POST', '/api/admin/export', {
@@ -167,6 +208,137 @@ async function main() {
     }
     if (Object.prototype.hasOwnProperty.call(exportedLdapConfig, 'bindPassword')) {
       throw new Error('LDAP bind password must not be exported in modular settings backup');
+    }
+
+    const legacyBackup = await requestJson('GET', '/api/admin/server-backup', null, authHeaders);
+    if (!Array.isArray(legacyBackup.data?.departments)) {
+      throw new Error('Expected legacy server backup to include departments');
+    }
+    if (legacyBackup.data?.serverConfig?.lockTimeoutMinutes !== 45) {
+      throw new Error('Expected legacy server backup to include persisted server settings');
+    }
+
+    let unsupportedModuleError = null;
+    try {
+      await requestJson('POST', '/api/admin/export', {
+        modules: {
+          integrations: true
+        }
+      }, authHeaders);
+    } catch (err) {
+      unsupportedModuleError = err;
+    }
+    if (!unsupportedModuleError || unsupportedModuleError.status !== 400 || unsupportedModuleError.code !== 'INVALID_REQUEST') {
+      throw new Error('Expected unsupported modular export selection to be rejected');
+    }
+
+    await requestJson('POST', '/api/admin/import', {
+      backup: exportResult.data,
+      modules: {
+        departments: false,
+        users: false,
+        settings: true
+      },
+      overwriteExisting: true
+    }, authHeaders);
+
+    const importedSystemConfig = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
+    if (importedSystemConfig.data?.ldap?.bindPasswordSet !== true) {
+      throw new Error('Expected LDAP bind password metadata to survive settings import');
+    }
+
+    const importedLocalSystemConfig = JSON.parse(fs.readFileSync(systemConfigLocalPath, 'utf8'));
+    if (importedLocalSystemConfig?.ldap?.bindPassword !== LDAP_BIND_PASSWORD) {
+      throw new Error('Expected local LDAP bind password sidecar to survive settings import');
+    }
+
+    await requestJson('POST', '/api/admin/system-config', {
+      server: {
+        lockTimeoutMinutes: 99,
+        userSessionTtlHours: 12,
+        adminSessionTtlHours: 10,
+        maxUploadBytes: 1048576,
+        enableBak: false
+      },
+      ldap: {
+        enabled: false,
+        log: false,
+        url: 'ldap://mutated.example.local:389',
+        bindDn: 'CN=mutated,DC=example,DC=local',
+        bindPassword: LDAP_BIND_PASSWORD,
+        baseDn: 'DC=example,DC=local',
+        userFilter: '(uid={{username}})',
+        requiredGroupDn: '',
+        groupSearchBase: '',
+        localFallback: false
+      },
+      https: {
+        enabled: false,
+        keyPath: '',
+        certPath: ''
+      }
+    }, authHeaders);
+
+    const legacyRestore = await requestJson('POST', '/api/admin/server-restore', {
+      backup: legacyBackup.data,
+      overwriteExisting: true
+    }, authHeaders);
+    if ((legacyRestore.data?.summary?.settingsApplied || 0) < 1) {
+      throw new Error('Expected legacy server restore to re-apply stored settings');
+    }
+
+    const restoredFromLegacy = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
+    if (restoredFromLegacy.data?.server?.lockTimeoutMinutes !== 45) {
+      throw new Error('Expected legacy restore to roll back server settings to the backup snapshot');
+    }
+    if (restoredFromLegacy.data?.ldap?.bindPasswordSet !== true) {
+      throw new Error('Expected legacy restore to preserve LDAP bind password metadata');
+    }
+
+    let invalidUserError = null;
+    try {
+      await requestJson('POST', '/api/admin/users/local', {
+        userId: '../escape',
+        displayName: 'Escape',
+        password: 'EscapePass123'
+      }, authHeaders);
+    } catch (err) {
+      invalidUserError = err;
+    }
+    if (!invalidUserError || invalidUserError.status !== 400 || invalidUserError.code !== 'INVALID_USER') {
+      throw new Error('Expected invalid local user id creation to be rejected with INVALID_USER');
+    }
+    if (fs.existsSync(path.join(dataDir, 'escape.json'))) {
+      throw new Error('Invalid local user id must not create files outside the user store');
+    }
+
+    const invalidImport = await requestJson('POST', '/api/admin/import', {
+      backup: {
+        version: '2.0',
+        modules: {
+          users: {
+            data: [{
+              userId: '../escape',
+              userIdNormalized: '../escape',
+              type: 'local',
+              displayName: 'Escape',
+              passwordHash: hashLegacyPassword('EscapePass123')
+            }]
+          }
+        }
+      },
+      modules: {
+        departments: false,
+        users: true,
+        settings: false
+      },
+      overwriteExisting: true
+    }, authHeaders);
+    if ((invalidImport.data?.results?.users?.skipped || []).length !== 1) {
+      throw new Error('Expected invalid imported user ids to be skipped');
+    }
+    if ((invalidImport.data?.results?.users?.errors || []).length !== 0) {
+      throw new Error('Invalid imported user ids should be rejected cleanly without write errors');
     }
 
     const userLogin = await requestJson('POST', '/api/auth/login', {

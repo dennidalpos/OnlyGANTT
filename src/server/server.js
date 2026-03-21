@@ -12,13 +12,14 @@ const { logAuditEvent } = require('./auditService');
 const { restartServer } = require('./serverService');
 const { createLockStore } = require('./lockStore');
 
-const packageInfo = require('../package.json');
-const REPO_ROOT = path.resolve(__dirname, '..');
+const packageInfo = require('../../package.json');
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 const app = express();
 const SERVER_STARTED_AT = new Date().toISOString();
 const DEFAULT_ADMIN_USER = 'admin';
 const SYSTEM_CONFIG_FILE = 'system-config.json';
+const SYSTEM_CONFIG_LOCAL_FILE = 'system-config.local.json';
 const ADMIN_AUTH_CONFIG_FILE = 'admin-auth.json';
 
 if (!process.env.NODE_ENV) {
@@ -70,8 +71,8 @@ const CONFIG = {
 };
 
 app.use(express.json());
-app.use(express.static(path.join(REPO_ROOT, 'public')));
-app.use('/src', express.static(path.join(REPO_ROOT, 'src')));
+app.use('/assets', express.static(path.join(REPO_ROOT, 'artifacts', 'build', 'client')));
+app.use(express.static(path.join(REPO_ROOT, 'src', 'public')));
 
 const PATHS = {
   root: CONFIG.dataDir,
@@ -118,6 +119,11 @@ function getDepartmentFilePath(department) {
 function getSystemConfigFilePath() {
   ensureDataDir();
   return path.join(PATHS.config, SYSTEM_CONFIG_FILE);
+}
+
+function getSystemConfigLocalFilePath() {
+  ensureDataDir();
+  return path.join(PATHS.config, SYSTEM_CONFIG_LOCAL_FILE);
 }
 
 function getAdminAuthConfigFilePath() {
@@ -288,6 +294,21 @@ function normalizeSystemConfigValue(value, fallback = '') {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   return fallback;
+}
+
+function readJsonObjectFile(filePath, label) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn(`Unable to read ${label}:`, err.message);
+    return null;
+  }
 }
 
 function readAdminAuthConfig() {
@@ -473,20 +494,63 @@ function applySystemConfig(configPayload) {
 }
 
 function readSystemConfig() {
-  try {
-    const filePath = getSystemConfigFilePath();
-    if (!fs.existsSync(filePath)) return null;
-    const content = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (err) {
-    console.warn('Unable to read system config:', err.message);
+  const filePath = getSystemConfigFilePath();
+  const localFilePath = getSystemConfigLocalFilePath();
+  const baseConfig = readJsonObjectFile(filePath, 'system config');
+  const localConfig = readJsonObjectFile(localFilePath, 'local system config');
+
+  if (!baseConfig && !localConfig) {
     return null;
   }
+
+  const mergedConfig = {
+    ...(baseConfig || {})
+  };
+
+  if (localConfig?.ldap && typeof localConfig.ldap === 'object') {
+    mergedConfig.ldap = {
+      ...(mergedConfig.ldap && typeof mergedConfig.ldap === 'object' ? mergedConfig.ldap : {}),
+      ...localConfig.ldap
+    };
+  }
+
+  return mergedConfig;
 }
 
 function writeSystemConfig(configPayload) {
   const filePath = getSystemConfigFilePath();
-  atomicWrite(filePath, configPayload);
+  const localFilePath = getSystemConfigLocalFilePath();
+  const existingLocalConfig = readJsonObjectFile(localFilePath, 'local system config') || {};
+  const persistedConfig = {
+    ...(configPayload && typeof configPayload === 'object' ? configPayload : {})
+  };
+
+  const persistedLdap = {
+    ...(persistedConfig.ldap && typeof persistedConfig.ldap === 'object' ? persistedConfig.ldap : {})
+  };
+  const hasBindPassword = Object.prototype.hasOwnProperty.call(persistedLdap, 'bindPassword');
+  const nextBindPassword = hasBindPassword
+    ? normalizeSystemConfigValue(persistedLdap.bindPassword, '')
+    : normalizeSystemConfigValue(existingLocalConfig?.ldap?.bindPassword, '');
+
+  delete persistedLdap.bindPassword;
+  delete persistedLdap.bindPasswordSet;
+
+  if (persistedConfig.ldap && typeof persistedConfig.ldap === 'object') {
+    persistedConfig.ldap = persistedLdap;
+  }
+
+  atomicWrite(filePath, persistedConfig);
+
+  if (nextBindPassword) {
+    atomicWrite(localFilePath, {
+      ldap: {
+        bindPassword: nextBindPassword
+      }
+    });
+  } else if (fs.existsSync(localFilePath)) {
+    fs.unlinkSync(localFilePath);
+  }
 }
 
 const storedSystemConfig = readSystemConfig();
@@ -725,8 +789,7 @@ function normalizeModules(modules = {}) {
   return {
     departments: !!modules.departments,
     users: !!modules.users,
-    settings: !!modules.settings,
-    integrations: !!modules.integrations
+    settings: !!modules.settings
   };
 }
 
@@ -735,7 +798,7 @@ function hasSelectedModules(modules) {
 }
 
 function isOnlyDepartments(modules) {
-  return modules.departments && !modules.users && !modules.settings && !modules.integrations;
+  return modules.departments && !modules.users && !modules.settings;
 }
 
 function collectDepartmentBackups() {
@@ -801,8 +864,7 @@ function buildModularBackup(modules) {
             adminUser: CONFIG.adminUser
           }
         }
-      } : { data: null },
-      integrations: modules.integrations ? { data: [] } : { data: null }
+      } : { data: null }
     }
   };
 }
@@ -1906,15 +1968,26 @@ app.post('/api/admin/server-restore', requireAdmin, (req, res) => {
     }
 
     const results = importDepartmentsBackup(backup.departments, overwriteExisting);
+    const appliedSettings = (backup.systemConfig || backup.serverConfig || backup.adminCredentials)
+      ? applyImportedSettings({
+          systemConfig: backup.systemConfig || null,
+          serverConfig: backup.serverConfig || {},
+          adminCredentials: backup.adminCredentials || {}
+        })
+      : {};
 
     res.json({
       ok: true,
       results,
+      settings: {
+        applied: appliedSettings
+      },
       summary: {
         total: backup.departments.length,
         imported: results.imported.length,
         skipped: results.skipped.length,
-        errors: results.errors.length
+        errors: results.errors.length,
+        settingsApplied: Object.keys(appliedSettings).length
       }
     });
   } catch (err) {
@@ -2035,9 +2108,6 @@ app.post('/api/admin/import', requireAdmin, (req, res) => {
     } else {
       results.settings = { skipped: true, reason: 'Module disabled' };
     }
-
-    const unsupportedReason = 'Module not supported yet';
-    results.integrations = modules.integrations ? { skipped: true, reason: unsupportedReason } : { skipped: true, reason: 'Module disabled' };
 
     res.json({
       ok: true,

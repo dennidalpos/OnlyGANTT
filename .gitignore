@@ -11,6 +11,15 @@ publish/
 tmp/
 Data/config/locks.json
 Data/config/admin-auth.json
+Data/config/system-config.local.json
+Data/config/*.bak
+Data/config/*.tmp
+Data/reparti/*.bak
+Data/reparti/*.tmp
+Data/utenti/*.json
+Data/utenti/*.bak
+Data/utenti/*.tmp
+Data/utenti/*.migrated
 Data/log/*.log
 .vscode/
 .idea/
