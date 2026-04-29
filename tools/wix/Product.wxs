@@ -16,6 +16,8 @@
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of OnlyGANTT is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="OnlyGanttIcon" SourceFile="$(var.BrandIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="OnlyGanttIcon" />
 
     <Property Id="NODEINSTALLDIR">
       <RegistrySearch

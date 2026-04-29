@@ -6,15 +6,7 @@
       "status": "todo",
       "risk": "medium",
       "priority": "medium",
-      "context": "npm audit reports uuid <14.0.0 through ldapts 7.4.0 after the non-breaking path-to-regexp fix. The available remediation requires ldapts 8.1.7, a major upgrade that must be validated against LDAP login, local fallback, config import/export and admin flows before applying."
-    },
-    {
-      "id": "ui-token-danger-alias",
-      "type": "refactor",
-      "status": "done",
-      "risk": "low",
-      "priority": "high",
-      "context": "Defined --danger as a single alias of the existing --error token in src/public/styles/00-foundation.css, preserving the current palette while restoring destructive dropdown and login error styling."
+      "context": "Verified with npm audit --omit=dev on 2026-04-29: uuid <14.0.0 is reported through ldapts 7.4.0. The available remediation requires ldapts 8.1.7, a major upgrade that must be validated against LDAP login, local fallback, config import/export and admin flows before applying."
     },
     {
       "id": "ui-project-form-label-associations",
@@ -30,7 +22,7 @@
       "status": "todo",
       "risk": "low",
       "priority": "medium",
-      "context": "ProjectList renders the import action as a styled label with a hidden file input. In the Playwright snapshot it appears as generic text ('Importa progetti') rather than a button/control, so keyboard and assistive-tech semantics are weaker than Export Progetti next to it. Replace or wrap it with an accessible button-like file trigger while preserving the current visual style and JSON import behavior."
+      "context": "ProjectList renders the import action as a styled label with a hidden file input. In the current component source it appears as label text ('Importa progetti') rather than a button/control, so keyboard and assistive-tech semantics are weaker than Export Progetti next to it. Replace or wrap it with an accessible button-like file trigger while preserving the current visual style and JSON import behavior."
     },
     {
       "id": "ui-alert-collapsible-aria-state",
@@ -38,7 +30,7 @@
       "status": "todo",
       "risk": "low",
       "priority": "medium",
-      "context": "AlertsPanel collapsible headers support click and Enter/Space, but do not expose aria-expanded or aria-controls. Browser snapshots show collapsed alert sections only communicate state through the '+' text. Add explicit expanded state and controlled region ids to the existing collapsible pattern."
+      "context": "AlertsPanel collapsible headers support click and Enter/Space, but do not expose aria-expanded or aria-controls. Add explicit expanded state and controlled region ids to the existing collapsible pattern."
     },
     {
       "id": "ui-mobile-gantt-sidebar-width",
@@ -46,39 +38,7 @@
       "status": "todo",
       "risk": "medium",
       "priority": "medium",
-      "context": "On a 390px viewport after opening Demo, Playwright measured .gantt-with-sidebar at 292px wide and .project-sidebar still expanded at 260px, leaving only a narrow canvas area even though there is no page-level horizontal overflow. Adjust the existing responsive sidebar behavior for <=480px, for example by defaulting to collapsed unless the user has explicitly expanded it, without redesigning the Gantt layout."
-    },
-    {
-      "id": "repo-remove-agent-artifacts",
-      "type": "config",
-      "status": "done",
-      "risk": "low",
-      "priority": "medium",
-      "context": "Removed versioned .playwright-cli snapshots from the supported repository path and added .playwright-cli/, output/ and playwright-report/ to ignored/cleaned local artifact roots."
-    },
-    {
-      "id": "repo-script-path-consolidation",
-      "type": "refactor",
-      "status": "done",
-      "risk": "low",
-      "priority": "medium",
-      "context": "Removed unreferenced npm aliases that bypassed the canonical build/test/package entrypoints, documented scripts/ as principal, internal, Windows service, agents, legacy or removable, and kept npm run test/npm run pack as the supported verification and packaging paths."
-    },
-    {
-      "id": "repo-brand-assets-pack",
-      "type": "docs",
-      "status": "done",
-      "risk": "low",
-      "priority": "medium",
-      "context": "Added deterministic brand asset generation for SVG logo, Windows icon sizes, ICO, common social image formats and WiX-style setup bitmaps under src/public/brand/ with operational documentation."
-    },
-    {
-      "id": "repo-remove-cmd-delete-fallback",
-      "type": "refactor",
-      "status": "done",
-      "risk": "medium",
-      "priority": "medium",
-      "context": "Removed the cmd.exe rmdir fallback from MSI cleanup helper so destructive cleanup remains in PowerShell with bounded retries."
+      "context": "On <=480px layouts, 40-sidebar.css keeps .project-sidebar.expanded at an overlay width inherited from the 768px breakpoint. Review the existing responsive sidebar behavior so the Gantt canvas remains usable on narrow mobile viewports without redesigning the Gantt layout."
     }
   ]
 }

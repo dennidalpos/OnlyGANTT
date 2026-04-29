@@ -267,6 +267,7 @@ $wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.p
 $wixSourcePath = Join-Path $repoRoot 'tools\wix\Product.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $nssmSourcePath = Join-Path $repoRoot 'tools\nssm\win64\nssm.exe'
+$brandIconPath = Join-Path $repoRoot 'src\public\brand\onlygantt.ico'
 
 if (-not (Test-Path $packageJsonPath)) {
   throw "package.json not found: $packageJsonPath"
@@ -292,6 +293,10 @@ foreach ($toolName in 'candle.exe', 'light.exe') {
 
 if (-not (Test-Path $nssmSourcePath)) {
   throw "nssm.exe not found for MSI packaging: $nssmSourcePath"
+}
+
+if (-not (Test-Path $brandIconPath)) {
+  throw "Windows brand icon not found for MSI packaging: $brandIconPath"
 }
 
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
@@ -344,6 +349,7 @@ $candleArguments = @(
   "-dProductVersion=$productVersion"
   "-dSourceDir=$stageRoot"
   "-dNssmSource=$nssmSourcePath"
+  "-dBrandIcon=$brandIconPath"
   $wixSourcePath
   $appFilesWxs
 )
