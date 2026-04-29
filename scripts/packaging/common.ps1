@@ -230,7 +230,8 @@ function Assert-OnlyGanttInstalled {
   foreach ($relativePath in @(
     'src\server\server.js',
     'src\public\index.html',
-    'tools\nssm\win64\nssm.exe'
+    'artifacts\build\client\app.bundle.js',
+    'service\OnlyGantt.Service.exe'
   )) {
     $targetPath = Join-Path $resolvedInstallRoot $relativePath
     if (-not (Test-Path $targetPath)) {

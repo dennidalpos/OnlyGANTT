@@ -7,11 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$installScript = Join-Path $repoRoot 'scripts\windows\install-service.ps1'
-$startScript = Join-Path $repoRoot 'scripts\windows\start-service.ps1'
-$stopScript = Join-Path $repoRoot 'scripts\windows\stop-service.ps1'
-$uninstallScript = Join-Path $repoRoot 'scripts\windows\uninstall-service.ps1'
-$cleanupScript = Join-Path $repoRoot 'scripts\windows\services-cleanup.ps1'
+$serviceScript = Join-Path $repoRoot 'scripts\windows\service.ps1'
 
 function Test-IsAdministrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -56,13 +52,13 @@ if ($null -ne $portInUse) {
 }
 
 try {
-  & $cleanupScript -ServiceName $ServiceName
-  & $installScript -ServiceName $ServiceName -DisplayName 'OnlyGantt Validation Service' -Description 'OnlyGANTT validation service lifecycle check' -StartType 'SERVICE_DEMAND_START' -ForceReinstall
-  & $startScript -ServiceName $ServiceName
+  & $serviceScript -Action Cleanup -ServiceName $ServiceName
+  & $serviceScript -Action Install -ServiceName $ServiceName -DisplayName 'OnlyGantt Validation Service' -Description 'OnlyGANTT validation service lifecycle check' -StartType 'demand' -ForceReinstall
+  & $serviceScript -Action Start -ServiceName $ServiceName
   Wait-ForServiceEndpoint -Port $ExpectedPort
-  & $stopScript -ServiceName $ServiceName
-  & $uninstallScript -ServiceName $ServiceName -ForceDelete
-  & $cleanupScript -ServiceName $ServiceName
+  & $serviceScript -Action Stop -ServiceName $ServiceName
+  & $serviceScript -Action Uninstall -ServiceName $ServiceName
+  & $serviceScript -Action Cleanup -ServiceName $ServiceName
 
   $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
   if ($null -ne $service) {
@@ -72,12 +68,12 @@ try {
   Write-Host 'Windows service lifecycle check passed'
 } finally {
   try {
-    & $stopScript -ServiceName $ServiceName | Out-Null
+    & $serviceScript -Action Stop -ServiceName $ServiceName | Out-Null
   } catch {
   }
 
   try {
-    & $cleanupScript -ServiceName $ServiceName | Out-Null
+    & $serviceScript -Action Cleanup -ServiceName $ServiceName | Out-Null
   } catch {
   }
 }

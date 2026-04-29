@@ -1,44 +1,12 @@
 {
   "tasks": [
     {
-      "id": "dependency-audit-ldapts-uuid",
-      "type": "config",
-      "status": "todo",
+      "id": "installer-clean-machine-interactive-validation",
+      "type": "test",
+      "status": "blocked",
       "risk": "medium",
-      "priority": "medium",
-      "context": "Verified with npm audit --omit=dev on 2026-04-29: uuid <14.0.0 is reported through ldapts 7.4.0. The available remediation requires ldapts 8.1.7, a major upgrade that must be validated against LDAP login, local fallback, config import/export and admin flows before applying."
-    },
-    {
-      "id": "ui-project-form-label-associations",
-      "type": "refactor",
-      "status": "todo",
-      "risk": "low",
-      "priority": "medium",
-      "context": "ProjectForm renders several labels without htmlFor/id associations for project and phase fields, while LoginScreen and SystemSettings already use explicit label/input wiring. Add stable ids and htmlFor links in src/client/components/ProjectForm.jsx for the existing fields without changing layout or copy."
-    },
-    {
-      "id": "ui-import-file-control-semantics",
-      "type": "refactor",
-      "status": "todo",
-      "risk": "low",
-      "priority": "medium",
-      "context": "ProjectList renders the import action as a styled label with a hidden file input. In the current component source it appears as label text ('Importa progetti') rather than a button/control, so keyboard and assistive-tech semantics are weaker than Export Progetti next to it. Replace or wrap it with an accessible button-like file trigger while preserving the current visual style and JSON import behavior."
-    },
-    {
-      "id": "ui-alert-collapsible-aria-state",
-      "type": "refactor",
-      "status": "todo",
-      "risk": "low",
-      "priority": "medium",
-      "context": "AlertsPanel collapsible headers support click and Enter/Space, but do not expose aria-expanded or aria-controls. Add explicit expanded state and controlled region ids to the existing collapsible pattern."
-    },
-    {
-      "id": "ui-mobile-gantt-sidebar-width",
-      "type": "refactor",
-      "status": "todo",
-      "risk": "medium",
-      "priority": "medium",
-      "context": "On <=480px layouts, 40-sidebar.css keeps .project-sidebar.expanded at an overlay width inherited from the 768px breakpoint. Review the existing responsive sidebar behavior so the Gantt canvas remains usable on narrow mobile viewports without redesigning the Gantt layout."
+      "priority": "high",
+      "context": "Blocked in this workspace because it requires an interactive clean Windows Server or Windows 11 VM. Local validation completed on 2026-04-29: npm audit --omit=dev, npm run build, npm run test and npm run pack passed, including native Windows service lifecycle validation and setup EXE generation. Still needs manual VM validation of Node.js prerequisite installation, per-machine install, service startup, all-users desktop shortcut, admin reset code flow and uninstall cleanup."
     }
   ]
 }

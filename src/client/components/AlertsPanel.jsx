@@ -35,14 +35,17 @@
 
     const renderSection = (key, title, color, content) => {
       const isCollapsed = collapsedSections.has(key);
+      const contentId = `alerts-section-${key}`;
 
       return (
-        <div className="alert-section collapsible">
+        <div key={key} className="alert-section collapsible">
           <div
             className="collapsible-header"
             onClick={() => toggleSection(key)}
             role="button"
             tabIndex={0}
+            aria-expanded={!isCollapsed}
+            aria-controls={contentId}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -56,7 +59,7 @@
             <span>{isCollapsed ? '+' : '−'}</span>
           </div>
           {!isCollapsed && (
-            <div className="collapsible-content">
+            <div id={contentId} className="collapsible-content">
               {content}
             </div>
           )}

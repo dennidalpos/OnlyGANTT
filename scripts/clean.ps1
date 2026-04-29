@@ -1,3 +1,8 @@
+param(
+  [switch]$IncludeRuntimeData,
+  [switch]$IncludeService
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -5,10 +10,10 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
-$serviceCleanupScript = Join-Path $PSScriptRoot 'windows\services-cleanup.ps1'
+$serviceScript = Join-Path $PSScriptRoot 'windows\service.ps1'
 
-if (Test-Path $serviceCleanupScript) {
-  & $serviceCleanupScript
+if ($IncludeService -and (Test-Path $serviceScript)) {
+  & $serviceScript -Action Cleanup -RemoveLogs
 }
 
 $managedArtifactRoots = @(
@@ -59,37 +64,41 @@ foreach ($path in $stalePathsToClean) {
   }
 }
 
-$runtimeFilesToClean = @(
-  'Data\config\locks.json',
-  'Data\config\admin-auth.json',
-  'Data\config\system-config.local.json',
-  'Data\log\audit.log',
-  'Data\log\service-stdout.log',
-  'Data\log\service-stderr.log'
-) | ForEach-Object { Join-Path $repoRoot $_ }
+if ($IncludeRuntimeData) {
+  $runtimeFilesToClean = @(
+    'Data\config\locks.json',
+    'Data\config\admin-auth.json',
+    'Data\config\system-config.local.json',
+    'Data\log\audit.log',
+    'Data\log\service-stdout.log',
+    'Data\log\service-stderr.log',
+    'Data\log\service-stdout.log.1',
+    'Data\log\service-stderr.log.1'
+  ) | ForEach-Object { Join-Path $repoRoot $_ }
 
-foreach ($path in $runtimeFilesToClean) {
-  if (Test-Path $path) {
-    Remove-Item -Path $path -Force
-    Write-Host "Removed runtime file $path"
-  }
-}
-
-$runtimePatternsToClean = @(
-  'Data\config\*.bak',
-  'Data\config\*.tmp',
-  'Data\reparti\*.bak',
-  'Data\reparti\*.tmp',
-  'Data\utenti\*.json',
-  'Data\utenti\*.bak',
-  'Data\utenti\*.tmp'
-) | ForEach-Object { Join-Path $repoRoot $_ }
-
-foreach ($pattern in $runtimePatternsToClean) {
-  Get-ChildItem -Path $pattern -File -Force -ErrorAction SilentlyContinue |
-    Sort-Object FullName |
-    ForEach-Object {
-      Remove-Item -Path $_.FullName -Force
-      Write-Host "Removed runtime file $($_.FullName)"
+  foreach ($path in $runtimeFilesToClean) {
+    if (Test-Path $path) {
+      Remove-Item -Path $path -Force
+      Write-Host "Removed runtime file $path"
     }
+  }
+
+  $runtimePatternsToClean = @(
+    'Data\config\*.bak',
+    'Data\config\*.tmp',
+    'Data\reparti\*.bak',
+    'Data\reparti\*.tmp',
+    'Data\utenti\*.json',
+    'Data\utenti\*.bak',
+    'Data\utenti\*.tmp'
+  ) | ForEach-Object { Join-Path $repoRoot $_ }
+
+  foreach ($pattern in $runtimePatternsToClean) {
+    Get-ChildItem -Path $pattern -File -Force -ErrorAction SilentlyContinue |
+      Sort-Object FullName |
+      ForEach-Object {
+        Remove-Item -Path $_.FullName -Force
+        Write-Host "Removed runtime file $($_.FullName)"
+      }
+  }
 }

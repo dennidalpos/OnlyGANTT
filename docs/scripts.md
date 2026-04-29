@@ -7,24 +7,24 @@ All supported operational entrypoints are exposed through `package.json` npm scr
 | npm command | Script | Behavior |
 | --- | --- | --- |
 | `npm run bootstrap` | `scripts/bootstrap.ps1` | Runs `npm ci`. |
-| `npm run doctor` | `scripts/doctor.ps1` | Checks Node.js >= 18, npm, required runtime files, brand icon, WiX source, NSSM x64 and `node_modules`. |
-| `npm run compile` | `scripts/compile.ps1` | Builds `artifacts/build/client/app.bundle.js` and writes `artifacts/build/runtime-manifest.json`. |
+| `npm run doctor` | `scripts/doctor.ps1` | Checks Node.js >= 20, npm, dotnet, required runtime files, brand icon, WiX sources, service host project and `node_modules`. |
+| `npm run compile` | `scripts/compile.ps1` | Builds `artifacts/build/client/app.bundle.js`, publishes the native service host and writes `artifacts/build/runtime-manifest.json`. |
 | `npm run build` | `scripts/build.ps1` | Runs `doctor` and `compile`. |
 | `npm run test` | `scripts/test.ps1` | Runs the canonical regression checks and writes `artifacts/test-results/summary.json`. |
-| `npm run pack` | `scripts/pack.ps1` | Runs `build`, then creates the x64 MSI through `scripts/packaging/build-msi.ps1`. |
+| `npm run pack` | `scripts/pack.ps1` | Runs `build`, then creates the x64 MSI and setup bootstrapper. |
 | `npm run publish` | `scripts/publish.ps1` | Copies existing files from `artifacts/packages/` to `artifacts/publish/local/` and writes a local publish manifest. |
-| `npm run clean` | `scripts/clean.ps1` | Cleans managed artifacts, stale local output roots and runtime-only data files. |
+| `npm run clean` | `scripts/clean.ps1` | Cleans managed artifacts and stale local output roots. Runtime data and service cleanup require explicit flags. |
 
 ## Runtime commands
 
 | npm command | Behavior |
 | --- | --- |
 | `npm start` | Runs `prestart` (`scripts/compile.ps1`) and starts `src/server/server.js`. |
-| `npm run service:install` | Installs the Windows service with NSSM. Requires administrator privileges. |
+| `npm run service:install` | Installs the Windows service with native Windows service management. Requires administrator privileges and a prior `npm run build`. |
 | `npm run service:uninstall` | Removes the Windows service. Requires administrator privileges. |
 | `npm run service:start` | Starts `OnlyGanttWeb`. |
 | `npm run service:stop` | Stops `OnlyGanttWeb`. |
-| `npm run service:cleanup` | Removes the service if present and deletes service log files. |
+| `npm run service:cleanup` | Removes the service if present. Service log deletion is available through `scripts/windows/service.ps1 -Action Cleanup -RemoveLogs`. |
 
 ## Tests
 
@@ -40,7 +40,12 @@ The Windows service lifecycle check skips explicitly when it cannot run in the c
 
 ## MSI packaging
 
-`npm run pack` creates `artifacts/packages/msi/OnlyGantt-<version>-x64.msi`.
+`npm run pack` creates:
+
+- `artifacts/packages/msi/OnlyGantt-<version>-x64.msi`
+- `artifacts/packages/setup/OnlyGantt-Setup-<version>-x64.exe`
+
+The setup EXE includes the Node.js 24 LTS x64 MSI prerequisite after verifying the official SHA256 hash during packaging.
 
 Full MSI lifecycle validation can be requested with:
 
@@ -72,6 +77,8 @@ The upgrade test intentionally builds and validates `1.0.0 -> 1.0.1` unless call
 | `scripts/assets/generate-brand-assets.ps1` | Deterministic generation for versioned brand assets. |
 | `scripts/packaging/common.ps1` | Shared MSI lifecycle helper functions. |
 | `scripts/packaging/provision-wix.ps1` | Provisions WiX 3.14.1 into `tools/wix314-binaries/` when missing. |
+| `scripts/packaging/provision-node.ps1` | Downloads and verifies the Node.js 24 LTS x64 MSI prerequisite. |
+| `scripts/windows/service.ps1` | Installs, starts, stops, removes and cleans up the native Windows service. |
 
 ## CI
 

@@ -266,8 +266,9 @@ $packageJsonPath = Join-Path $repoRoot 'package.json'
 $wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.ps1'
 $wixSourcePath = Join-Path $repoRoot 'tools\wix\Product.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
-$nssmSourcePath = Join-Path $repoRoot 'tools\nssm\win64\nssm.exe'
 $brandIconPath = Join-Path $repoRoot 'src\public\brand\onlygantt.ico'
+$serviceHostPath = Join-Path $repoRoot 'artifacts\build\service\OnlyGantt.Service.exe'
+$clientBundlePath = Join-Path $repoRoot 'artifacts\build\client\app.bundle.js'
 
 if (-not (Test-Path $packageJsonPath)) {
   throw "package.json not found: $packageJsonPath"
@@ -291,12 +292,16 @@ foreach ($toolName in 'candle.exe', 'light.exe') {
   }
 }
 
-if (-not (Test-Path $nssmSourcePath)) {
-  throw "nssm.exe not found for MSI packaging: $nssmSourcePath"
-}
-
 if (-not (Test-Path $brandIconPath)) {
   throw "Windows brand icon not found for MSI packaging: $brandIconPath"
+}
+
+if (-not (Test-Path $serviceHostPath)) {
+  throw "Published Windows service host not found: $serviceHostPath. Run scripts/build.ps1 before packaging."
+}
+
+if (-not (Test-Path $clientBundlePath)) {
+  throw "Client bundle not found: $clientBundlePath. Run scripts/build.ps1 before packaging."
 }
 
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
@@ -324,6 +329,7 @@ $stageTargets = @(
   @{ Source = 'LICENSE'; Destination = 'LICENSE' },
   @{ Source = 'src'; Destination = 'src' },
   @{ Source = 'node_modules'; Destination = 'node_modules' },
+  @{ Source = 'artifacts\build\client'; Destination = 'artifacts\build\client' },
   @{ Source = 'scripts\windows'; Destination = 'scripts\windows' }
 )
 
@@ -348,8 +354,10 @@ $candleArguments = @(
   '-out', "$objRoot\"
   "-dProductVersion=$productVersion"
   "-dSourceDir=$stageRoot"
-  "-dNssmSource=$nssmSourcePath"
+  "-dServiceHostSource=$serviceHostPath"
   "-dBrandIcon=$brandIconPath"
+  '-ext', 'WixUIExtension'
+  '-ext', 'WixUtilExtension'
   $wixSourcePath
   $appFilesWxs
 )
@@ -362,7 +370,10 @@ if ($LASTEXITCODE -ne 0) {
 $lightArguments = @(
   '-nologo'
   '-sice:ICE61'
+  '-sice:ICE43'
   '-out', $msiOutputPath
+  '-ext', 'WixUIExtension'
+  '-ext', 'WixUtilExtension'
   $wixObjectFiles
 )
 

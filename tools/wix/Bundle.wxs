@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix
+  xmlns="http://schemas.microsoft.com/wix/2006/wi"
+  xmlns:bal="http://schemas.microsoft.com/wix/BalExtension"
+  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Bundle
+    Name="OnlyGANTT Setup"
+    Version="$(var.ProductVersion)"
+    Manufacturer="Danny Perondi"
+    UpgradeCode="B08F4DE5-BB9E-4263-8EE4-92F4D3940A59"
+    IconSourceFile="$(var.BrandIcon)">
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
+      <bal:WixStandardBootstrapperApplication LicenseFile="$(var.LicenseRtf)" SuppressOptionsUI="yes" />
+    </BootstrapperApplicationRef>
+
+    <util:RegistrySearch
+      Id="NodeInstallDirSearch"
+      Root="HKLM"
+      Key="SOFTWARE\Node.js"
+      Value="InstallPath"
+      Variable="NodeInstallDir"
+      Result="value"
+      Win64="yes" />
+
+    <Chain>
+      <MsiPackage
+        Id="NodeLts"
+        SourceFile="$(var.NodeMsiSource)"
+        DisplayInternalUI="no"
+        Permanent="yes"
+        Vital="yes"
+        InstallCondition="NOT NodeInstallDir" />
+      <MsiPackage
+        Id="OnlyGanttMsi"
+        SourceFile="$(var.ProductMsiSource)"
+        DisplayInternalUI="yes"
+        Vital="yes" />
+    </Chain>
+  </Bundle>
+</Wix>

@@ -6,10 +6,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
 Assert-CommandExists -Name 'npm'
+Assert-CommandExists -Name 'dotnet'
 
 $nodeVersion = Get-NodeVersionInfo
-if ($nodeVersion.Major -lt 18) {
-  throw "Node.js >= 18 is required. Detected: $($nodeVersion.Raw)"
+if ($nodeVersion.Major -lt 20) {
+  throw "Node.js >= 20 is required. Detected: $($nodeVersion.Raw)"
 }
 
 $requiredPaths = @(
@@ -23,7 +24,10 @@ $requiredPaths = @(
   @{ Path = (Join-Path $repoRoot 'scripts\helpers\build-client-bundle.mjs'); Label = 'client bundler helper' },
   @{ Path = (Join-Path $repoRoot 'tests\smoke-check.js'); Label = 'smoke test' },
   @{ Path = (Join-Path $repoRoot 'tools\wix\Product.wxs'); Label = 'WiX source' },
-  @{ Path = (Join-Path $repoRoot 'tools\nssm\win64\nssm.exe'); Label = 'NSSM x64 binary' }
+  @{ Path = (Join-Path $repoRoot 'tools\wix\Bundle.wxs'); Label = 'WiX bootstrapper source' },
+  @{ Path = (Join-Path $repoRoot 'src\service\OnlyGantt.Service\OnlyGantt.Service.csproj'); Label = 'Windows service host project' },
+  @{ Path = (Join-Path $repoRoot 'scripts\windows\service.ps1'); Label = 'Windows service management script' },
+  @{ Path = (Join-Path $repoRoot 'scripts\packaging\provision-node.ps1'); Label = 'Node.js prerequisite provisioning script' }
 )
 
 foreach ($item in $requiredPaths) {
@@ -38,9 +42,10 @@ if (-not (Test-Path $nodeModulesPath)) {
 $doctorReport = @(
   "node=$($nodeVersion.Raw)",
   "npm=$((& npm --version).Trim())",
+  "dotnet=$((& dotnet --version).Trim())",
   'dependencies=installed',
   'tests=tests/smoke-check.js',
-  'packaging=scripts/packaging/build-msi.ps1'
+  'packaging=scripts/pack.ps1'
 ) -join "`r`n"
 
 Write-Utf8File -Path (Join-Path $repoRoot 'artifacts\logs\doctor.txt') -Content $doctorReport

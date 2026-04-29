@@ -48,7 +48,7 @@ if ($exitCode -ne 0) {
 }
 
 $serviceLifecycleStatus = 'skipped'
-& powershell -NoProfile -ExecutionPolicy Bypass -File $serviceLifecycleScript 2>&1 | Tee-Object -FilePath $serviceLifecycleLogPath
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $serviceLifecycleScript 2>&1 | Tee-Object -FilePath $serviceLifecycleLogPath
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
   throw "Windows service lifecycle check failed with exit code $exitCode"

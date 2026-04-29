@@ -26,6 +26,7 @@
     const [expandedProjects, setExpandedProjects] = useState(new Set());
     const [highlightedProjectId, setHighlightedProjectId] = useState(null);
     const projectRefs = useRef({});
+    const importFileInputRef = useRef(null);
     const highlightTimerRef = useRef(null);
 
     useEffect(() => {
@@ -84,6 +85,20 @@
       onSelectedProjectIdsChange(new Set());
     };
 
+    const openImportFilePicker = () => {
+      if (readOnly || !importFileInputRef.current) return;
+      importFileInputRef.current.click();
+    };
+
+    const handleImportFileChange = (e) => {
+      if (readOnly) return;
+      const file = e.target.files[0];
+      if (file) {
+        onImportJSON(file);
+        e.target.value = '';
+      }
+    };
+
     const allSelected = projects.length > 0 && selectedProjectIds.size === projects.length;
 
     return (
@@ -122,27 +137,22 @@
           </div>
 
           <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            <label
-              className={`btn-secondary btn-small ${readOnly ? 'btn-disabled' : ''}`}
-              style={{ cursor: readOnly ? 'not-allowed' : 'pointer', margin: 0 }}
-              aria-disabled={readOnly}
+            <button
+              type="button"
+              onClick={openImportFilePicker}
+              className="btn-secondary btn-small"
+              disabled={readOnly}
             >
               Importa progetti
-              <input
-                type="file"
-                accept=".json"
-                onChange={(e) => {
-                  if (readOnly) return;
-                  const file = e.target.files[0];
-                  if (file) {
-                    onImportJSON(file);
-                    e.target.value = '';
-                  }
-                }}
-                style={{ display: 'none' }}
-                disabled={readOnly}
-              />
-            </label>
+            </button>
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportFileChange}
+              style={{ display: 'none' }}
+              disabled={readOnly}
+            />
             <button onClick={onExportJSON} className="btn-secondary btn-small">
               Export Progetti
             </button>

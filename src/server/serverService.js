@@ -10,8 +10,9 @@ function logRestartDiagnostic(message) {
 }
 
 function restartServer() {
-  if ((process.env.ONLYGANTT_SERVICE_MANAGER || '').toLowerCase() === 'nssm') {
-    logRestartDiagnostic('Restart delegated to NSSM service manager');
+  const serviceManager = (process.env.ONLYGANTT_SERVICE_MANAGER || '').toLowerCase();
+  if (serviceManager === 'native') {
+    logRestartDiagnostic('Restart delegated to native Windows service manager');
     process.exit(0);
     return;
   }

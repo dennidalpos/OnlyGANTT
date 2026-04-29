@@ -43,6 +43,8 @@
 
     if (!formData) return null;
 
+    const projectFormId = `project-form-${formData.id || 'new'}`;
+
     const updateFormData = (nextData) => {
       setFormData(nextData);
       if (formStatus) {
@@ -146,8 +148,9 @@
         )}
 
         <div className="form-group">
-          <label>Nome Progetto *</label>
+          <label htmlFor={`${projectFormId}-nome`}>Nome Progetto *</label>
           <input
+            id={`${projectFormId}-nome`}
             type="text"
             value={formData.nome}
             onChange={(e) => handleProjectChange('nome', e.target.value)}
@@ -157,8 +160,9 @@
 
         <div className="form-row">
           <div className="form-group">
-            <label>Colore</label>
+            <label htmlFor={`${projectFormId}-colore`}>Colore</label>
             <input
+              id={`${projectFormId}-colore`}
               type="color"
               value={formData.colore}
               onChange={(e) => handleProjectChange('colore', e.target.value)}
@@ -167,8 +171,9 @@
           </div>
 
           <div className="form-group">
-            <label>Stato</label>
+            <label htmlFor={`${projectFormId}-stato`}>Stato</label>
             <select
+              id={`${projectFormId}-stato`}
               value={formData.stato}
               onChange={(e) => handleProjectChange('stato', e.target.value)}
               disabled={readOnly}
@@ -184,8 +189,9 @@
 
         <div className="form-row">
           <div className="form-group">
-            <label>Data Inizio</label>
+            <label htmlFor={`${projectFormId}-data-inizio`}>Data Inizio</label>
             <input
+              id={`${projectFormId}-data-inizio`}
               type="date"
               value={formData.dataInizio || ''}
               onChange={(e) => handleProjectChange('dataInizio', e.target.value || null)}
@@ -194,8 +200,9 @@
           </div>
 
           <div className="form-group">
-            <label>Data Fine</label>
+            <label htmlFor={`${projectFormId}-data-fine`}>Data Fine</label>
             <input
+              id={`${projectFormId}-data-fine`}
               type="date"
               value={formData.dataFine || ''}
               onChange={(e) => handleProjectChange('dataFine', e.target.value || null)}
@@ -211,9 +218,10 @@
         </div>
 
         <div className="form-group">
-          <label>Percentuale Completamento</label>
+          <label htmlFor={`${projectFormId}-percentuale`}>Percentuale Completamento</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <input
+              id={`${projectFormId}-percentuale`}
               type="number"
               min="0"
               max="100"
@@ -222,8 +230,9 @@
               placeholder="Auto (media fasi)"
               disabled={readOnly || formData.percentualeCompletamento === null}
             />
-            <label className="checkbox-label">
+            <label className="checkbox-label" htmlFor={`${projectFormId}-percentuale-auto`}>
               <input
+                id={`${projectFormId}-percentuale-auto`}
                 type="checkbox"
                 checked={formData.percentualeCompletamento === null}
                 onChange={(e) => handleProjectChange('percentualeCompletamento', e.target.checked ? null : 0)}
@@ -266,7 +275,10 @@
           </div>
         )}
 
-        {formData.fasi.map((fase, index) => (
+        {formData.fasi.map((fase, index) => {
+          const phaseFormId = `${projectFormId}-phase-${fase.id || index}`;
+
+          return (
           <React.Fragment key={fase.id}>
             <div
               style={{
@@ -299,7 +311,7 @@
               </div>
 
             <div className="form-group">
-              <label>Nome Fase *</label>
+              <label htmlFor={`${phaseFormId}-nome`}>Nome Fase *</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div
                   style={{
@@ -313,6 +325,7 @@
                   title={`Colore: ${fase.colore || '#64748b'}`}
                 />
                 <input
+                  id={`${phaseFormId}-nome`}
                   type="text"
                   value={fase.nome}
                   onChange={(e) => handlePhaseChange(index, 'nome', e.target.value)}
@@ -324,8 +337,9 @@
 
             <div className="form-row">
               <div className="form-group">
-                <label>Data Inizio</label>
+                <label htmlFor={`${phaseFormId}-data-inizio`}>Data Inizio</label>
                 <input
+                  id={`${phaseFormId}-data-inizio`}
                   type="date"
                   value={fase.dataInizio || ''}
                   onChange={(e) => handlePhaseChange(index, 'dataInizio', e.target.value || null)}
@@ -334,8 +348,9 @@
               </div>
 
               <div className="form-group">
-                <label>Data Fine</label>
+                <label htmlFor={`${phaseFormId}-data-fine`}>Data Fine</label>
                 <input
+                  id={`${phaseFormId}-data-fine`}
                   type="date"
                   value={fase.dataFine || ''}
                   onChange={(e) => handlePhaseChange(index, 'dataFine', e.target.value || null)}
@@ -352,8 +367,9 @@
 
             <div className="form-row">
               <div className="form-group">
-                <label>Stato</label>
+                <label htmlFor={`${phaseFormId}-stato`}>Stato</label>
                 <select
+                  id={`${phaseFormId}-stato`}
                   value={fase.stato}
                   onChange={(e) => handlePhaseChange(index, 'stato', e.target.value)}
                   disabled={readOnly}
@@ -367,9 +383,10 @@
               </div>
 
               <div className="form-group">
-                <label>Completamento (%)</label>
+                <label htmlFor={`${phaseFormId}-percentuale`}>Completamento (%)</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <input
+                    id={`${phaseFormId}-percentuale`}
                     type="number"
                     min="0"
                     max="100"
@@ -377,8 +394,9 @@
                     onChange={(e) => handlePhaseChange(index, 'percentualeCompletamento', e.target.value === '' ? null : parseInt(e.target.value, 10) || 0)}
                     disabled={readOnly || fase.percentualeCompletamento === null}
                   />
-                  <label className="checkbox-label">
+                  <label className="checkbox-label" htmlFor={`${phaseFormId}-percentuale-auto`}>
                     <input
+                      id={`${phaseFormId}-percentuale-auto`}
                       type="checkbox"
                       checked={fase.percentualeCompletamento === null}
                       onChange={(e) => handlePhaseChange(index, 'percentualeCompletamento', e.target.checked ? null : 0)}
@@ -391,8 +409,9 @@
             </div>
 
             <div className="form-group">
-              <label className="checkbox-label">
+              <label className="checkbox-label" htmlFor={`${phaseFormId}-milestone`}>
                 <input
+                  id={`${phaseFormId}-milestone`}
                   type="checkbox"
                   checked={fase.milestone}
                   onChange={(e) => handlePhaseChange(index, 'milestone', e.target.checked)}
@@ -403,8 +422,9 @@
             </div>
 
             <div className="form-group">
-              <label className="checkbox-label">
+              <label className="checkbox-label" htmlFor={`${phaseFormId}-include-festivi`}>
                 <input
+                  id={`${phaseFormId}-include-festivi`}
                   type="checkbox"
                   checked={fase.includeFestivi}
                   onChange={(e) => handlePhaseChange(index, 'includeFestivi', e.target.checked)}
@@ -415,8 +435,9 @@
             </div>
 
             <div className="form-group">
-              <label>Note</label>
+              <label htmlFor={`${phaseFormId}-note`}>Note</label>
               <textarea
+                id={`${phaseFormId}-note`}
                 value={fase.note}
                 onChange={(e) => handlePhaseChange(index, 'note', e.target.value)}
                 disabled={readOnly}
@@ -452,7 +473,8 @@
               </div>
             )}
           </React.Fragment>
-        ))}
+          );
+        })}
 
         {!readOnly && formData.fasi.length > 0 && (
           <div style={{ marginBottom: '1rem', padding: '0.5rem 0.75rem', border: '1px dashed #475569', borderRadius: 'var(--radius-md)' }}>
