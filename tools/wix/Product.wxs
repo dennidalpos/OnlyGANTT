@@ -13,6 +13,7 @@
       InstallerVersion="500"
       Compressed="yes"
       InstallScope="perMachine"
+      InstallPrivileges="elevated"
       Platform="x64"
       Description="OnlyGANTT server installer" />
 

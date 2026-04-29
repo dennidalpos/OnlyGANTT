@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.ServiceProcess;
 
 namespace OnlyGantt.Service;
@@ -51,7 +52,15 @@ internal static class Program
 
         protected override void OnStart(string[] args)
         {
-            runner.Start();
+            try
+            {
+                runner.Start();
+            }
+            catch (Exception ex)
+            {
+                ServiceDiagnostics.WriteStartupFailure(ex);
+                throw;
+            }
         }
 
         protected override void OnStop()
@@ -98,6 +107,7 @@ internal static class Program
 
                 stopping = false;
                 Directory.CreateDirectory(options.LogDir);
+                ServiceDiagnostics.ValidateStartup(options);
                 RotateLog(options.StdoutLogPath);
                 RotateLog(options.StderrLogPath);
 
@@ -310,6 +320,51 @@ internal static class Program
         private static string FullPath(string path)
         {
             return Path.GetFullPath(System.Environment.ExpandEnvironmentVariables(path));
+        }
+    }
+
+    private static class ServiceDiagnostics
+    {
+        private const string EventSource = "OnlyGanttWeb";
+
+        public static void ValidateStartup(ServiceOptions options)
+        {
+            if (!File.Exists(options.NodePath))
+            {
+                throw new FileNotFoundException("Node.js executable was not found.", options.NodePath);
+            }
+
+            if (!File.Exists(options.ServerJs))
+            {
+                throw new FileNotFoundException("OnlyGANTT server entrypoint was not found.", options.ServerJs);
+            }
+
+            if (IsPortInUse(options.Port))
+            {
+                throw new InvalidOperationException($"TCP port {options.Port} is already in use. Choose a different port or stop the process using that port before starting OnlyGANTT.");
+            }
+        }
+
+        public static void WriteStartupFailure(Exception exception)
+        {
+            try
+            {
+                if (!EventLog.SourceExists(EventSource))
+                {
+                    EventLog.CreateEventSource(EventSource, "Application");
+                }
+
+                EventLog.WriteEntry(EventSource, exception.ToString(), EventLogEntryType.Error);
+            }
+            catch
+            {
+            }
+        }
+
+        private static bool IsPortInUse(int port)
+        {
+            var listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+            return listeners.Any(listener => listener.Port == port);
         }
     }
 }
