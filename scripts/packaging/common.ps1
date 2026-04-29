@@ -325,12 +325,6 @@ function Remove-OnlyGanttMachineState {
         break
       }
 
-      cmd.exe /c "rmdir /s /q `"$installRoot`"" 2>$null | Out-Null
-      if (-not (Test-Path $installRoot)) {
-        $global:LASTEXITCODE = 0
-        break
-      }
-
       Start-Sleep -Seconds 1
     }
 

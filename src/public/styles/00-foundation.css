@@ -21,6 +21,7 @@
   --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
+  --danger: var(--error);
   --info: #06b6d4;
 
   --milestone-color: #8b5cf6;

@@ -17,6 +17,8 @@ $requiredPaths = @(
   @{ Path = (Join-Path $repoRoot 'package-lock.json'); Label = 'package-lock.json' },
   @{ Path = (Join-Path $repoRoot 'src\server\server.js'); Label = 'server entrypoint' },
   @{ Path = (Join-Path $repoRoot 'src\public\index.html'); Label = 'public shell' },
+  @{ Path = (Join-Path $repoRoot 'src\public\brand\onlygantt-logo.svg'); Label = 'brand logo' },
+  @{ Path = (Join-Path $repoRoot 'src\public\brand\onlygantt.ico'); Label = 'Windows brand icon' },
   @{ Path = (Join-Path $repoRoot 'src\client\bundle-entry.jsx'); Label = 'client bundle entrypoint' },
   @{ Path = (Join-Path $repoRoot 'scripts\helpers\build-client-bundle.mjs'); Label = 'client bundler helper' },
   @{ Path = (Join-Path $repoRoot 'tests\smoke-check.js'); Label = 'smoke test' },

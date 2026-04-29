@@ -15,8 +15,6 @@ npm run bootstrap
 npm run doctor
 ```
 
-Per una procedura guidata piu' semplice per Windows, con primo avvio del server e gestione delle prime credenziali, vedi [docs/windows-server-quickstart.md](docs/windows-server-quickstart.md).
-
 ## Comandi principali
 
 ```powershell
@@ -31,6 +29,8 @@ npm run clean
 ```
 
 `npm start` esegue prima `prestart` con `scripts/compile.ps1` e poi avvia il server applicativo su `src/server/server.js`.
+
+La classificazione completa degli script e' in [`docs/scripts.md`](/D:/GITHUB/OnlyGANTT/docs/scripts.md).
 
 ## Build e run
 
@@ -159,15 +159,14 @@ La gestione del servizio usa `tools/nssm/` come host del processo Node.js.
 ├── tools/
 ├── src/
 ├── Data/
-├── PROJECT_SPEC.md
-├── PROJECT_STATUS.json
-└── AGENTS.md
+└── PROJECT_STATUS.json
 ```
 
 Note di layout:
 
 - `scripts/` contiene gli entrypoint canonici e le sottocartelle `helpers/`, `packaging/`, `windows/`.
 - `artifacts/` e' l'unica root prevista per output persistenti locali e CI.
+- `src/public/brand/` contiene logo, icone Windows/setup e immagini social generate in modo deterministico; dettagli in [`docs/brand-assets.md`](/D:/GITHUB/OnlyGANTT/docs/brand-assets.md).
 - `artifacts/build/client/` contiene il bundle client locale generato da `compile`, `build`, `test` e `prestart`.
 - `src/server/` contiene il backend Express e i servizi di runtime.
 - `src/public/` contiene la shell statica HTML/CSS servita dal backend.

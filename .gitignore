@@ -1,5 +1,6 @@
 node_modules/
 tools/wix314-binaries/
+.playwright-cli/
 artifacts/**
 !artifacts/
 !artifacts/**/
@@ -7,8 +8,10 @@ artifacts/**
 build/
 dist/
 out/
+output/
 publish/
 tmp/
+playwright-report/
 Data/config/locks.json
 Data/config/admin-auth.json
 Data/config/system-config.local.json

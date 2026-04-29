@@ -42,9 +42,12 @@ Get-ChildItem -Path $artifactsRoot -Force -ErrorAction SilentlyContinue |
   }
 
 $stalePathsToClean = @(
+  '.playwright-cli',
   'build',
   'dist',
   'out',
+  'output',
+  'playwright-report',
   'publish',
   'tmp'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
