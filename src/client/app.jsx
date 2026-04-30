@@ -643,6 +643,11 @@
       setScrollToTodayTrigger(prev => prev + 1);
     };
 
+    const handleUserTokenChange = (nextUserToken) => {
+      api.setUserToken(nextUserToken || null);
+      setUserToken(nextUserToken || null);
+    };
+
     const resetSessionState = async ({ nextUserName = '', nextAdminToken = null } = {}) => {
       try {
         await releaseLock();
@@ -664,7 +669,7 @@
       setShowScreensaver(false);
       setAdminToken(nextAdminToken);
       setUserName(nextUserName);
-      setUserToken(null);
+      handleUserTokenChange(null);
     };
 
     const handleUserNameChange = async (nextUserName) => {
@@ -685,7 +690,7 @@
 
       const result = await api.adminLogin(adminId, password);
       setAdminToken(result.token);
-      setUserToken(result.userToken || null);
+      handleUserTokenChange(result.userToken || null);
       setUserName(adminId);
       pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
     };
@@ -1268,7 +1273,7 @@
               adminToken={adminToken}
               onAdminLogin={handleAdminLogin}
               onAdminLogout={handleUserLogout}
-              onUserTokenChange={setUserToken}
+              onUserTokenChange={handleUserTokenChange}
               loginError={loginError}
               setLoginError={setLoginError}
               pushNotification={pushNotification}

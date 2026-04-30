@@ -1424,6 +1424,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const normalizedUserId = userId.trim();
+    const authSnapshot = userStore.getAuthSnapshot();
     const ldapConfig = getLdapConfigForAuth();
 
     if (CONFIG.ldapEnabled) {
@@ -1480,6 +1481,24 @@ app.post('/api/auth/login', async (req, res) => {
           ? 500
           : 401;
       return errorResponse(res, statusCode, ldapResult.code, ldapResult.message);
+    }
+
+    const isUsernameOnlyLogin = password === undefined || password === null || password === '';
+    if (authSnapshot.localUsers === 0 && isUsernameOnlyLogin) {
+      revokeUserSessionsForUser(normalizedUserId);
+      const userToken = createUserSession(normalizedUserId, { userType: 'standard' });
+      return res.json({
+        ok: true,
+        authType: 'standard',
+        token: userToken,
+        user: {
+          userId: normalizedUserId,
+          type: 'standard',
+          displayName: normalizedUserId,
+          mail: null,
+          department: department || null
+        }
+      });
     }
 
     const localResult = userStore.verifyLocalUser(normalizedUserId, password);

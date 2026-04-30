@@ -312,13 +312,13 @@
     ctx.imageSmoothingEnabled = false;
 
     const headerBaseY = config.gantt.CANVAS_TOP_MARGIN;
-    const headerDayNumberY = headerBaseY - 14;
-    const headerDayLetterY = headerBaseY - 30;
-    const headerWeekY = headerBaseY - 50;
-    const headerTodayY = headerBaseY - 4;
-    const headerMsY = headerBaseY - 72;
-    const headerMonthY = headerBaseY - 94;
-    const headerYearY = headerBaseY - 118;
+    const headerTodayY = headerBaseY - 18;
+    const headerDayNumberY = headerBaseY - 38;
+    const headerDayLetterY = headerBaseY - 56;
+    const headerWeekY = headerBaseY - 76;
+    const headerMsY = headerBaseY - 98;
+    const headerMonthY = headerBaseY - 120;
+    const headerYearY = headerBaseY - 142;
 
     const projectAreaTop = rows.length ? rows[0].y : config.gantt.CANVAS_TOP_MARGIN;
     const projectAreaBottom = rows.length ? rows[rows.length - 1].y + rows[rows.length - 1].height : config.gantt.CANVAS_TOP_MARGIN;
@@ -326,13 +326,13 @@
     const projectAreaRight = canvasWidth - config.gantt.CANVAS_RIGHT_MARGIN;
 
     const footerBaseY = projectAreaBottom;
-    const footerDayNumberY = footerBaseY + 14;
-    const footerDayLetterY = footerBaseY + 30;
-    const footerWeekY = footerBaseY + 50;
-    const footerTodayY = footerBaseY + 4;
-    const footerMsY = footerBaseY + 72;
-    const footerMonthY = footerBaseY + 94;
-    const footerYearY = footerBaseY + 118;
+    const footerTodayY = footerBaseY + 18;
+    const footerDayNumberY = footerBaseY + 38;
+    const footerDayLetterY = footerBaseY + 56;
+    const footerWeekY = footerBaseY + 76;
+    const footerMsY = footerBaseY + 98;
+    const footerMonthY = footerBaseY + 120;
+    const footerYearY = footerBaseY + 142;
 
     ctx.fillStyle = config.gantt.BACKGROUND_COLOR;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -496,6 +496,23 @@
     const today = new Date();
     const todayX = dateToX[dateUtils.formatDate(today)];
 
+    const drawTodayLabel = (text, x, y) => {
+      const paddingX = 5;
+      const paddingY = 3;
+      const width = ctx.measureText(text).width + (paddingX * 2);
+      const height = 15 + (paddingY * 2);
+      const left = x - width / 2;
+      const top = y - height / 2;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+      ctx.fillRect(left, top, width, height);
+      ctx.strokeStyle = config.gantt.TODAY_LINE_COLOR;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(left, top, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, x, y);
+    };
+
     const drawTodayMarker = () => {
       if (todayX === null || todayX === undefined || todayX < projectAreaLeft) return;
 
@@ -512,8 +529,8 @@
       ctx.font = `bold 11px ${fontFamily}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Oggi', todayX, headerTodayY);
-      ctx.fillText('Oggi', todayX, footerTodayY);
+      drawTodayLabel('Oggi', todayX, headerTodayY);
+      drawTodayLabel('Oggi', todayX, footerTodayY);
       ctx.restore();
     };
 
@@ -642,7 +659,7 @@
     });
 
     ctx.strokeStyle = config.gantt.MILESTONE_COLOR;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2.5;
     ctx.setLineDash([4, 4]);
 
     milestones.forEach(ms => {
@@ -693,6 +710,15 @@
       const centerY = ms.row.y + ms.row.height / 2;
       const size = 8;
 
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+      ctx.beginPath();
+      ctx.moveTo(mx, centerY - size - 2);
+      ctx.lineTo(mx + size + 2, centerY);
+      ctx.lineTo(mx, centerY + size + 2);
+      ctx.lineTo(mx - size - 2, centerY);
+      ctx.closePath();
+      ctx.fill();
+
       ctx.fillStyle = config.gantt.MILESTONE_COLOR;
       ctx.beginPath();
       ctx.moveTo(mx, centerY - size);
@@ -702,8 +728,8 @@
       ctx.closePath();
       ctx.fill();
 
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     });
 

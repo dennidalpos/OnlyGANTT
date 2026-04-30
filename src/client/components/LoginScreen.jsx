@@ -264,13 +264,24 @@
       setIsLoading(true);
 
       try {
+        const normalizedUserName = pendingUserName.trim();
+        if (normalizedUserName !== userName) {
+          const userChanged = await onUserNameChange(normalizedUserName);
+          if (!userChanged) {
+            setIsLoading(false);
+            return;
+          }
+        }
+
         let authResult = null;
-        if (!adminToken && requiresUserPassword) {
-          authResult = await api.authLogin(pendingUserName.trim(), userPassword, selectedDept);
+        if (!adminToken) {
+          authResult = await api.authLogin(normalizedUserName, userPassword, selectedDept);
         }
 
         if (authResult?.token) {
           onUserTokenChange(authResult.token);
+        } else if (!adminToken) {
+          throw new Error('Sessione utente non inizializzata');
         }
 
         if (needsPassword) {
@@ -283,12 +294,7 @@
             return;
           }
           
-          storage.setPassword(pendingUserName.trim(), selectedDept, deptPassword);
-        }
-
-        
-        if (pendingUserName.trim() !== userName) {
-          onUserNameChange(pendingUserName.trim());
+          storage.setPassword(normalizedUserName, selectedDept, deptPassword);
         }
 
         setUserPassword('');

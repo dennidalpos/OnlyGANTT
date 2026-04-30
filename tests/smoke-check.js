@@ -153,6 +153,55 @@ async function main() {
       throw new Error('Expected admin to be configured during smoke run');
     }
 
+    const standardLogin = await requestJson('POST', '/api/auth/login', {
+      userId: 'standard-user',
+      department: 'Demo'
+    });
+    const standardUserToken = standardLogin.data?.token;
+    if (standardLogin.data?.authType !== 'standard' || !standardUserToken) {
+      throw new Error('Username-only standard login did not return a user token');
+    }
+
+    let unauthorizedSaveStatus = null;
+    try {
+      await requestJson('POST', '/api/projects/Demo', {
+        projects: [],
+        expectedRevision: 1,
+        userName: 'standard-user'
+      });
+    } catch (err) {
+      unauthorizedSaveStatus = err.status;
+    }
+    if (unauthorizedSaveStatus !== 401) {
+      throw new Error(`Expected unauthorized project save to return 401, got ${unauthorizedSaveStatus}`);
+    }
+
+    await requestJson('POST', '/api/lock/Demo/acquire', {
+      userName: 'standard-user',
+      clientHost: 'smoke-check'
+    }, {
+      'X-User-Token': standardUserToken
+    });
+
+    const standardProjects = await requestJson('GET', '/api/projects/Demo');
+    await requestJson('POST', '/api/projects/Demo', {
+      projects: [],
+      expectedRevision: standardProjects.data?.meta?.revision,
+      userName: 'standard-user'
+    }, {
+      'X-User-Token': standardUserToken
+    });
+
+    await requestJson('POST', '/api/lock/Demo/release', {
+      userName: 'standard-user'
+    }, {
+      'X-User-Token': standardUserToken
+    });
+
+    await requestJson('POST', '/api/auth/logout', {}, {
+      'X-User-Token': standardUserToken
+    });
+
     const adminLogin = await requestJson('POST', '/api/admin/login', {
       userId: 'admin',
       password: ADMIN_PASSWORD

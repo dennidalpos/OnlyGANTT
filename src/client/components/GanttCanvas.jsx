@@ -39,6 +39,7 @@
     const scrollbarWidthRef = useRef(0);
     const scrollRafRef = useRef(null);
     const pendingScrollLeftRef = useRef(0);
+    const handledScrollToTodayTriggerRef = useRef(0);
     const verticalScrollContainerRef = useRef(null);
     const syncedVerticalScrollTopRef = useRef(null);
 
@@ -286,23 +287,6 @@
     }, [render]);
 
     useEffect(() => {
-      if (scrollToTodayTrigger && layout && topScrollbarRef.current) {
-        const today = new Date();
-        const todayStr = dateUtils.formatDate(today);
-        const todayX = layout.dateToX[todayStr];
-
-        if (todayX !== null && todayX !== undefined && wrapperRef.current) {
-          const wrapperWidth = wrapperRef.current.clientWidth;
-          const scrollPos = Math.max(0, todayX - wrapperWidth / 2);
-
-          topScrollbarRef.current.scrollLeft = scrollPos;
-          bottomScrollbarRef.current.scrollLeft = scrollPos;
-          setScrollLeft(scrollPos);
-        }
-      }
-    }, [scrollToTodayTrigger, layout]);
-
-    useEffect(() => {
       if (!layout || !wrapperRef.current) return;
 
       const maxScroll = Math.max(0, layout.canvasWidth - wrapperRef.current.clientWidth);
@@ -379,6 +363,45 @@
 
       setScrollLabels(labels);
     }, [layout, viewMode, filters.showPhasePercentages, verticalScrollTop]);
+
+    const scrollToToday = useCallback(() => {
+      if (!layout || !wrapperRef.current) return false;
+
+      const todayStr = dateUtils.formatDate(new Date());
+      const todayX = layout.dateToX[todayStr];
+      if (todayX === null || todayX === undefined) return false;
+
+      const wrapperWidth = wrapperRef.current.clientWidth;
+      const maxScroll = Math.max(0, layout.canvasWidth - wrapperWidth);
+      const targetScroll = Math.min(
+        Math.max(0, todayX - wrapperWidth / 2),
+        maxScroll
+      );
+
+      scrollLeftRef.current = targetScroll;
+      pendingScrollLeftRef.current = targetScroll;
+      if (topScrollbarRef.current) {
+        topScrollbarRef.current.scrollLeft = targetScroll;
+      }
+      if (bottomScrollbarRef.current) {
+        bottomScrollbarRef.current.scrollLeft = targetScroll;
+      }
+      setScrollLeft(targetScroll);
+      window.requestAnimationFrame(updateScrollLabels);
+      return true;
+    }, [layout, updateScrollLabels]);
+
+    useEffect(() => {
+      if (!scrollToTodayTrigger || viewMode !== '4months') return;
+      if (handledScrollToTodayTriggerRef.current === scrollToTodayTrigger) return;
+
+      const frame = window.requestAnimationFrame(() => {
+        if (scrollToToday()) {
+          handledScrollToTodayTriggerRef.current = scrollToTodayTrigger;
+        }
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }, [scrollToTodayTrigger, viewMode, scrollToToday]);
 
     const handleScroll = useCallback((source) => {
       const left = source.scrollLeft;

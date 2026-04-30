@@ -124,6 +124,64 @@ function createSampleProject() {
   };
 }
 
+function createRecordingCanvasContext() {
+  const records = {
+    strokes: [],
+    strokeRects: [],
+    fillTexts: []
+  };
+  const ctx = {
+    fillStyle: '#000000',
+    strokeStyle: '#000000',
+    lineWidth: 1,
+    font: '10px sans-serif',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
+    imageSmoothingEnabled: true,
+    currentDash: [],
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    closePath() {},
+    rect() {},
+    clip() {},
+    save() {},
+    restore() {},
+    fill() {},
+    fillRect() {},
+    stroke() {
+      records.strokes.push({
+        strokeStyle: this.strokeStyle,
+        lineWidth: this.lineWidth,
+        dash: this.currentDash.slice()
+      });
+    },
+    strokeRect(x, y, width, height) {
+      records.strokeRects.push({
+        x,
+        y,
+        width,
+        height,
+        strokeStyle: this.strokeStyle,
+        lineWidth: this.lineWidth,
+        dash: this.currentDash.slice()
+      });
+    },
+    fillText(text, x, y) {
+      records.fillTexts.push({ text, x, y, fillStyle: this.fillStyle, font: this.font });
+    },
+    strokeText() {},
+    measureText(text) {
+      return { width: String(text).length * 6 };
+    },
+    setLineDash(dash) {
+      this.currentDash = Array.isArray(dash) ? dash.slice() : [];
+    }
+  };
+  ctx.records = records;
+  return ctx;
+}
+
 function main() {
   const repoRoot = path.join(__dirname, '..');
   assertNoNativeDialogs(repoRoot);
@@ -262,10 +320,22 @@ function main() {
   assert.ok(layout.dateToX[project.dataInizio] >= context.window.AppConfig.gantt.CANVAS_LEFT_MARGIN);
   assert.ok(layout.weeks.length > 0);
   assert.ok(layout.months.length > 0);
+  assert.ok(context.window.AppConfig.gantt.CANVAS_TOP_MARGIN >= 150);
+  assert.ok(context.window.AppConfig.gantt.CANVAS_BOTTOM_MARGIN >= 150);
 
   const phaseHit = gantt.hitTest(layout.dateToX['2026-04-02'] + 1, layout.rows[0].y + 10, layout);
   assert.strictEqual(phaseHit.type, 'phase');
   assert.strictEqual(phaseHit.phase.nome, 'Analisi');
+
+  const milestoneHit = gantt.hitTest(layout.dateToX['2026-04-15'], layout.rows[0].y + layout.rows[0].height / 2, layout);
+  assert.strictEqual(milestoneHit.type, 'phase');
+  assert.strictEqual(milestoneHit.phase.nome, 'Deploy');
+
+  const ctx = createRecordingCanvasContext();
+  gantt.render(ctx, layout, {});
+  const milestoneLineStrokes = ctx.records.strokes.filter(stroke => stroke.dash.length > 0);
+  assert.ok(milestoneLineStrokes.some(stroke => stroke.lineWidth === 2.5 && stroke.strokeStyle === context.window.AppConfig.gantt.MILESTONE_COLOR));
+  assert.ok(!milestoneLineStrokes.some(stroke => stroke.lineWidth === 4.5 || stroke.lineWidth === 1.5));
 
   const dateHit = gantt.hitTest(context.window.AppConfig.gantt.CANVAS_LEFT_MARGIN + 1, layout.rows[0].y - 10, layout);
   assert.strictEqual(dateHit.type, 'date');
