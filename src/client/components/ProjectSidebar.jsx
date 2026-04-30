@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useState, useEffect, useCallback } = React;
+  const { useState, useEffect, useCallback, useRef } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -51,26 +51,46 @@
       }
     });
 
+    const scrollContainerRef = useRef(null);
     const headerHeight = ganttHeaderHeight || config.gantt.CANVAS_TOP_MARGIN;
     const rowHeight = config.gantt.ROW_HEIGHT;
     const hasTopScrollbar = viewMode === '4months';
     const scrollbarOffset = hasTopScrollbar ? SCROLLBAR_HEIGHT : 0;
     const sidebarWidth = isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
     const projectsHeight = projects.length * rowHeight;
+    const bottomSpacerHeight = config.gantt.CANVAS_BOTTOM_MARGIN + scrollbarOffset;
+    const scrollContentHeight = projectsHeight + bottomSpacerHeight;
+
+    const getMaxScrollTop = useCallback(() => {
+      const containerHeight = scrollContainerRef.current ? scrollContainerRef.current.clientHeight : 0;
+      return Math.max(0, scrollContentHeight - containerHeight);
+    }, [scrollContentHeight]);
+
+    const clampScrollTop = useCallback((value) => {
+      const maxScrollTop = getMaxScrollTop();
+      return Math.min(Math.max(0, value), maxScrollTop);
+    }, [getMaxScrollTop]);
 
     const handleWheel = useCallback((e) => {
       if (!onScrollChange) return;
 
-      const nextScrollTop = Math.max(
-        0,
-        (scrollTop || 0) + e.deltaY
-      );
+      const nextScrollTop = clampScrollTop((scrollTop || 0) + e.deltaY);
 
       if (nextScrollTop !== (scrollTop || 0)) {
         e.preventDefault();
         onScrollChange(nextScrollTop);
       }
-    }, [onScrollChange, scrollTop]);
+    }, [clampScrollTop, onScrollChange, scrollTop]);
+
+    useEffect(() => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+
+      scrollContainer.addEventListener('wheel', handleWheel, { passive: false });
+      return () => {
+        scrollContainer.removeEventListener('wheel', handleWheel);
+      };
+    }, [handleWheel]);
 
     useEffect(() => {
       try {
@@ -87,6 +107,15 @@
         localStorage.setItem(STORAGE_KEY_PINNED, String(isPinned));
       } catch {}
     }, [isPinned]);
+
+    useEffect(() => {
+      if (!onScrollChange) return;
+
+      const clampedScrollTop = clampScrollTop(scrollTop || 0);
+      if (clampedScrollTop !== (scrollTop || 0)) {
+        onScrollChange(clampedScrollTop);
+      }
+    }, [clampScrollTop, onScrollChange, scrollTop]);
 
     const toggleCollapsed = useCallback(() => {
       setIsCollapsed(prev => !prev);
@@ -153,7 +182,7 @@
 
         <div
           className="sidebar-scroll-container"
-          onWheel={handleWheel}
+          ref={scrollContainerRef}
         >
           {projects.length === 0 ? (
             !isCollapsed && (
@@ -166,7 +195,7 @@
               className="sidebar-projects"
               style={{
                 transform: `translateY(-${scrollTop || 0}px)`,
-                height: projectsHeight
+                height: scrollContentHeight
               }}
             >
               {projects.map((project) => {

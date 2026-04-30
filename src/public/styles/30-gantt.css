@@ -252,7 +252,8 @@
 }
 
 .gantt-canvas-inner {
-  display: inline-block;
+  display: block;
+  line-height: 0;
 }
 
 canvas.gantt-canvas {
