@@ -7,7 +7,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <InvariantGlobalization>true</InvariantGlobalization>
     <AssemblyName>OnlyGantt.Service</AssemblyName>
     <RootNamespace>OnlyGantt.Service</RootNamespace>

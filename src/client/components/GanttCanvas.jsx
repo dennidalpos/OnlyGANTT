@@ -40,41 +40,33 @@
     const scrollRafRef = useRef(null);
     const pendingScrollLeftRef = useRef(0);
     const verticalScrollContainerRef = useRef(null);
-    const isVerticalScrollingRef = useRef(false);
+    const syncedVerticalScrollTopRef = useRef(null);
 
     useEffect(() => {
-      if (verticalScrollContainerRef.current && !isVerticalScrollingRef.current && verticalScrollTop !== undefined) {
-        verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
+      if (verticalScrollContainerRef.current && verticalScrollTop !== undefined) {
+        if (Math.abs(verticalScrollContainerRef.current.scrollTop - verticalScrollTop) > 0.5) {
+          syncedVerticalScrollTopRef.current = verticalScrollTop;
+          verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
+        }
       }
     }, [verticalScrollTop]);
 
-    const scrollTimeoutRef = useRef(null);
     const currentVerticalScrollTop = viewportRef.current
       ? viewportRef.current.scrollTop
       : (verticalScrollTop || 0);
 
     const handleVerticalScroll = useCallback((e) => {
-      isVerticalScrollingRef.current = true;
-
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+      const syncedScrollTop = syncedVerticalScrollTopRef.current;
+      if (syncedScrollTop !== null && Math.abs(e.target.scrollTop - syncedScrollTop) <= 0.5) {
+        syncedVerticalScrollTopRef.current = null;
+        return;
       }
 
+      syncedVerticalScrollTopRef.current = null;
       if (onVerticalScrollChange) {
         onVerticalScrollChange(e.target.scrollTop);
       }
-
-      scrollTimeoutRef.current = setTimeout(() => {
-        isVerticalScrollingRef.current = false;
-      }, 50);
     }, [onVerticalScrollChange]);
-
-    useEffect(() => () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-    }, []);
 
     const updateScrollbars = useCallback((newLayout) => {
       if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {

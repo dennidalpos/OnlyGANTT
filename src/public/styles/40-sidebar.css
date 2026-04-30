@@ -139,27 +139,9 @@
 
 .sidebar-scroll-container {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--bg-hover) var(--bg-secondary);
-}
-
-.sidebar-scroll-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-thumb {
-  background: var(--bg-hover);
-  border-radius: 3px;
-}
-
-.sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--border-color);
+  min-height: 0;
 }
 
 .sidebar-empty {
@@ -173,6 +155,7 @@
 .sidebar-projects {
   display: flex;
   flex-direction: column;
+  will-change: transform;
 }
 
 .sidebar-project-row {

@@ -1,7 +1,7 @@
 (function() {
   'use strict';
 
-  const { useState, useEffect, useRef, useCallback } = React;
+  const { useState, useEffect, useCallback } = React;
 
   window.OnlyGantt = window.OnlyGantt || {};
   window.OnlyGantt.components = window.OnlyGantt.components || {};
@@ -51,9 +51,26 @@
       }
     });
 
-    const scrollContainerRef = useRef(null);
-    const isScrollingRef = useRef(false);
-    const scrollTimeoutRef = useRef(null);
+    const headerHeight = ganttHeaderHeight || config.gantt.CANVAS_TOP_MARGIN;
+    const rowHeight = config.gantt.ROW_HEIGHT;
+    const hasTopScrollbar = viewMode === '4months';
+    const scrollbarOffset = hasTopScrollbar ? SCROLLBAR_HEIGHT : 0;
+    const sidebarWidth = isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
+    const projectsHeight = projects.length * rowHeight;
+
+    const handleWheel = useCallback((e) => {
+      if (!onScrollChange) return;
+
+      const nextScrollTop = Math.max(
+        0,
+        (scrollTop || 0) + e.deltaY
+      );
+
+      if (nextScrollTop !== (scrollTop || 0)) {
+        e.preventDefault();
+        onScrollChange(nextScrollTop);
+      }
+    }, [onScrollChange, scrollTop]);
 
     useEffect(() => {
       try {
@@ -70,34 +87,6 @@
         localStorage.setItem(STORAGE_KEY_PINNED, String(isPinned));
       } catch {}
     }, [isPinned]);
-
-    useEffect(() => {
-      if (scrollContainerRef.current && !isScrollingRef.current) {
-        scrollContainerRef.current.scrollTop = scrollTop || 0;
-      }
-    }, [scrollTop]);
-
-    const handleScroll = useCallback((e) => {
-      isScrollingRef.current = true;
-      if (onScrollChange) {
-        onScrollChange(e.target.scrollTop);
-      }
-
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingRef.current = false;
-      }, 50);
-    }, [onScrollChange]);
-
-    useEffect(() => () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-    }, []);
 
     const toggleCollapsed = useCallback(() => {
       setIsCollapsed(prev => !prev);
@@ -116,14 +105,6 @@
       }
       onSelectedProjectIdsChange(newSelected);
     }, [selectedProjectIds, onSelectedProjectIdsChange]);
-
-    const headerHeight = ganttHeaderHeight || config.gantt.CANVAS_TOP_MARGIN;
-    const rowHeight = config.gantt.ROW_HEIGHT;
-
-    const hasTopScrollbar = viewMode === '4months';
-    const scrollbarOffset = hasTopScrollbar ? SCROLLBAR_HEIGHT : 0;
-
-    const sidebarWidth = isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
     return (
       <div
@@ -171,9 +152,8 @@
         />
 
         <div
-          ref={scrollContainerRef}
           className="sidebar-scroll-container"
-          onScroll={handleScroll}
+          onWheel={handleWheel}
         >
           {projects.length === 0 ? (
             !isCollapsed && (
@@ -182,7 +162,13 @@
               </div>
             )
           ) : (
-            <div className="sidebar-projects">
+            <div
+              className="sidebar-projects"
+              style={{
+                transform: `translateY(-${scrollTop || 0}px)`,
+                height: projectsHeight
+              }}
+            >
               {projects.map((project) => {
                 const isSelected = selectedProjectIds.has(project.id);
                 const isHovered = hoveredProjectId === project.id;

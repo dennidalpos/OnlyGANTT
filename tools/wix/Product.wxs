@@ -17,9 +17,12 @@
       Platform="x64"
       Description="OnlyGANTT server installer" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of OnlyGANTT is already installed." />
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer version of OnlyGANTT is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Icon Id="OnlyGanttIcon" SourceFile="$(var.BrandIcon)" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
     <Property Id="ARPPRODUCTICON" Value="OnlyGanttIcon" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
     <Property Id="APPPORT" Value="3000" />
@@ -51,6 +54,7 @@
       <ComponentRef Id="CmpDataConfig" />
       <ComponentRef Id="CmpDataLog" />
       <ComponentRef Id="CmpDataDepartments" />
+      <ComponentRef Id="CmpDemoDepartment" />
       <ComponentRef Id="CmpDataUsers" />
       <ComponentRef Id="CmpDesktopShortcut" />
       <ComponentRef Id="CmpNativeService" />
@@ -140,7 +144,7 @@
           ErrorControl="normal"
           Vital="yes"
           Account="LocalSystem"
-          Arguments="--app-dir &quot;[INSTALLDIR]&quot; --node-path &quot;[NODEINSTALLDIR]node.exe&quot; --server-js &quot;[INSTALLDIR]src\server\server.js&quot; --data-dir &quot;[DATADIR]&quot; --port [APPPORT] --log-dir &quot;[DATALOGDIR]&quot; --admin-reset-code &quot;[ADMINRESETCODE]&quot;" />
+          Arguments="--app-dir &quot;[INSTALLDIR].&quot; --node-path &quot;[NODEINSTALLDIR]node.exe&quot; --server-js &quot;[INSTALLDIR]src\server\server.js&quot; --data-dir &quot;[DATADIR].&quot; --port [APPPORT] --log-dir &quot;[DATALOGDIR].&quot; --admin-reset-code &quot;[ADMINRESETCODE]&quot;" />
         <ServiceControl
           Id="SvcControlOnlyGantt"
           Name="OnlyGanttWeb"
@@ -237,6 +241,10 @@
     </DirectoryRef>
 
     <DirectoryRef Id="DATADEPARTMENTSDIR">
+      <Component Id="CmpDemoDepartment" Guid="66D889EA-C7C4-4454-BEC7-E84276019516" Win64="yes">
+        <File Id="FilDemoDepartment" Source="$(var.DemoDepartmentSource)" Name="Demo.json" KeyPath="yes" />
+      </Component>
+
       <Component Id="CmpDataDepartments" Guid="DFD81D72-C8A5-4BC4-87D7-49CE5BFB4E91" Win64="yes">
         <CreateFolder />
         <RemoveFile Id="RemoveDataDepartmentFiles" Name="*.*" On="uninstall" />

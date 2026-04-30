@@ -66,6 +66,17 @@ function Get-SemVerCore {
   }
 }
 
+function ConvertTo-RtfText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Text
+  )
+
+  $escaped = $Text.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}')
+  $escaped = $escaped -replace "`r`n|`n|`r", "\par`r`n"
+  return "{\rtf1\ansi`r`n$escaped`r`n}"
+}
+
 function Get-WixId {
   param(
     [Parameter(Mandatory = $true)]
@@ -267,6 +278,8 @@ $wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.p
 $wixSourcePath = Join-Path $repoRoot 'tools\wix\Product.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $brandIconPath = Join-Path $repoRoot 'src\public\brand\onlygantt.ico'
+$licensePath = Join-Path $repoRoot 'LICENSE'
+$demoDepartmentPath = Join-Path $repoRoot 'Data\reparti\Demo.json'
 $serviceHostPath = Join-Path $repoRoot 'artifacts\build\service\OnlyGantt.Service.exe'
 $clientBundlePath = Join-Path $repoRoot 'artifacts\build\client\app.bundle.js'
 
@@ -296,6 +309,14 @@ if (-not (Test-Path $brandIconPath)) {
   throw "Windows brand icon not found for MSI packaging: $brandIconPath"
 }
 
+if (-not (Test-Path $licensePath)) {
+  throw "License file not found for MSI packaging: $licensePath"
+}
+
+if (-not (Test-Path $demoDepartmentPath)) {
+  throw "Demo department file not found for MSI packaging: $demoDepartmentPath"
+}
+
 if (-not (Test-Path $serviceHostPath)) {
   throw "Published Windows service host not found: $serviceHostPath. Run scripts/build.ps1 before packaging."
 }
@@ -314,6 +335,7 @@ $stageRoot = Join-Path $buildRoot 'stage'
 $objRoot = Join-Path $buildRoot 'obj'
 $distRoot = Join-Path $repoRoot 'artifacts\packages\msi'
 $appFilesWxs = Join-Path $buildRoot 'AppFiles.wxs'
+$licenseRtfPath = Join-Path $buildRoot 'LICENSE.rtf'
 $msiName = "OnlyGantt-$productVersion-x64.msi"
 $msiOutputPath = Join-Path $distRoot $msiName
 
@@ -339,6 +361,7 @@ foreach ($target in $stageTargets) {
 
 Remove-NodeModulesPackagingNoise -StageRoot $stageRoot
 
+ConvertTo-RtfText -Text (Get-Content $licensePath -Raw) | Set-Content -Path $licenseRtfPath -Encoding ascii
 Write-AppFilesFragment -StageRoot $stageRoot -OutputPath $appFilesWxs
 
 $candlePath = Join-Path $wixToolRoot 'candle.exe'
@@ -356,6 +379,8 @@ $candleArguments = @(
   "-dSourceDir=$stageRoot"
   "-dServiceHostSource=$serviceHostPath"
   "-dBrandIcon=$brandIconPath"
+  "-dLicenseRtf=$licenseRtfPath"
+  "-dDemoDepartmentSource=$demoDepartmentPath"
   '-ext', 'WixUIExtension'
   '-ext', 'WixUtilExtension'
   $wixSourcePath
@@ -385,7 +410,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "MSI created: $msiOutputPath"
 
 if (-not $KeepBuildArtifacts) {
-  $temporaryPaths = @($stageRoot, $objRoot, $appFilesWxs) | Where-Object { Test-Path $_ }
+  $temporaryPaths = @($stageRoot, $objRoot, $appFilesWxs, $licenseRtfPath) | Where-Object { Test-Path $_ }
   if ($temporaryPaths.Count -gt 0) {
     Remove-Item -Path $temporaryPaths -Recurse -Force
   }

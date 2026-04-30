@@ -6,7 +6,7 @@
       "status": "blocked",
       "risk": "medium",
       "priority": "high",
-      "context": "Blocked in this workspace because it requires an interactive clean Windows Server or Windows 11 VM. Local validation completed on 2026-04-29: npm audit --omit=dev, npm run build, npm run test and npm run pack passed, including native Windows service lifecycle validation and setup EXE generation. Still needs manual VM validation of Node.js prerequisite installation, per-machine install, service startup, all-users desktop shortcut, admin reset code flow and uninstall cleanup."
+      "context": "Blocked in this workspace because it requires an interactive clean Windows Server or Windows 11 VM with installer privileges. Local validation completed on 2026-04-30: npm run doctor, npm run build, npm run test, npm run pack and npm run publish passed; setup EXE generation completed. The local Windows service lifecycle check was skipped by npm run test because TCP port 3000 was already in use. Still needs manual clean-machine validation of Node.js prerequisite installation, per-machine install, service startup, all-users desktop shortcut, admin reset code flow and uninstall cleanup."
     }
   ]
 }
