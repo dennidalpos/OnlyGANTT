@@ -1,5 +1,7 @@
 # OnlyGANTT
 
+![OnlyGANTT logo](src/public/brand/onlygantt-logo.svg)
+
 OnlyGANTT is a Windows-oriented web application for managing project Gantt charts by department. It runs as a Node.js/Express server, serves a bundled React browser UI, and supports optional Windows service and x64 MSI packaging.
 
 It is not a standalone desktop app. The supported product surface is a web UI hosted by the local/server Node process.
@@ -19,12 +21,20 @@ It is not a standalone desktop app. The supported product surface is a web UI ho
 
 ## Requirements
 
+For source checkout, build, test and packaging:
+
 - Windows.
 - PowerShell 7+ (`pwsh`).
 - Node.js 20 or newer.
 - npm.
 - .NET SDK with `dotnet` available on `PATH` for build, test and service host publish.
 - Administrator privileges only for Windows service install/uninstall and MSI lifecycle validation.
+
+For an end-user Windows 10/11 machine using the setup EXE:
+
+- No preinstalled developer tools are required.
+- The setup EXE includes the official Node.js 24.15.0 x64 MSI prerequisite and installs it before OnlyGANTT.
+- The service host is published self-contained, so no separate .NET runtime is required on the client.
 
 ## Fresh Install
 
@@ -36,6 +46,7 @@ npm run test
 ```
 
 `npm run bootstrap` is the supported dependency install path and runs `npm ci` from `package-lock.json`. `npm run doctor` checks the required commands, installed dependencies and packaging inputs before build or test.
+`npm run gate` is the single local validation gate after dependencies are installed.
 
 ## Run Locally
 
@@ -43,7 +54,7 @@ npm run test
 npm start
 ```
 
-The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/compile.ps1` first, then starts `src/server/server.js`. The runtime serves the built client bundle from `artifacts/build/client/` and stores default repository data under `Data/`.
+The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/build-runtime.ps1` first, then starts `src/server/server.js`. The runtime serves the built client bundle from `artifacts/build/client/` and stores default repository data under `Data/`.
 
 ## Commands
 
@@ -57,6 +68,7 @@ The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/
 | `npm run pack` | Build the x64 MSI and setup EXE under `artifacts/packages/`. |
 | `npm run publish` | Copy existing package artifacts to `artifacts/publish/local/`. |
 | `npm run clean` | Remove managed artifacts, stale local outputs and runtime-only data files. |
+| `npm run gate` | Run the supported preflight, test and package gate. |
 
 There are currently no supported lint or typecheck npm scripts.
 
@@ -70,7 +82,7 @@ Automated environments can also set `ONLYGANTT_RUN_MSI_TESTS=true`. This reposit
 
 ## Windows Service
 
-The service scripts are consolidated in `scripts/windows/service.ps1` and use native Windows service management. Run `npm run build` before installing the service manually so `artifacts/build/service/OnlyGantt.Service.exe` exists:
+The service script is `scripts/manage-service.ps1` and uses native Windows service management. Run `npm run build` before installing the service manually so `artifacts/build/service/OnlyGantt.Service.exe` exists:
 
 ```powershell
 npm run service:install
@@ -93,8 +105,9 @@ The MSI is x64-only by design: the WiX source uses `ProgramFiles64Folder` and `P
 The installer:
 
 - installs per machine;
-- checks Node.js from HKLM and blocks when using the MSI without a machine Node.js installation;
-- installs the cached Node.js 24.15.0 x64 MSI prerequisite automatically when using the setup EXE and Node.js is missing;
+- runs the cached official Node.js 24.15.0 x64 MSI prerequisite before installing OnlyGANTT when using the setup EXE;
+- blocks the standalone MSI before install when the machine-wide Node.js registry entry is missing, with an actionable Node.js requirement message;
+- validates Node.js 20 or newer again during manual service install and service first startup, with an actionable error if the runtime is missing or too old;
 - asks for service installation, server port, desktop shortcut URL and optional initial admin reset code;
 - installs the server, public assets, dependencies, native service host and Windows service configuration;
 - creates an all-users desktop shortcut to the configured homepage URL;
@@ -129,6 +142,7 @@ Versioned defaults live in `Data/config/system-config.json`. Local secrets such 
 - If `npm run doctor` reports missing dependencies, run `npm run bootstrap`.
 - If `npm run doctor`, `npm run build` or `npm run test` reports `dotnet` missing, install a .NET SDK that can build `src/service/OnlyGantt.Service/OnlyGantt.Service.csproj`.
 - If manual service commands fail with an administrator error, reopen PowerShell as Administrator.
+- If the standalone MSI reports a missing Node.js prerequisite, use `OnlyGantt-Setup-<version>-x64.exe` or install Node.js x64 LTS from `https://nodejs.org/`, then verify with `node --version`.
 - If `npm start` fails because port `3000` is already in use, stop the conflicting process or start with a different port, for example `$env:PORT = '3001'; npm start`.
 - If `npm run pack` runs on a fresh machine, it may download WiX 3.14.1 binaries and the Node.js 24.15.0 x64 MSI prerequisite into ignored local cache paths.
 
@@ -152,7 +166,7 @@ Open residual work is tracked in [`PROJECT_STATUS.json`](PROJECT_STATUS.json).
 
 ## Technical Docs
 
-- [Script reference](docs/scripts.md)
+- [Script inventory](scripts/script.md)
 - [Brand assets](docs/brand-assets.md)
 
 ## License

@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot '..\helpers\common.ps1')
+. (Join-Path $PSScriptRoot '..\common.ps1')
 
 function Assert-Administrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -18,14 +18,14 @@ function Get-PackagingPaths {
     [string]$ScriptRoot
   )
 
-  $repoRoot = (Resolve-Path (Join-Path $ScriptRoot '..\..')).Path
+  $repoRoot = (Resolve-Path (Join-Path $ScriptRoot '..\..\..')).Path
   Ensure-ArtifactsLayout -RepoRoot $repoRoot
 
   return [pscustomobject]@{
     RepoRoot = $repoRoot
     LogsRoot = Join-Path $repoRoot 'artifacts\logs'
     PackagesRoot = Join-Path $repoRoot 'artifacts\packages\msi'
-    BuildMsiScript = Join-Path $repoRoot 'scripts\packaging\build-msi.ps1'
+    BuildMsiScript = Join-Path $repoRoot 'scripts\support\packaging\build-msi.ps1'
     DefaultInstallRoot = Join-Path ${env:ProgramFiles} 'OnlyGANTT'
   }
 }

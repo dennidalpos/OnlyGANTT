@@ -18,6 +18,8 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+. (Join-Path $PSScriptRoot 'support\prerequisites.ps1')
+
 function Assert-Administrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
   $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -55,20 +57,25 @@ function Resolve-Node {
   )
 
   if ($ExplicitPath) {
-    return (Resolve-Path $ExplicitPath).Path
+    $resolved = (Resolve-Path $ExplicitPath).Path
+    Assert-NodeRuntime -NodePath $resolved -Reason 'OnlyGANTT service management starts the installed Node.js server process.' | Out-Null
+    return $resolved
   }
 
   $command = Get-Command node -ErrorAction SilentlyContinue
   if ($command) {
+    Assert-NodeRuntime -NodePath $command.Source -Reason 'OnlyGANTT service management starts the installed Node.js server process.' | Out-Null
     return $command.Source
   }
 
   $programFilesNode = Join-Path ${env:ProgramFiles} 'nodejs\node.exe'
   if (Test-Path $programFilesNode) {
-    return (Resolve-Path $programFilesNode).Path
+    $resolved = (Resolve-Path $programFilesNode).Path
+    Assert-NodeRuntime -NodePath $resolved -Reason 'OnlyGANTT service management starts the installed Node.js server process.' | Out-Null
+    return $resolved
   }
 
-  throw 'Node.js was not found. Install Node.js 24 LTS or pass -NodePath.'
+  Assert-NodeRuntime -NodePath $programFilesNode -Reason 'OnlyGANTT service management starts the installed Node.js server process.' | Out-Null
 }
 
 function Wait-ServiceStatus {
@@ -124,7 +131,7 @@ function Install-Service {
     Remove-ServiceIfPresent -Name $ServiceName
   }
 
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
   $serviceHost = Resolve-ServiceHost -RepoRoot $repoRoot -ExplicitPath $ServiceHostPath
   $node = Resolve-Node -ExplicitPath $NodePath
   $serverPath = Join-Path $repoRoot 'src\server\server.js'
@@ -212,7 +219,7 @@ function Cleanup-Service {
   Remove-ServiceIfPresent -Name $ServiceName
 
   if ($RemoveLogs) {
-    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     foreach ($relativePath in @(
       'Data\log\service-stdout.log',
       'Data\log\service-stderr.log',

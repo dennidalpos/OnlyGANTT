@@ -6,8 +6,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$serviceScript = Join-Path $repoRoot 'scripts\windows\service.ps1'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$serviceScript = Join-Path $repoRoot 'scripts\manage-service.ps1'
 
 function Test-IsAdministrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

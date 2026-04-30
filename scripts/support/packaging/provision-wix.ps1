@@ -10,7 +10,7 @@ $wixReleaseTag = 'wix3141rtm'
 $wixArchiveName = 'wix314-binaries.zip'
 $downloadUri = "https://github.com/wixtoolset/wix3/releases/download/$wixReleaseTag/$wixArchiveName"
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $installRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $tmpRoot = Join-Path $repoRoot 'artifacts\build\wix314'
 $archivePath = Join-Path $tmpRoot $wixArchiveName

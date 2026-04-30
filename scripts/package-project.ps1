@@ -35,12 +35,12 @@ function Get-PackageMsiVersion {
 
 $shouldRunMsiLifecycleValidation = $RunMsiLifecycleValidation.IsPresent -or (Test-TruthyValue -Value $env:ONLYGANTT_RUN_MSI_TESTS)
 $packageMsiVersion = Get-PackageMsiVersion -PackageJsonPath (Join-Path $PSScriptRoot '..\package.json')
-$buildScript = Join-Path $PSScriptRoot 'build.ps1'
-$packagingScript = Join-Path $PSScriptRoot 'packaging\build-msi.ps1'
-$setupPackagingScript = Join-Path $PSScriptRoot 'packaging\build-setup.ps1'
-$msiInstallTestScript = Join-Path $PSScriptRoot 'packaging\msi-install-test.ps1'
-$msiUpgradeTestScript = Join-Path $PSScriptRoot 'packaging\msi-upgrade-test.ps1'
-$msiUninstallTestScript = Join-Path $PSScriptRoot 'packaging\msi-uninstall-test.ps1'
+$buildScript = Join-Path $PSScriptRoot 'build-project.ps1'
+$packagingScript = Join-Path $PSScriptRoot 'support\packaging\build-msi.ps1'
+$setupPackagingScript = Join-Path $PSScriptRoot 'support\packaging\build-setup.ps1'
+$msiInstallTestScript = Join-Path $PSScriptRoot 'support\packaging\test-msi-install.ps1'
+$msiUpgradeTestScript = Join-Path $PSScriptRoot 'support\packaging\test-msi-upgrade.ps1'
+$msiUninstallTestScript = Join-Path $PSScriptRoot 'support\packaging\test-msi-uninstall.ps1'
 
 & $buildScript
 & $packagingScript

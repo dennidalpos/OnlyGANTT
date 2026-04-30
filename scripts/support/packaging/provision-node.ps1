@@ -10,7 +10,7 @@ $nodeMsiName = "node-v$nodeVersion-x64.msi"
 $nodeMsiSha256 = 'FEFFB8E5CB5AC47F793666636D496EF3E975BE82C84C4DA5D20E6AA8FA4EB806'
 $downloadUri = "https://nodejs.org/dist/v$nodeVersion/$nodeMsiName"
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $cacheRoot = Join-Path $repoRoot 'artifacts\build\prerequisites'
 $nodeMsiPath = Join-Path $cacheRoot $nodeMsiName
 $metadataPath = Join-Path $cacheRoot 'node-lts.json'

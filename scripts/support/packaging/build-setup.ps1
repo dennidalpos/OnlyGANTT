@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-. (Join-Path $PSScriptRoot '..\helpers\common.ps1')
+. (Join-Path $PSScriptRoot '..\common.ps1')
 
 function Get-SemVerCore {
   param(
@@ -31,12 +31,12 @@ function ConvertTo-RtfText {
   return "{\rtf1\ansi`r`n$escaped`r`n}"
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
 
 $packageJsonPath = Join-Path $repoRoot 'package.json'
-$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.ps1'
-$nodeProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-node.ps1'
+$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\support\packaging\provision-wix.ps1'
+$nodeProvisionScriptPath = Join-Path $repoRoot 'scripts\support\packaging\provision-node.ps1'
 $bundleSourcePath = Join-Path $repoRoot 'tools\wix\Bundle.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $brandIconPath = Join-Path $repoRoot 'src\public\brand\onlygantt.ico'

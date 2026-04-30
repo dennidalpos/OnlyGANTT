@@ -28,8 +28,7 @@
         SourceFile="$(var.NodeMsiSource)"
         DisplayInternalUI="no"
         Permanent="yes"
-        Vital="yes"
-        InstallCondition="NOT NodeInstallDir" />
+        Vital="yes" />
       <MsiPackage
         Id="OnlyGanttMsi"
         SourceFile="$(var.ProductMsiSource)"

@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'helpers\common.ps1')
+. (Join-Path $PSScriptRoot 'support\common.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
@@ -10,12 +10,12 @@ $sourceRoot = Join-Path $repoRoot 'artifacts\packages'
 $publishRoot = Join-Path $repoRoot 'artifacts\publish\local'
 
 if (-not (Test-Path $sourceRoot)) {
-  throw "Package artifacts not found: $sourceRoot. Run scripts/pack.ps1 first."
+  throw "Package artifacts not found: $sourceRoot. Run npm run pack or scripts/package-project.ps1 first."
 }
 
 $packageFiles = @(Get-ChildItem -Path $sourceRoot -Recurse -File | Sort-Object FullName)
 if ($packageFiles.Count -eq 0) {
-  throw "No package artifacts found under $sourceRoot. Run scripts/pack.ps1 first."
+  throw "No package artifacts found under $sourceRoot. Run npm run pack or scripts/package-project.ps1 first."
 }
 
 if (Test-Path $publishRoot) {

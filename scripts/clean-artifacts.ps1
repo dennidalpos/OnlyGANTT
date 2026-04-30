@@ -6,11 +6,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'helpers\common.ps1')
+. (Join-Path $PSScriptRoot 'support\common.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
-$serviceScript = Join-Path $PSScriptRoot 'windows\service.ps1'
+$serviceScript = Join-Path $PSScriptRoot 'manage-service.ps1'
 
 if ($IncludeService -and (Test-Path $serviceScript)) {
   & $serviceScript -Action Cleanup -RemoveLogs

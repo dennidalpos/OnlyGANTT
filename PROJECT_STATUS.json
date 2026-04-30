@@ -6,7 +6,7 @@
       "status": "blocked",
       "risk": "medium",
       "priority": "high",
-      "context": "Blocked in this workspace because it requires an interactive clean Windows Server or Windows 11 VM with installer privileges. Local validation completed on 2026-04-30: npm run bootstrap, npm run doctor, npm run build, npm run test, npm run pack, npm run publish and a controlled npm start smoke passed; setup EXE generation completed, and the local Windows service lifecycle check passed. Still needs manual clean-machine validation of Node.js prerequisite installation, per-machine install, service startup from the installed MSI/setup path, all-users desktop shortcut, admin reset code flow and uninstall cleanup."
+      "context": "Blocked in this workspace because it requires an interactive clean Windows 10/11 client VM with installer privileges and no preinstalled developer/runtime tools. Local validation completed on 2026-04-30: npm run doctor, npm run build, npm run test, npm run pack, prerequisite regression checks, setup EXE generation and local Windows service lifecycle passed. Still needs manual clean-client validation that OnlyGantt-Setup installs the bundled official Node.js 24.15.0 x64 prerequisite before the app MSI, starts the installed OnlyGanttWeb service from the install path, creates the all-users desktop shortcut, preserves the admin reset code flow and uninstalls cleanly. Also validate the standalone MSI blocks before install with the expected actionable Node.js 20+ message when Node.js is missing or below the supported version."
     }
   ]
 }

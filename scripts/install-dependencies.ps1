@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'helpers\common.ps1')
+. (Join-Path $PSScriptRoot 'support\common.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot

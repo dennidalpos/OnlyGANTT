@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'helpers\common.ps1')
+. (Join-Path $PSScriptRoot 'support\common.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Ensure-ArtifactsLayout -RepoRoot $repoRoot
@@ -13,7 +13,7 @@ $servicePublishRoot = Join-Path $repoRoot 'artifacts\build\service'
 Reset-ManagedDirectory -Path $clientBuildRoot
 Reset-ManagedDirectory -Path $servicePublishRoot
 
-$clientBuildScript = Join-Path $PSScriptRoot 'helpers\build-client-bundle.mjs'
+$clientBuildScript = Join-Path $PSScriptRoot 'support\build-client-bundle.mjs'
 & node $clientBuildScript
 if ($LASTEXITCODE -ne 0) {
   throw "Client bundling failed with exit code $LASTEXITCODE"
@@ -45,17 +45,18 @@ $manifest = [ordered]@{
     'tests/security-regression-check.js',
     'tests/admin-flow-regression-check.js',
     'tests/client-logic-regression-check.js',
-    'tests/windows-service-lifecycle-check.ps1'
+    'tests/prerequisite-regression-check.ps1',
+    'scripts/support/test-windows-service-lifecycle.ps1'
   )
   packaging = [ordered]@{
-    pack = 'scripts/pack.ps1'
-    buildMsi = 'scripts/packaging/build-msi.ps1'
-    buildSetup = 'scripts/packaging/build-setup.ps1'
-    provisionWix = 'scripts/packaging/provision-wix.ps1'
-    provisionNode = 'scripts/packaging/provision-node.ps1'
+    pack = 'scripts/package-project.ps1'
+    buildMsi = 'scripts/support/packaging/build-msi.ps1'
+    buildSetup = 'scripts/support/packaging/build-setup.ps1'
+    provisionWix = 'scripts/support/packaging/provision-wix.ps1'
+    provisionNode = 'scripts/support/packaging/provision-node.ps1'
   }
   windows = [ordered]@{
-    service = 'scripts/windows/service.ps1'
+    service = 'scripts/manage-service.ps1'
   }
 }
 

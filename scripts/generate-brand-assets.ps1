@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 
 Add-Type -AssemblyName System.Drawing
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $brandRoot = Join-Path $repoRoot 'src\public\brand'
 New-Item -ItemType Directory -Force -Path $brandRoot | Out-Null
 
@@ -141,6 +141,28 @@ function Save-Png {
   }
 }
 
+function Save-Bmp {
+  param(
+    [string]$Path,
+    [int]$Width,
+    [int]$Height,
+    [scriptblock]$Draw
+  )
+
+  $bitmap = [System.Drawing.Bitmap]::new($Width, $Height, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+  $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  try {
+    & $Draw $graphics $Width $Height
+    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Bmp)
+  } finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+  }
+}
+
 function Draw-Background {
   param(
     [System.Drawing.Graphics]$Graphics,
@@ -248,10 +270,11 @@ function Draw-Lockup {
 
 function Save-IconPng {
   param(
-    [int]$Size
+    [int]$Size,
+    [string]$Name = "icon-$Size.png"
   )
 
-  Save-Png -Path (Join-Path $brandRoot "icon-$Size.png") -Width $Size -Height $Size -Draw {
+  Save-Png -Path (Join-Path $brandRoot $Name) -Width $Size -Height $Size -Draw {
     param($graphics, $width, $height)
     $graphics.Clear([System.Drawing.Color]::Transparent)
     Draw-Mark -Graphics $graphics -X 0 -Y 0 -Size $width
@@ -309,10 +332,36 @@ function Write-Ico {
   }
 }
 
+$markSvg = @'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-labelledby="title desc">
+  <title id="title">OnlyGANTT mark</title>
+  <desc id="desc">Compact OnlyGANTT mark with three Gantt bars.</desc>
+  <rect x="0" y="0" width="140" height="140" rx="30" fill="#1e293b"/>
+  <path d="M31 96h78" stroke="#f8fafc" stroke-width="9" stroke-linecap="round"/>
+  <path d="M42 83V43" stroke="#38bdf8" stroke-width="13" stroke-linecap="round"/>
+  <path d="M70 83V29" stroke="#22c55e" stroke-width="13" stroke-linecap="round"/>
+  <path d="M98 83V55" stroke="#f59e0b" stroke-width="13" stroke-linecap="round"/>
+</svg>
+'@
+
 $logoSvg = @'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" role="img" aria-labelledby="title desc">
   <title id="title">OnlyGANTT</title>
   <desc id="desc">OnlyGANTT logo with a compact Gantt chart mark.</desc>
+  <rect x="0" y="0" width="140" height="140" rx="30" fill="#1e293b"/>
+  <path d="M31 96h78" stroke="#f8fafc" stroke-width="9" stroke-linecap="round"/>
+  <path d="M42 83V43" stroke="#38bdf8" stroke-width="13" stroke-linecap="round"/>
+  <path d="M70 83V29" stroke="#22c55e" stroke-width="13" stroke-linecap="round"/>
+  <path d="M98 83V55" stroke="#f59e0b" stroke-width="13" stroke-linecap="round"/>
+  <text x="170" y="83" fill="#0f172a" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">OnlyGANTT</text>
+  <text x="173" y="116" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Interactive Gantt scheduling for Windows teams</text>
+</svg>
+'@
+
+$logoDarkSvg = @'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" role="img" aria-labelledby="title desc">
+  <title id="title">OnlyGANTT dark logo</title>
+  <desc id="desc">OnlyGANTT logo for dark surfaces.</desc>
   <rect x="0" y="0" width="140" height="140" rx="30" fill="#1e293b"/>
   <path d="M31 96h78" stroke="#f8fafc" stroke-width="9" stroke-linecap="round"/>
   <path d="M42 83V43" stroke="#38bdf8" stroke-width="13" stroke-linecap="round"/>
@@ -323,11 +372,22 @@ $logoSvg = @'
 </svg>
 '@
 
+[System.IO.File]::WriteAllText((Join-Path $brandRoot 'onlygantt-mark.svg'), $markSvg, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText((Join-Path $brandRoot 'onlygantt-app-icon.svg'), $markSvg, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText((Join-Path $brandRoot 'onlygantt-logo.svg'), $logoSvg, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText((Join-Path $brandRoot 'onlygantt-logo-dark.svg'), $logoDarkSvg, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText((Join-Path $repoRoot 'src\public\favicon.svg'), $markSvg, [System.Text.UTF8Encoding]::new($false))
 
 foreach ($size in @(16, 24, 32, 48, 256)) {
   Save-IconPng -Size $size
 }
+
+Save-IconPng -Size 32 -Name 'favicon-32.png'
+Copy-Item -Path (Join-Path $brandRoot 'favicon-32.png') -Destination (Join-Path $repoRoot 'src\public\favicon-32.png') -Force
+Save-IconPng -Size 180 -Name 'apple-touch-icon.png'
+Copy-Item -Path (Join-Path $brandRoot 'apple-touch-icon.png') -Destination (Join-Path $repoRoot 'src\public\apple-touch-icon.png') -Force
+Save-IconPng -Size 192 -Name 'pwa-icon-192.png'
+Save-IconPng -Size 512 -Name 'pwa-icon-512.png'
 
 Write-Ico -PngPaths @(
   (Join-Path $brandRoot 'icon-16.png'),
@@ -336,6 +396,33 @@ Write-Ico -PngPaths @(
   (Join-Path $brandRoot 'icon-48.png'),
   (Join-Path $brandRoot 'icon-256.png')
 ) -Path (Join-Path $brandRoot 'onlygantt.ico')
+
+$manifest = [ordered]@{
+  name = 'OnlyGANTT'
+  short_name = 'OnlyGANTT'
+  description = 'Interactive Gantt scheduling for Windows teams'
+  start_url = '/'
+  scope = '/'
+  display = 'standalone'
+  background_color = '#0f172a'
+  theme_color = '#1e293b'
+  icons = @(
+    [ordered]@{
+      src = '/brand/pwa-icon-192.png'
+      sizes = '192x192'
+      type = 'image/png'
+      purpose = 'any'
+    },
+    [ordered]@{
+      src = '/brand/pwa-icon-512.png'
+      sizes = '512x512'
+      type = 'image/png'
+      purpose = 'any'
+    }
+  )
+}
+$manifestJson = $manifest | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText((Join-Path $repoRoot 'src\public\site.webmanifest'), $manifestJson, [System.Text.UTF8Encoding]::new($false))
 
 Save-Png -Path (Join-Path $brandRoot 'social-og-1200x630.png') -Width 1200 -Height 630 -Draw {
   param($graphics, $width, $height)
@@ -368,6 +455,16 @@ Save-Png -Path (Join-Path $brandRoot 'setup-banner-493x58.png') -Width 493 -Heig
 }
 
 Save-Png -Path (Join-Path $brandRoot 'setup-dialog-493x312.png') -Width 493 -Height 312 -Draw {
+  param($graphics, $width, $height)
+  Draw-Lockup -Graphics $graphics -Width $width -Height $height -Mode 'setup-dialog'
+}
+
+Save-Bmp -Path (Join-Path $brandRoot 'setup-banner-493x58.bmp') -Width 493 -Height 58 -Draw {
+  param($graphics, $width, $height)
+  Draw-Lockup -Graphics $graphics -Width $width -Height $height -Mode 'setup-banner'
+}
+
+Save-Bmp -Path (Join-Path $brandRoot 'setup-dialog-493x312.bmp') -Width 493 -Height 312 -Draw {
   param($graphics, $width, $height)
   Draw-Lockup -Graphics $graphics -Width $width -Height $height -Mode 'setup-dialog'
 }

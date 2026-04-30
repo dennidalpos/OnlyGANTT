@@ -326,13 +326,16 @@ internal static class Program
     private static class ServiceDiagnostics
     {
         private const string EventSource = "OnlyGanttWeb";
+        private static readonly Version MinimumNodeVersion = new(20, 0, 0);
 
         public static void ValidateStartup(ServiceOptions options)
         {
             if (!File.Exists(options.NodePath))
             {
-                throw new FileNotFoundException("Node.js executable was not found.", options.NodePath);
+                throw new FileNotFoundException(FormatNodePrerequisiteMessage(null, options.NodePath), options.NodePath);
             }
+
+            ValidateNodeVersion(options.NodePath);
 
             if (!File.Exists(options.ServerJs))
             {
@@ -343,6 +346,94 @@ internal static class Program
             {
                 throw new InvalidOperationException($"TCP port {options.Port} is already in use. Choose a different port or stop the process using that port before starting OnlyGANTT.");
             }
+        }
+
+        private static void ValidateNodeVersion(string nodePath)
+        {
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = nodePath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            process.StartInfo.ArgumentList.Add("--version");
+
+            try
+            {
+                if (!process.Start())
+                {
+                    throw new InvalidOperationException(FormatNodePrerequisiteMessage(null, nodePath));
+                }
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                throw new InvalidOperationException(FormatNodePrerequisiteMessage(null, nodePath), ex);
+            }
+
+            if (!process.WaitForExit(5000))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                }
+
+                throw new InvalidOperationException(FormatNodePrerequisiteMessage("timed out while reading Node.js version", nodePath));
+            }
+
+            var rawVersion = process.StandardOutput.ReadToEnd().Trim();
+            if (process.ExitCode != 0)
+            {
+                var stderr = process.StandardError.ReadToEnd().Trim();
+                throw new InvalidOperationException(FormatNodePrerequisiteMessage(string.IsNullOrWhiteSpace(stderr) ? rawVersion : stderr, nodePath));
+            }
+
+            if (!TryParseNodeVersion(rawVersion, out var parsedVersion) || parsedVersion.CompareTo(MinimumNodeVersion) < 0)
+            {
+                throw new InvalidOperationException(FormatNodePrerequisiteMessage(rawVersion, nodePath));
+            }
+        }
+
+        private static bool TryParseNodeVersion(string rawVersion, out Version parsedVersion)
+        {
+            parsedVersion = new Version(0, 0, 0);
+            if (string.IsNullOrWhiteSpace(rawVersion) || rawVersion[0] != 'v')
+            {
+                return false;
+            }
+
+            if (!Version.TryParse(rawVersion[1..], out var version))
+            {
+                return false;
+            }
+
+            parsedVersion = version;
+            return true;
+        }
+
+        private static string FormatNodePrerequisiteMessage(string? detected, string nodePath)
+        {
+            var message = "Missing prerequisite: Node.js. Required version: Node.js 20 or newer; setup bundles Node.js 24.15.0 x64 LTS. " +
+                "Why it is required: OnlyGANTT runs the server process with Node.js. " +
+                "Install action: run OnlyGantt-Setup-<version>-x64.exe to install the bundled official Node.js prerequisite, or install Node.js x64 LTS from https://nodejs.org/ before running the standalone MSI/manual service path. " +
+                "Verification: run `node --version` in PowerShell and confirm it reports v20.0.0 or newer.";
+
+            if (!string.IsNullOrWhiteSpace(detected))
+            {
+                message += $" Detected version: {detected}.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(nodePath))
+            {
+                message += $" Detected path: {nodePath}.";
+            }
+
+            return message;
         }
 
         public static void WriteStartupFailure(Exception exception)

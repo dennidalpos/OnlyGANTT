@@ -272,12 +272,14 @@ $script:WixNamespace = 'http://schemas.microsoft.com/wix/2006/wi'
 $script:XmlNamespaceManager = New-Object System.Xml.XmlNamespaceManager((New-Object System.Xml.NameTable))
 $script:XmlNamespaceManager.AddNamespace('wix', $script:WixNamespace)
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $packageJsonPath = Join-Path $repoRoot 'package.json'
-$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\packaging\provision-wix.ps1'
+$wixProvisionScriptPath = Join-Path $repoRoot 'scripts\support\packaging\provision-wix.ps1'
 $wixSourcePath = Join-Path $repoRoot 'tools\wix\Product.wxs'
 $wixToolRoot = Join-Path $repoRoot 'tools\wix314-binaries'
 $brandIconPath = Join-Path $repoRoot 'src\public\brand\onlygantt.ico'
+$brandBannerPath = Join-Path $repoRoot 'src\public\brand\setup-banner-493x58.bmp'
+$brandDialogPath = Join-Path $repoRoot 'src\public\brand\setup-dialog-493x312.bmp'
 $licensePath = Join-Path $repoRoot 'LICENSE'
 $demoDepartmentPath = Join-Path $repoRoot 'Data\reparti\Demo.json'
 $serviceHostPath = Join-Path $repoRoot 'artifacts\build\service\OnlyGantt.Service.exe'
@@ -309,6 +311,14 @@ if (-not (Test-Path $brandIconPath)) {
   throw "Windows brand icon not found for MSI packaging: $brandIconPath"
 }
 
+if (-not (Test-Path $brandBannerPath)) {
+  throw "WiX banner bitmap not found for MSI packaging: $brandBannerPath"
+}
+
+if (-not (Test-Path $brandDialogPath)) {
+  throw "WiX dialog bitmap not found for MSI packaging: $brandDialogPath"
+}
+
 if (-not (Test-Path $licensePath)) {
   throw "License file not found for MSI packaging: $licensePath"
 }
@@ -318,11 +328,11 @@ if (-not (Test-Path $demoDepartmentPath)) {
 }
 
 if (-not (Test-Path $serviceHostPath)) {
-  throw "Published Windows service host not found: $serviceHostPath. Run scripts/build.ps1 before packaging."
+  throw "Published Windows service host not found: $serviceHostPath. Run npm run build or scripts/build-project.ps1 before packaging."
 }
 
 if (-not (Test-Path $clientBundlePath)) {
-  throw "Client bundle not found: $clientBundlePath. Run scripts/build.ps1 before packaging."
+  throw "Client bundle not found: $clientBundlePath. Run npm run build or scripts/build-project.ps1 before packaging."
 }
 
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
@@ -352,7 +362,7 @@ $stageTargets = @(
   @{ Source = 'src'; Destination = 'src' },
   @{ Source = 'node_modules'; Destination = 'node_modules' },
   @{ Source = 'artifacts\build\client'; Destination = 'artifacts\build\client' },
-  @{ Source = 'scripts\windows'; Destination = 'scripts\windows' }
+  @{ Source = 'scripts\manage-service.ps1'; Destination = 'scripts\manage-service.ps1' }
 )
 
 foreach ($target in $stageTargets) {
@@ -379,6 +389,8 @@ $candleArguments = @(
   "-dSourceDir=$stageRoot"
   "-dServiceHostSource=$serviceHostPath"
   "-dBrandIcon=$brandIconPath"
+  "-dBrandBanner=$brandBannerPath"
+  "-dBrandDialog=$brandDialogPath"
   "-dLicenseRtf=$licenseRtfPath"
   "-dDemoDepartmentSource=$demoDepartmentPath"
   '-ext', 'WixUIExtension'

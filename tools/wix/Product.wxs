@@ -23,6 +23,8 @@
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Icon Id="OnlyGanttIcon" SourceFile="$(var.BrandIcon)" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BrandBanner)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.BrandDialog)" />
     <Property Id="ARPPRODUCTICON" Value="OnlyGanttIcon" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
     <Property Id="APPPORT" Value="3000" />
@@ -39,12 +41,21 @@
         Type="raw"
         Win64="yes" />
     </Property>
+    <Property Id="NODEVERSION">
+      <RegistrySearch
+        Id="NodeVersionSearch"
+        Root="HKLM"
+        Key="SOFTWARE\Node.js"
+        Name="Version"
+        Type="raw"
+        Win64="yes" />
+    </Property>
 
     <Condition Message="APPPORT must be a TCP port between 1 and 65535.">
       APPPORT &gt;= 1 AND APPPORT &lt;= 65535
     </Condition>
-    <Condition Message="Node.js 24 LTS or newer must be installed before installing OnlyGANTT. Use OnlyGantt-Setup to install prerequisites automatically.">
-      Installed OR NODEINSTALLDIR
+    <Condition Message="Missing prerequisite: Node.js 20+ x64. Required to run the OnlyGANTT server. Install: run OnlyGantt-Setup for bundled Node.js 24.15 LTS, or install Node.js LTS from nodejs.org. Verify: node --version reports v20+.">
+      Installed OR (NODEINSTALLDIR AND NODEVERSION &gt;= "20.0.0")
     </Condition>
 
     <Feature Id="MainFeature" Title="OnlyGANTT" Level="1" Absent="disallow">
