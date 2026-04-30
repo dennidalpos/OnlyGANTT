@@ -87,6 +87,13 @@
     });
   }
 
+  async function getAuthSession(signal) {
+    return fetchJSON('/api/auth/session', {
+      headers: buildUserHeaders(),
+      signal
+    });
+  }
+
   async function createDepartment(name, adminToken, signal) {
     return fetchJSON('/api/departments', {
       method: 'POST',
@@ -451,6 +458,7 @@
     adminReleaseLock,
     getAuthConfig,
     authLogin,
+    getAuthSession,
     authLogout,
     adminLogin,
     adminLogout,

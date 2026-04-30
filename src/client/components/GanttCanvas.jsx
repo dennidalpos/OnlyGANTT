@@ -51,9 +51,7 @@
       }
     }, [verticalScrollTop]);
 
-    const currentVerticalScrollTop = viewportRef.current
-      ? viewportRef.current.scrollTop
-      : (verticalScrollTop || 0);
+    const currentVerticalScrollTop = verticalScrollTop || 0;
 
     const handleVerticalScroll = useCallback((e) => {
       const syncedScrollTop = syncedVerticalScrollTopRef.current;
@@ -67,6 +65,36 @@
         onVerticalScrollChange(e.target.scrollTop);
       }
     }, [onVerticalScrollChange]);
+
+    const handleVerticalWheel = useCallback((e) => {
+      const container = verticalScrollContainerRef.current;
+      if (!container || !onVerticalScrollChange || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+
+      const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      if (maxScrollTop <= 0) return;
+
+      const nextScrollTop = Math.min(
+        Math.max(0, container.scrollTop + e.deltaY),
+        maxScrollTop
+      );
+
+      if (Math.abs(nextScrollTop - container.scrollTop) <= 0.5) return;
+
+      e.preventDefault();
+      syncedVerticalScrollTopRef.current = nextScrollTop;
+      container.scrollTop = nextScrollTop;
+      onVerticalScrollChange(nextScrollTop);
+    }, [onVerticalScrollChange]);
+
+    useEffect(() => {
+      const container = verticalScrollContainerRef.current;
+      if (!container) return;
+
+      container.addEventListener('wheel', handleVerticalWheel, { passive: false });
+      return () => {
+        container.removeEventListener('wheel', handleVerticalWheel);
+      };
+    }, [handleVerticalWheel]);
 
     const updateScrollbars = useCallback((newLayout) => {
       if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {
@@ -304,12 +332,21 @@
 
       const containerWidth = wrapperRef.current.clientWidth;
       const viewportLeft = scrollLeftRef.current;
-      const viewportRight = viewportLeft + containerWidth;
+      const verticalViewportTop = verticalScrollTop || 0;
+      const verticalViewportHeight = viewportRef.current ? viewportRef.current.clientHeight : 0;
+      const verticalViewportBottom = verticalViewportHeight > 0
+        ? verticalViewportTop + verticalViewportHeight
+        : null;
       const labels = [];
 
-      const topScrollbarHeight = topScrollbarRef.current ? topScrollbarRef.current.offsetHeight : 0;
-
       layout.rows.forEach(row => {
+        if (verticalViewportBottom !== null) {
+          const rowBottom = row.y + row.height;
+          if (rowBottom < verticalViewportTop || row.y > verticalViewportBottom) {
+            return;
+          }
+        }
+
         const project = row.project;
         if (Array.isArray(project.fasi)) {
           project.fasi.forEach(fase => {
@@ -329,7 +366,7 @@
                   const labelText = showPercent ? `${fase.nome} ${percentage}%` : fase.nome;
                   labels.push({
                     text: labelText,
-                    y: faseY + topScrollbarHeight,
+                    y: faseY,
                     height: faseHeight,
                     color: fase.colore || project.colore || '#3b82f6'
                   });
@@ -341,10 +378,11 @@
       });
 
       setScrollLabels(labels);
-    }, [layout, viewMode, filters.showPhasePercentages]);
+    }, [layout, viewMode, filters.showPhasePercentages, verticalScrollTop]);
 
     const handleScroll = useCallback((source) => {
       const left = source.scrollLeft;
+      scrollLeftRef.current = left;
       pendingScrollLeftRef.current = left;
 
       if (scrollRafRef.current === null) {
@@ -547,6 +585,35 @@
               />
             </div>
           </div>
+
+          {scrollLabels.map((label, i) => (
+            <div
+              key={i}
+              className="gantt-scroll-label"
+              style={{
+                top: `${label.y}px`,
+                transform: `translateY(-${currentVerticalScrollTop}px)`,
+                left: '24px',
+                height: `${label.height}px`,
+                backgroundColor: label.color,
+                position: 'absolute',
+                padding: '0 8px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 10,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                border: '1px solid rgba(30, 41, 59, 0.5)'
+              }}
+            >
+              {label.text}
+            </div>
+          ))}
         </div>
 
         {isScrollable && (
@@ -554,35 +621,6 @@
             <div className="gantt-scrollbar-content"></div>
           </div>
         )}
-
-        {scrollLabels.map((label, i) => (
-          <div
-            key={i}
-            className="gantt-scroll-label"
-            style={{
-              top: `${label.y}px`,
-              transform: `translateY(-${currentVerticalScrollTop}px)`,
-              left: '24px',
-              height: `${label.height}px`,
-              backgroundColor: label.color,
-              position: 'absolute',
-              padding: '0 8px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: '600',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              border: '1px solid rgba(30, 41, 59, 0.5)'
-            }}
-          >
-            {label.text}
-          </div>
-        ))}
 
         {tooltip && (
           <div

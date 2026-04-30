@@ -163,6 +163,13 @@ async function main() {
       throw new Error('Admin login did not return a user token');
     }
 
+    const restoredSession = await requestJson('GET', '/api/auth/session', null, {
+      'X-User-Token': userToken
+    });
+    if (restoredSession.data?.userName !== 'admin' || restoredSession.data?.userType !== 'admin') {
+      throw new Error('Auth session restore did not return the expected admin user session');
+    }
+
     await requestJson('POST', '/api/departments/Demo/reset-password', {
       newPassword: 'demo-pass'
     }, {

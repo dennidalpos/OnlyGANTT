@@ -58,11 +58,13 @@
   }
 
   function App() {
-    const [userName, setUserName] = useState(storage.getCurrentUser() || '');
-    const [userToken, setUserToken] = useState(null);
+    const restoredSessionRef = useRef(storage.getActiveSession());
+    const restoredSession = restoredSessionRef.current || {};
+    const [userName, setUserName] = useState(restoredSession.userName || storage.getCurrentUser() || '');
+    const [userToken, setUserToken] = useState(restoredSession.userToken || null);
     const [notifications, setNotifications] = useState([]);
 
-    const [department, setDepartment] = useState(null);
+    const [department, setDepartment] = useState(restoredSession.department || null);
     const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
     const [lockEnabled, setLockEnabled] = useState(false);
     const [isDepartmentProtected, setIsDepartmentProtected] = useState(false);
@@ -117,7 +119,7 @@
       }
     });
 
-    const [adminToken, setAdminToken] = useState(null);
+    const [adminToken, setAdminToken] = useState(restoredSession.adminToken || null);
     const [loginError, setLoginError] = useState('');
 
     const effectiveUserName = adminToken ? (userName || 'admin') : userName;
@@ -279,6 +281,45 @@
     useEffect(() => {
       api.setUserToken(userToken);
     }, [userToken]);
+
+    useEffect(() => {
+      storage.setActiveSession({
+        userName,
+        department,
+        userToken,
+        adminToken
+      });
+    }, [userName, department, userToken, adminToken]);
+
+    useEffect(() => {
+      const restoredSession = restoredSessionRef.current || {};
+      if (!restoredSession.userToken) return;
+
+      const controller = new AbortController();
+      let isActive = true;
+
+      const validateRestoredSession = async () => {
+        try {
+          const session = await api.getAuthSession(controller.signal);
+          if (!isActive) return;
+          if (session.userName && session.userName !== userName) {
+            setUserName(session.userName);
+          }
+        } catch (err) {
+          if (!isActive || err.name === 'AbortError') return;
+          setLoginError('Sessione utente scaduta. Effettua nuovamente l\'accesso.');
+          storage.clearActiveSession();
+          await resetSessionState({ nextUserName: storage.getCurrentUser() || '', nextAdminToken: null });
+        }
+      };
+
+      validateRestoredSession();
+
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }, []);
 
     useEffect(() => {
       const handleUserSessionInvalid = async (event) => {
@@ -606,6 +647,10 @@
       try {
         await releaseLock();
       } catch (err) {}
+
+      if (!nextAdminToken) {
+        storage.clearActiveSession();
+      }
 
       setDepartment(null);
       setActiveView('gantt');

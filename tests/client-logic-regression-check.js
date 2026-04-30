@@ -42,13 +42,33 @@ function assertNoNativeDialogs(repoRoot) {
   assert.deepStrictEqual(violations, [], `Native dialogs are not allowed in client code:\n${violations.join('\n')}`);
 }
 
+function createMemoryStorage() {
+  const values = new Map();
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+    clear() {
+      values.clear();
+    }
+  };
+}
+
 function createClientContext() {
   const sandbox = {
     console,
     Math,
     Date,
     setTimeout,
-    clearTimeout
+    clearTimeout,
+    localStorage: createMemoryStorage(),
+    sessionStorage: createMemoryStorage()
   };
 
   sandbox.window = sandbox;
@@ -62,6 +82,7 @@ function createClientContext() {
   loadBrowserScript(context, 'src/utils/utils-date.js');
   loadBrowserScript(context, 'src/utils/utils-logic.js');
   loadBrowserScript(context, 'src/utils/utils-gantt.js');
+  loadBrowserScript(context, 'src/client/storage.js');
   return context;
 }
 
@@ -112,6 +133,7 @@ function main() {
   const dateUtils = context.window.OnlyGantt.dateUtils;
   const logic = context.window.OnlyGantt.logic;
   const gantt = context.window.OnlyGantt.gantt;
+  const storage = context.window.OnlyGantt.storage;
 
   assert.strictEqual(dateUtils.formatDate(easter.calculateEaster(2026)), '2026-04-05');
   assert.strictEqual(dateUtils.formatDate(easter.calculateEasterMonday(2026)), '2026-04-06');
@@ -197,6 +219,20 @@ function main() {
   assert.deepStrictEqual(Array.from(allPhaseNames).sort(), ['Analisi', 'Custom Phase', 'Deploy']);
   assert.strictEqual(logic.getPhaseColor('Analisi'), '#3b82f6');
   assert.strictEqual(logic.getPhaseColor('Custom Phase', allPhaseNames), context.window.AppConfig.customPhaseColors[0]);
+
+  storage.setActiveSession({
+    userName: 'mario',
+    department: 'Demo',
+    userToken: 'user-token',
+    adminToken: null
+  });
+  const activeSession = storage.getActiveSession();
+  assert.strictEqual(activeSession.userName, 'mario');
+  assert.strictEqual(activeSession.department, 'Demo');
+  assert.strictEqual(activeSession.userToken, 'user-token');
+  assert.strictEqual(activeSession.adminToken, null);
+  storage.clearActiveSession();
+  assert.strictEqual(Object.keys(storage.getActiveSession()).length, 0);
 
   gantt.invalidateCache();
   const filters = {

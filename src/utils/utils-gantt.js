@@ -496,7 +496,11 @@
     const today = new Date();
     const todayX = dateToX[dateUtils.formatDate(today)];
 
-    if (todayX !== null && todayX !== undefined && todayX >= projectAreaLeft) {
+    const drawTodayMarker = () => {
+      if (todayX === null || todayX === undefined || todayX < projectAreaLeft) return;
+
+      ctx.save();
+      ctx.setLineDash([]);
       ctx.strokeStyle = config.gantt.TODAY_LINE_COLOR;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -507,9 +511,11 @@
       ctx.fillStyle = config.gantt.TODAY_LINE_COLOR;
       ctx.font = `bold 11px ${fontFamily}`;
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText('Oggi', todayX, headerTodayY);
       ctx.fillText('Oggi', todayX, footerTodayY);
-    }
+      ctx.restore();
+    };
 
     if (rows.length > 0) {
       ctx.strokeStyle = config.gantt.GRID_COLOR;
@@ -700,6 +706,8 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     });
+
+    drawTodayMarker();
   }
 
   function hitTest(mouseX, mouseY, layout) {

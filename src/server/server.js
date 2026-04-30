@@ -687,6 +687,24 @@ function validateUserSession(req, res, userName) {
   return true;
 }
 
+function getValidUserSession(token) {
+  if (!token) return null;
+
+  cleanupExpiredUserSessions();
+  const session = userSessions.get(token);
+  if (!session) return null;
+
+  if (new Date(session.expiresAt).getTime() <= Date.now()) {
+    userSessions.delete(token);
+    return null;
+  }
+
+  session.lastSeenAt = new Date().toISOString();
+  session.expiresAt = new Date(Date.now() + CONFIG.userSessionTtlHours * 60 * 60 * 1000).toISOString();
+  userSessions.set(token, session);
+  return session;
+}
+
 function requireAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -1481,6 +1499,25 @@ app.post('/api/auth/login', async (req, res) => {
         mail: localResult.user.mail || null,
         department: localResult.user.department || null
       }
+    });
+  } catch (err) {
+    errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+  }
+});
+
+app.get('/api/auth/session', (req, res) => {
+  try {
+    const token = getUserToken(req);
+    const session = getValidUserSession(token);
+    if (!session) {
+      return errorResponse(res, 401, 'UNAUTHORIZED', 'Invalid or expired user session');
+    }
+
+    res.json({
+      ok: true,
+      userName: session.userName,
+      userType: session.userType,
+      expiresAt: session.expiresAt
     });
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);

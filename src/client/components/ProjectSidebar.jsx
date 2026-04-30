@@ -10,12 +10,26 @@
   const logic = window.OnlyGantt.logic;
 
   const STORAGE_KEY_COLLAPSED = 'onlygantt_sidebar_collapsed';
-  const STORAGE_KEY_PINNED = 'onlygantt_sidebar_pinned';
 
-  const SIDEBAR_WIDTH_EXPANDED = 260;
-  const SIDEBAR_WIDTH_COLLAPSED = 40;
+  const SIDEBAR_WIDTH_EXPANDED = 280;
+  const SIDEBAR_WIDTH_COLLAPSED = 72;
 
   const SCROLLBAR_HEIGHT = 20;
+
+  function getProjectAbbreviation(projectName) {
+    const words = String(projectName || '')
+      .match(/[A-Za-z0-9]+/g) || [];
+
+    if (words.length === 0) {
+      return '--';
+    }
+
+    if (words.length === 1) {
+      return words[0].slice(0, 3).toUpperCase();
+    }
+
+    return words.slice(0, 3).map(word => word[0]).join('').toUpperCase();
+  }
 
   function ProjectSidebar({
     projects,
@@ -42,24 +56,17 @@
       }
     });
 
-    const [isPinned, setIsPinned] = useState(() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY_PINNED);
-        return saved === 'true';
-      } catch {
-        return false;
-      }
-    });
-
     const scrollContainerRef = useRef(null);
+    const syncedScrollTopRef = useRef(null);
     const headerHeight = ganttHeaderHeight || config.gantt.CANVAS_TOP_MARGIN;
     const rowHeight = config.gantt.ROW_HEIGHT;
     const hasTopScrollbar = viewMode === '4months';
     const scrollbarOffset = hasTopScrollbar ? SCROLLBAR_HEIGHT : 0;
+    const headerSpacerHeight = headerHeight - 36 + scrollbarOffset;
     const sidebarWidth = isCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
     const projectsHeight = projects.length * rowHeight;
     const bottomSpacerHeight = config.gantt.CANVAS_BOTTOM_MARGIN + scrollbarOffset;
-    const scrollContentHeight = projectsHeight + bottomSpacerHeight;
+    const scrollContentHeight = headerSpacerHeight + projectsHeight + bottomSpacerHeight;
 
     const getMaxScrollTop = useCallback(() => {
       const containerHeight = scrollContainerRef.current ? scrollContainerRef.current.clientHeight : 0;
@@ -71,16 +78,33 @@
       return Math.min(Math.max(0, value), maxScrollTop);
     }, [getMaxScrollTop]);
 
-    const handleWheel = useCallback((e) => {
-      if (!onScrollChange) return;
+    const handleScroll = useCallback((e) => {
+      const nextScrollTop = clampScrollTop(e.currentTarget.scrollTop);
+      const syncedScrollTop = syncedScrollTopRef.current;
 
-      const nextScrollTop = clampScrollTop((scrollTop || 0) + e.deltaY);
+      if (syncedScrollTop !== null && Math.abs(nextScrollTop - syncedScrollTop) <= 0.5) {
+        syncedScrollTopRef.current = null;
+        return;
+      }
 
-      if (nextScrollTop !== (scrollTop || 0)) {
-        e.preventDefault();
+      syncedScrollTopRef.current = null;
+      if (onScrollChange && Math.abs(nextScrollTop - (scrollTop || 0)) > 0.5) {
         onScrollChange(nextScrollTop);
       }
     }, [clampScrollTop, onScrollChange, scrollTop]);
+
+    const handleWheel = useCallback((e) => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer || !onScrollChange || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+
+      const nextScrollTop = clampScrollTop(scrollContainer.scrollTop + e.deltaY);
+      if (Math.abs(nextScrollTop - scrollContainer.scrollTop) <= 0.5) return;
+
+      e.preventDefault();
+      syncedScrollTopRef.current = nextScrollTop;
+      scrollContainer.scrollTop = nextScrollTop;
+      onScrollChange(nextScrollTop);
+    }, [clampScrollTop, onScrollChange]);
 
     useEffect(() => {
       const scrollContainer = scrollContainerRef.current;
@@ -93,6 +117,17 @@
     }, [handleWheel]);
 
     useEffect(() => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+
+      const clampedScrollTop = clampScrollTop(scrollTop || 0);
+      if (Math.abs(scrollContainer.scrollTop - clampedScrollTop) > 0.5) {
+        syncedScrollTopRef.current = clampedScrollTop;
+        scrollContainer.scrollTop = clampedScrollTop;
+      }
+    }, [clampScrollTop, scrollTop]);
+
+    useEffect(() => {
       try {
         localStorage.setItem(STORAGE_KEY_COLLAPSED, String(isCollapsed));
       } catch {}
@@ -101,12 +136,6 @@
         onCollapsedChange(isCollapsed);
       }
     }, [isCollapsed, onCollapsedChange]);
-
-    useEffect(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY_PINNED, String(isPinned));
-      } catch {}
-    }, [isPinned]);
 
     useEffect(() => {
       if (!onScrollChange) return;
@@ -121,10 +150,6 @@
       setIsCollapsed(prev => !prev);
     }, []);
 
-    const togglePinned = useCallback(() => {
-      setIsPinned(prev => !prev);
-    }, []);
-
     const toggleProjectInGantt = useCallback((projectId) => {
       const newSelected = new Set(selectedProjectIds);
       if (newSelected.has(projectId)) {
@@ -137,35 +162,20 @@
 
     return (
       <div
-        className={`project-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${isPinned ? 'pinned' : ''}`}
+        className={`project-sidebar ${isCollapsed ? 'collapsed' : 'expanded'}`}
         style={{ width: sidebarWidth }}
       >
         <div className="sidebar-header">
-          <div className="sidebar-controls">
-            <button
-              className="sidebar-btn sidebar-toggle-btn"
-              onClick={toggleCollapsed}
-              title={isCollapsed ? 'Espandi sidebar' : 'Riduci sidebar'}
-              aria-label={isCollapsed ? 'Espandi sidebar' : 'Riduci sidebar'}
-            >
-              <span className="sidebar-icon">
-                {isCollapsed ? '☰' : '✕'}
-              </span>
-            </button>
-
-            {!isCollapsed && (
-              <button
-                className={`sidebar-btn sidebar-pin-btn ${isPinned ? 'active' : ''}`}
-                onClick={togglePinned}
-                title={isPinned ? 'Sblocca sidebar' : 'Blocca sidebar aperta'}
-                aria-label={isPinned ? 'Sblocca sidebar' : 'Blocca sidebar aperta'}
-              >
-                <span className="sidebar-icon">
-                  {isPinned ? '📌' : '📍'}
-                </span>
-              </button>
-            )}
-          </div>
+          <button
+            className="sidebar-btn sidebar-toggle-btn"
+            onClick={toggleCollapsed}
+            title={isCollapsed ? 'Espandi lista progetti' : 'Comprimi lista progetti'}
+            aria-label={isCollapsed ? 'Espandi lista progetti' : 'Comprimi lista progetti'}
+          >
+            <span className="sidebar-icon">
+              {isCollapsed ? '☰' : '✕'}
+            </span>
+          </button>
 
           {!isCollapsed && (
             <div className="sidebar-title">
@@ -173,36 +183,42 @@
               <span className="sidebar-count">{projects.length}</span>
             </div>
           )}
-        </div>
 
-        <div
-          className="sidebar-header-spacer"
-          style={{ height: headerHeight - 36 + scrollbarOffset }}
-        />
+          {isCollapsed && (
+            <span className="sidebar-count compact">{projects.length}</span>
+          )}
+        </div>
 
         <div
           className="sidebar-scroll-container"
           ref={scrollContainerRef}
+          onScroll={handleScroll}
         >
-          {projects.length === 0 ? (
-            !isCollapsed && (
-              <div className="sidebar-empty">
-                Nessun progetto
-              </div>
-            )
-          ) : (
+          <div
+            className="sidebar-projects"
+            style={{
+              height: scrollContentHeight
+            }}
+          >
             <div
-              className="sidebar-projects"
-              style={{
-                transform: `translateY(-${scrollTop || 0}px)`,
-                height: scrollContentHeight
-              }}
-            >
-              {projects.map((project) => {
+              className="sidebar-header-spacer"
+              style={{ height: headerSpacerHeight }}
+            />
+
+            {projects.length === 0 ? (
+              !isCollapsed && (
+                <div className="sidebar-empty">
+                  Nessun progetto
+                </div>
+              )
+            ) : (
+              projects.map((project) => {
                 const isSelected = selectedProjectIds.has(project.id);
                 const isHovered = hoveredProjectId === project.id;
                 const alerts = logic.getProjectAlerts(project);
                 const severity = logic.getProjectAlertSeverity(alerts);
+                const percentage = logic.calculateProjectPercentage(project);
+                const abbreviation = getProjectAbbreviation(project.nome);
 
                 return (
                   <div
@@ -213,17 +229,22 @@
                     onMouseLeave={() => onProjectHover && onProjectHover(null)}
                   >
                     {isCollapsed ? (
-                      <div
+                      <button
+                        type="button"
                         className="sidebar-project-collapsed"
                         onClick={() => toggleProjectInGantt(project.id)}
-                        title={project.nome}
+                        title={`${project.nome} - ${percentage}%`}
+                        aria-label={`${project.nome} - ${percentage}%`}
                       >
                         <span
-                          className="sidebar-project-color"
+                          className="sidebar-project-acronym"
                           style={{ backgroundColor: project.colore || '#64748b' }}
-                        />
+                        >
+                          {abbreviation}
+                        </span>
+                        <span className="sidebar-project-mini-percent">{percentage}%</span>
                         {isSelected && <span className="sidebar-check-indicator">✓</span>}
-                      </div>
+                      </button>
                     ) : (
                       <div className="sidebar-project-expanded">
                         <label className="sidebar-project-checkbox">
@@ -248,16 +269,16 @@
                             {project.nome}
                           </span>
                           <span className="sidebar-project-percent">
-                            {logic.calculateProjectPercentage(project)}%
+                            {percentage}%
                           </span>
                         </div>
                       </div>
                     )}
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
       </div>
     );

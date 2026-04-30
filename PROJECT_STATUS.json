@@ -7,6 +7,38 @@
       "risk": "medium",
       "priority": "high",
       "context": "Blocked in this workspace because it requires an interactive clean Windows Server or Windows 11 VM with installer privileges. Local validation completed on 2026-04-30: npm run doctor, npm run build, npm run test, npm run pack and npm run publish passed; setup EXE generation completed. The local Windows service lifecycle check was skipped by npm run test because TCP port 3000 was already in use. Still needs manual clean-machine validation of Node.js prerequisite installation, per-machine install, service startup, all-users desktop shortcut, admin reset code flow and uninstall cleanup."
+    },
+    {
+      "id": "reduced-view-scroll-real-data-visual-validation",
+      "type": "test",
+      "status": "done",
+      "risk": "low",
+      "priority": "medium",
+      "context": "Done on 2026-04-30. Reduced Gantt view scroll alignment was verified on localhost:3000 with the real Demo department dataset. The project sidebar was rebuilt as a frozen left rail with expanded and acronym-collapsed modes; horizontal timeline scroll leaves the sidebar anchored, vertical scroll stays synchronized with canvasScrollTop/sidebarScrollTop, and row maxRowDelta stayed 0. Screenshot artifacts: artifacts/test-results/project-sidebar-expanded-frozen.png and artifacts/test-results/project-sidebar-collapsed-acronyms.png."
+    },
+    {
+      "id": "reduced-view-mouse-wheel-scroll-jitter",
+      "type": "test",
+      "status": "done",
+      "risk": "low",
+      "priority": "high",
+      "context": "Done on 2026-04-30. Wheel ownership for the reduced Gantt view was centralized on the active vertical scroll container: wheel input over either the canvas or frozen sidebar now prevents native independent scrolling, clamps the target scrollTop and publishes the same value through the shared verticalScrollTop state. This removes the transient canvas/sidebar divergence caused by two synchronized native vertical scroll containers."
+    },
+    {
+      "id": "session-refresh-login-redirect",
+      "type": "refactor",
+      "status": "done",
+      "risk": "low",
+      "priority": "high",
+      "context": "Done on 2026-04-30. The active user session is restored from sessionStorage after page refresh, the user token is validated through /api/auth/session, and stale sessions are cleared back to login. A valid refreshed session restores userName, department, userToken and adminToken without returning to the login screen."
+    },
+    {
+      "id": "today-red-line-canvas-z-order",
+      "type": "refactor",
+      "status": "done",
+      "risk": "low",
+      "priority": "high",
+      "context": "Done on 2026-04-30. The red \"Oggi\" marker is now drawn as the final canvas operation in the Gantt renderer, after grid, bars, phase labels and milestone rendering, so it remains in the foreground."
     }
   ]
 }
