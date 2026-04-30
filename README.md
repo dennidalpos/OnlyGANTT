@@ -23,17 +23,27 @@ It is not a standalone desktop app. The supported product surface is a web UI ho
 - PowerShell 7+ (`pwsh`).
 - Node.js 20 or newer.
 - npm.
+- .NET SDK with `dotnet` available on `PATH` for build, test and service host publish.
 - Administrator privileges only for Windows service install/uninstall and MSI lifecycle validation.
 
-## Quick Start
+## Fresh Install
 
 ```powershell
 npm run bootstrap
 npm run doctor
+npm run build
+npm run test
+```
+
+`npm run bootstrap` is the supported dependency install path and runs `npm ci` from `package-lock.json`. `npm run doctor` checks the required commands, installed dependencies and packaging inputs before build or test.
+
+## Run Locally
+
+```powershell
 npm start
 ```
 
-The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/compile.ps1` first, then starts `src/server/server.js`.
+The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/compile.ps1` first, then starts `src/server/server.js`. The runtime serves the built client bundle from `artifacts/build/client/` and stores default repository data under `Data/`.
 
 ## Commands
 
@@ -48,6 +58,8 @@ The app starts on `http://localhost:3000` by default. `npm start` runs `scripts/
 | `npm run publish` | Copy existing package artifacts to `artifacts/publish/local/`. |
 | `npm run clean` | Remove managed artifacts, stale local outputs and runtime-only data files. |
 
+There are currently no supported lint or typecheck npm scripts.
+
 MSI lifecycle validation is available when the environment can install and remove machine-wide packages:
 
 ```powershell
@@ -58,7 +70,7 @@ Automated environments can also set `ONLYGANTT_RUN_MSI_TESTS=true`. This reposit
 
 ## Windows Service
 
-The service scripts are consolidated in `scripts/windows/service.ps1` and use native Windows service management:
+The service scripts are consolidated in `scripts/windows/service.ps1` and use native Windows service management. Run `npm run build` before installing the service manually so `artifacts/build/service/OnlyGantt.Service.exe` exists:
 
 ```powershell
 npm run service:install
@@ -81,13 +93,44 @@ The MSI is x64-only by design: the WiX source uses `ProgramFiles64Folder` and `P
 The installer:
 
 - installs per machine;
-- checks Node.js from HKLM and blocks with precise instructions when using the MSI without Node.js;
-- installs Node.js 24 LTS automatically when using the setup EXE;
+- checks Node.js from HKLM and blocks when using the MSI without a machine Node.js installation;
+- installs the cached Node.js 24.15.0 x64 MSI prerequisite automatically when using the setup EXE and Node.js is missing;
 - asks for service installation, server port, desktop shortcut URL and optional initial admin reset code;
 - installs the server, public assets, dependencies, native service host and Windows service configuration;
 - creates an all-users desktop shortcut to the configured homepage URL;
 - uses the Windows brand icon from `src/public/brand/onlygantt.ico`;
 - stores package outputs under `artifacts/packages/`.
+
+`npm run publish` does not rebuild packages. It copies the existing package outputs from `artifacts/packages/` to `artifacts/publish/local/`.
+
+## Configuration
+
+The server reads these supported environment variables at startup:
+
+| Variable | Purpose |
+| --- | --- |
+| `PORT` | HTTP/HTTPS port. Defaults to `3000`. |
+| `ONLYGANTT_DATA_DIR` or `DATA_DIR` | Data directory override. Defaults to `Data`. |
+| `ONLYGANTT_ADMIN_USER` | Admin username. Defaults to `admin`. |
+| `ONLYGANTT_ADMIN_PASSWORD` | Admin password managed by environment instead of local config. |
+| `ONLYGANTT_ADMIN_RESET_CODE` | Enables admin password reset flow. |
+| `ONLYGANTT_LOCK_TIMEOUT_MINUTES` | Department lock timeout. Defaults to `60`. |
+| `ONLYGANTT_USER_SESSION_TTL_HOURS` | User session TTL. Defaults to `8`. |
+| `ONLYGANTT_ADMIN_TTL_HOURS` | Admin session TTL. Defaults to `8`. |
+| `ONLYGANTT_MAX_UPLOAD_BYTES` | JSON upload limit. Defaults to `2000000`. |
+| `ONLYGANTT_ENABLE_BAK` | Enables `.bak` writes for data updates. Defaults to enabled. |
+| `LDAP_ENABLED`, `LOG_LDAP`, `LDAP_URL`, `LDAP_BIND_DN`, `LDAP_BIND_PASSWORD`, `LDAP_BASE_DN`, `LDAP_USER_FILTER`, `LDAP_REQUIRED_GROUP`, `LDAP_GROUP_SEARCH_BASE`, `LDAP_LOCAL_FALLBACK` | Optional LDAP settings used by the admin configuration flow. |
+| `HTTPS_ENABLED`, `HTTPS_KEY_PATH`, `HTTPS_CERT_PATH` | Optional HTTPS listener settings. |
+
+Versioned defaults live in `Data/config/system-config.json`. Local secrets such as LDAP bind password are stored in ignored local sidecar files, not in the versioned seed config.
+
+## Troubleshooting
+
+- If `npm run doctor` reports missing dependencies, run `npm run bootstrap`.
+- If `npm run doctor`, `npm run build` or `npm run test` reports `dotnet` missing, install a .NET SDK that can build `src/service/OnlyGantt.Service/OnlyGantt.Service.csproj`.
+- If manual service commands fail with an administrator error, reopen PowerShell as Administrator.
+- If `npm start` fails because port `3000` is already in use, stop the conflicting process or start with a different port, for example `$env:PORT = '3001'; npm start`.
+- If `npm run pack` runs on a fresh machine, it may download WiX 3.14.1 binaries and the Node.js 24.15.0 x64 MSI prerequisite into ignored local cache paths.
 
 ## Project State
 

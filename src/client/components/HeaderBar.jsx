@@ -68,6 +68,7 @@
         action();
       }
       setMenuOpen(false);
+      menuButtonRef.current?.focus();
     };
 
     const handlePasswordChange = async () => {
@@ -277,19 +278,22 @@
             className="topbar__menu-btn"
             onClick={() => setMenuOpen(prev => !prev)}
             aria-label="Apri menu"
+            aria-haspopup="menu"
             aria-expanded={menuOpen}
+            aria-controls="topbar-menu"
           >
             <span className="topbar__menu-icon">☰</span>
           </button>
 
           {}
           {menuOpen && (
-            <div ref={menuRef} className="topbar__dropdown">
+            <div id="topbar-menu" ref={menuRef} className="topbar__dropdown" role="menu">
               {}
               <div className="topbar__dropdown-section">
                 <div className="topbar__dropdown-title">Reparto</div>
                 <button
                   className="topbar__dropdown-item"
+                  role="menuitem"
                   onClick={() => handleMenuAction(() => onDepartmentChange(null))}
                   disabled={!department}
                 >
@@ -297,6 +301,7 @@
                 </button>
                 <button
                   className="topbar__dropdown-item"
+                  role="menuitem"
                   onClick={() => handleMenuAction(onEnableLock)}
                   disabled={!department || lockEnabled || isLockedByOther}
                 >
@@ -305,6 +310,7 @@
                 {isLockedByOther && (
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(lockEnabled ? onRefreshLock : onEnableLock)}
                     disabled={!department}
                   >
@@ -313,6 +319,7 @@
                 )}
                 <button
                   className="topbar__dropdown-item"
+                  role="menuitem"
                   onClick={() => handleMenuAction(onReleaseLock)}
                   disabled={!department || !isLocked}
                 >
@@ -320,6 +327,7 @@
                 </button>
                 <button
                   className="topbar__dropdown-item"
+                  role="menuitem"
                   onClick={() => handleMenuAction(handlePasswordChange)}
                   disabled={!department || readOnlyDepartment || adminToken}
                 >
@@ -334,24 +342,28 @@
                   <div className="topbar__dropdown-title">Admin</div>
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(onNavigateSystemSettings)}
                   >
                     Impostazioni di sistema
                   </button>
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(onNavigateUserManagement)}
                   >
                     Gestione utenti
                   </button>
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(handleAdminCreate)}
                   >
                     Crea reparto
                   </button>
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(handleAdminPasswordReset)}
                     disabled={!department}
                   >
@@ -359,12 +371,14 @@
                   </button>
                   <button
                     className="topbar__dropdown-item"
+                    role="menuitem"
                     onClick={() => handleMenuAction(handleAdminChangePassword)}
                   >
                     Cambia password admin
                   </button>
                   <button
                     className="topbar__dropdown-item topbar__dropdown-item--danger"
+                    role="menuitem"
                     onClick={() => handleMenuAction(handleAdminDelete)}
                     disabled={!department}
                   >
@@ -372,6 +386,7 @@
                   </button>
                   <button
                     className="topbar__dropdown-item topbar__dropdown-item--danger"
+                    role="menuitem"
                     onClick={() => handleMenuAction(onAdminReleaseLock)}
                     disabled={!department || !lockInfo?.locked || isLocked}
                   >
@@ -385,6 +400,7 @@
                 <div className="topbar__dropdown-title">Sessione</div>
                 <button
                   className="topbar__dropdown-item"
+                  role="menuitem"
                   onClick={() => handleMenuAction(onUserLogout)}
                 >
                   Logout

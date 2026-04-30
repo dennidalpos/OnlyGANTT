@@ -53,7 +53,7 @@ if ($null -ne $portInUse) {
 
 try {
   & $serviceScript -Action Cleanup -ServiceName $ServiceName
-  & $serviceScript -Action Install -ServiceName $ServiceName -DisplayName 'OnlyGantt Validation Service' -Description 'OnlyGANTT validation service lifecycle check' -StartType 'demand' -ForceReinstall
+  & $serviceScript -Action Install -ServiceName $ServiceName -DisplayName 'OnlyGantt Validation Service' -Description 'OnlyGANTT validation service lifecycle check' -StartType 'demand' -Port $ExpectedPort -ForceReinstall
   & $serviceScript -Action Start -ServiceName $ServiceName
   Wait-ForServiceEndpoint -Port $ExpectedPort
   & $serviceScript -Action Stop -ServiceName $ServiceName

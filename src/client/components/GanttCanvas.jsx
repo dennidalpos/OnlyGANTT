@@ -602,6 +602,8 @@
               <canvas
                 ref={canvasRef}
                 className="gantt-canvas"
+                role="img"
+                aria-label="Diagramma Gantt dei progetti visibili"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
                 onContextMenu={handleContextMenu}

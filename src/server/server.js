@@ -646,6 +646,20 @@ function createUserSession(userName, { userType = 'user' } = {}) {
   return token;
 }
 
+function createAuthLoginResponse(userId, { authType, sessionUserType = authType, user }) {
+  revokeUserSessionsForUser(userId);
+  const token = createUserSession(userId, { userType: sessionUserType });
+  return {
+    ok: true,
+    authType,
+    token,
+    user: {
+      userId,
+      ...user
+    }
+  };
+}
+
 function getUserToken(req) {
   return req.headers['x-user-token'] || req.body?.userToken || null;
 }
@@ -1435,20 +1449,15 @@ app.post('/api/auth/login', async (req, res) => {
           mail: ldapResult.profile.mail,
           department: ldapResult.profile.department || department || null
         });
-        revokeUserSessionsForUser(normalizedUserId);
-        const userToken = createUserSession(normalizedUserId, { userType: 'ldap' });
-        return res.json({
-          ok: true,
+        return res.json(createAuthLoginResponse(normalizedUserId, {
           authType: 'ldap',
-          token: userToken,
           user: {
-            userId: normalizedUserId,
             type: 'ad',
             displayName: storeResult.user.displayName,
             mail: storeResult.user.mail,
             department: storeResult.user.department
           }
-        });
+        }));
       }
 
       if (ldapResult.code === 'GROUP_REQUIRED') {
@@ -1458,20 +1467,15 @@ app.post('/api/auth/login', async (req, res) => {
       if (CONFIG.ldapLocalFallback && ldapResult.code !== 'GROUP_REQUIRED') {
         const localResult = userStore.verifyLocalUser(normalizedUserId, password);
         if (localResult.ok) {
-          revokeUserSessionsForUser(normalizedUserId);
-          const userToken = createUserSession(normalizedUserId, { userType: 'local' });
-          return res.json({
-            ok: true,
+          return res.json(createAuthLoginResponse(normalizedUserId, {
             authType: 'local',
-            token: userToken,
             user: {
-              userId: normalizedUserId,
               type: 'local',
               displayName: localResult.user.displayName || normalizedUserId,
               mail: localResult.user.mail || null,
               department: localResult.user.department || null
             }
-          });
+          }));
         }
       }
 
@@ -1485,40 +1489,30 @@ app.post('/api/auth/login', async (req, res) => {
 
     const isUsernameOnlyLogin = password === undefined || password === null || password === '';
     if (authSnapshot.localUsers === 0 && isUsernameOnlyLogin) {
-      revokeUserSessionsForUser(normalizedUserId);
-      const userToken = createUserSession(normalizedUserId, { userType: 'standard' });
-      return res.json({
-        ok: true,
+      return res.json(createAuthLoginResponse(normalizedUserId, {
         authType: 'standard',
-        token: userToken,
         user: {
-          userId: normalizedUserId,
           type: 'standard',
           displayName: normalizedUserId,
           mail: null,
           department: department || null
         }
-      });
+      }));
     }
 
     const localResult = userStore.verifyLocalUser(normalizedUserId, password);
     if (!localResult.ok) {
       return errorResponse(res, 401, 'INVALID_CREDENTIALS', 'Invalid credentials');
     }
-    revokeUserSessionsForUser(normalizedUserId);
-    const userToken = createUserSession(normalizedUserId, { userType: 'local' });
-    return res.json({
-      ok: true,
+    return res.json(createAuthLoginResponse(normalizedUserId, {
       authType: 'local',
-      token: userToken,
       user: {
-        userId: normalizedUserId,
         type: 'local',
         displayName: localResult.user.displayName || normalizedUserId,
         mail: localResult.user.mail || null,
         department: localResult.user.department || null
       }
-    });
+    }));
   } catch (err) {
     errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
   }

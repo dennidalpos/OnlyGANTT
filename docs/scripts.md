@@ -15,16 +15,20 @@ All supported operational entrypoints are exposed through `package.json` npm scr
 | `npm run publish` | `scripts/publish.ps1` | Copies existing files from `artifacts/packages/` to `artifacts/publish/local/` and writes a local publish manifest. |
 | `npm run clean` | `scripts/clean.ps1` | Cleans managed artifacts and stale local output roots. Runtime data and service cleanup require explicit flags. |
 
+There are no supported lint or typecheck scripts in `package.json` today.
+
 ## Runtime commands
 
 | npm command | Behavior |
 | --- | --- |
-| `npm start` | Runs `prestart` (`scripts/compile.ps1`) and starts `src/server/server.js`. |
-| `npm run service:install` | Installs the Windows service with native Windows service management. Requires administrator privileges and a prior `npm run build`. |
+| `npm start` | Runs `prestart` (`scripts/compile.ps1`) and starts `src/server/server.js` on `PORT` or `3000`. |
+| `npm run service:install` | Installs the Windows service with native Windows service management. Requires administrator privileges, Node.js and a prior `npm run build`. |
 | `npm run service:uninstall` | Removes the Windows service. Requires administrator privileges. |
 | `npm run service:start` | Starts `OnlyGanttWeb`. |
 | `npm run service:stop` | Stops `OnlyGanttWeb`. |
 | `npm run service:cleanup` | Removes the service if present. Service log deletion is available through `scripts/windows/service.ps1 -Action Cleanup -RemoveLogs`. |
+
+Manual service options available through `scripts/windows/service.ps1` include `-Port`, `-AdminResetCode`, `-ServiceHostPath`, `-NodePath`, `-ForceReinstall` and `-RemoveLogs`.
 
 ## Tests
 
@@ -46,6 +50,14 @@ The Windows service lifecycle check skips explicitly when it cannot run in the c
 - `artifacts/packages/setup/OnlyGantt-Setup-<version>-x64.exe`
 
 The setup EXE includes the Node.js 24 LTS x64 MSI prerequisite after verifying the official SHA256 hash during packaging.
+
+Packaging prerequisites are handled as follows:
+
+| Prerequisite | Handling |
+| --- | --- |
+| WiX 3.14.1 binaries | `scripts/packaging/provision-wix.ps1` reuses or downloads them into `tools/wix314-binaries/`. |
+| Node.js 24.15.0 x64 MSI prerequisite | `scripts/packaging/provision-node.ps1` reuses or downloads it into `artifacts/build/prerequisites/` and verifies SHA256. |
+| MSI install/remove lifecycle | Manual/elevated unless `npm run pack -- -RunMsiLifecycleValidation` or `ONLYGANTT_RUN_MSI_TESTS=true` is used in an elevated environment. |
 
 Full MSI lifecycle validation can be requested with:
 

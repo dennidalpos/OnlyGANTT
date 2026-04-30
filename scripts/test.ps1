@@ -23,6 +23,21 @@ $adminFlowScript = Join-Path $repoRoot 'tests\admin-flow-regression-check.js'
 $clientLogicScript = Join-Path $repoRoot 'tests\client-logic-regression-check.js'
 $serviceLifecycleScript = Join-Path $repoRoot 'tests\windows-service-lifecycle-check.ps1'
 
+function Get-AvailableTcpPort {
+  foreach ($port in 3324..3399) {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
+    try {
+      $listener.Start()
+      return $port
+    } catch {
+    } finally {
+      $listener.Stop()
+    }
+  }
+
+  throw 'No free TCP port found in validation range 3324-3399.'
+}
+
 & node $smokeScript 2>&1 | Tee-Object -FilePath $logPath
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
@@ -48,7 +63,9 @@ if ($exitCode -ne 0) {
 }
 
 $serviceLifecycleStatus = 'skipped'
-& pwsh -NoProfile -ExecutionPolicy Bypass -File $serviceLifecycleScript 2>&1 | Tee-Object -FilePath $serviceLifecycleLogPath
+$serviceLifecyclePort = Get-AvailableTcpPort
+Write-Host "Windows service lifecycle check using TCP port $serviceLifecyclePort."
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $serviceLifecycleScript -ExpectedPort $serviceLifecyclePort 2>&1 | Tee-Object -FilePath $serviceLifecycleLogPath
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
   throw "Windows service lifecycle check failed with exit code $exitCode"
@@ -66,6 +83,7 @@ $summary = [ordered]@{
   adminFlows = 'passed'
   clientLogic = 'passed'
   serviceLifecycle = $serviceLifecycleStatus
+  serviceLifecyclePort = $serviceLifecyclePort
   entrypoint = 'tests/smoke-check.js'
   additionalChecks = @(
     'tests/security-regression-check.js',

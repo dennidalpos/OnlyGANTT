@@ -403,9 +403,13 @@
           </div>
 
           {}
-          <div className="login-tabs">
+          <div className="login-tabs" role="tablist" aria-label="Tipo di accesso">
             <button
               type="button"
+              id="login-tab-user"
+              role="tab"
+              aria-selected={activeTab === 'user'}
+              aria-controls="login-panel-user"
               className={`login-tab ${activeTab === 'user' ? 'active' : ''}`}
               onClick={() => handleTabChange('user')}
               disabled={isLoading}
@@ -415,6 +419,10 @@
             </button>
             <button
               type="button"
+              id="login-tab-admin"
+              role="tab"
+              aria-selected={activeTab === 'admin'}
+              aria-controls="login-panel-admin"
               className={`login-tab ${activeTab === 'admin' ? 'active' : ''}`}
               onClick={() => handleTabChange('admin')}
               disabled={isLoading}
@@ -426,7 +434,7 @@
 
           {}
           {effectiveError && (
-            <div className="login-error">
+            <div className="login-error" role="alert">
               <span className="login-error-icon">!</span>
               <span className="login-error-text">{effectiveError}</span>
             </div>
@@ -434,7 +442,7 @@
 
           {}
           {activeTab === 'user' && (
-            <div className="login-form">
+            <div id="login-panel-user" className="login-form" role="tabpanel" aria-labelledby="login-tab-user">
               <div className="login-section">
                 <div className="login-section-header">
                   <span className="login-section-number">1</span>
@@ -561,7 +569,7 @@
 
           {}
           {activeTab === 'admin' && (
-            <div className="login-form">
+            <div id="login-panel-admin" className="login-form" role="tabpanel" aria-labelledby="login-tab-admin">
               {adminToken ? (
                 <div className="login-admin-active">
                   <div className="login-admin-status">
@@ -699,7 +707,7 @@
                           <div style={{ marginTop: 'var(--spacing-md)' }}>
                             <div className="login-section">
                               <div className="login-section-header">
-                                <span className="login-section-title" style={{ fontSize: '0.8rem' }}>Reset Password Admin</span>
+                                <span className="login-section-title" style={{ fontSize: '0.8rem' }}>Reset password admin</span>
                               </div>
                               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)' }}>
                                 Usa il codice di reset fornito dall'amministratore di sistema (variabile ambiente ONLYGANTT_ADMIN_RESET_CODE).
@@ -734,7 +742,7 @@
                                 onClick={handleAdminPasswordReset}
                                 disabled={!adminResetCode || !newAdminPassword || isLoading}
                               >
-                                {isLoading ? 'Resettando...' : 'Reimposta Password'}
+                                {isLoading ? 'Reset in corso...' : 'Reimposta password'}
                               </button>
                             </div>
                           </div>

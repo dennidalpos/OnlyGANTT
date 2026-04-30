@@ -252,18 +252,22 @@
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleProjectInGantt(project.id)}
+                            aria-label={`${isSelected ? 'Nascondi' : 'Mostra'} ${project.nome} nel diagramma Gantt`}
                           />
                         </label>
 
                         <span
                           className="sidebar-project-color"
+                          aria-hidden="true"
                           style={{ backgroundColor: project.colore || '#64748b' }}
                         />
 
-                        <div
+                        <button
+                          type="button"
                           className="sidebar-project-info"
                           onClick={() => !readOnly && onEditProject && onEditProject(project)}
                           title={readOnly ? project.nome : `Modifica: ${project.nome}`}
+                          disabled={readOnly || !onEditProject}
                         >
                           <span className="sidebar-project-name">
                             {project.nome}
@@ -271,7 +275,7 @@
                           <span className="sidebar-project-percent">
                             {percentage}%
                           </span>
-                        </div>
+                        </button>
                       </div>
                     )}
                   </div>

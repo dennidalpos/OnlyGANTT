@@ -196,7 +196,7 @@
           )}
 
           {validationError && (
-            <div className="alert-item warning dialog-validation">
+            <div className="alert-item warning dialog-validation" role="alert">
               {validationError}
             </div>
           )}

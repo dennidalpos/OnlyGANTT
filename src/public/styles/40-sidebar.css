@@ -311,7 +311,22 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-xs);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
   cursor: pointer;
+}
+
+.sidebar-project-info:disabled {
+  cursor: default;
+}
+
+.sidebar-project-info:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
 }
 
 .sidebar-project-name {

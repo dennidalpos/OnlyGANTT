@@ -147,32 +147,39 @@
     return (
       <div className="card-section">
         <div className="gantt-toolbar">
-          <button onClick={onGoToToday} className="btn-secondary btn-small">
+          <button type="button" onClick={onGoToToday} className="btn-secondary btn-small">
             Vai a Oggi
           </button>
 
           <div className="button-group">
             <button
+              type="button"
               onClick={() => onViewModeChange('4months')}
               className={`btn-small ${viewMode === '4months' ? 'btn-success' : 'btn-secondary'}`}
+              aria-pressed={viewMode === '4months'}
             >
               Ridotta
             </button>
             <button
+              type="button"
               onClick={() => onViewModeChange('full')}
               className={`btn-small ${viewMode === 'full' ? 'btn-success' : 'btn-secondary'}`}
+              aria-pressed={viewMode === 'full'}
             >
               Completa
             </button>
           </div>
 
-          <button onClick={onExportPNG} className="btn-secondary btn-small">
+          <button type="button" onClick={onExportPNG} className="btn-secondary btn-small">
             PNG
           </button>
 
           <button
+            type="button"
             onClick={() => setShowOptions(!showOptions)}
             className={`btn-small ${showOptions ? 'btn-success' : 'btn-secondary'}`}
+            aria-expanded={showOptions}
+            aria-controls="gantt-filters-panel"
           >
             {showOptions ? '▲' : '▼'} Filtri
             <span className="filter-count">{activeFilterCount}/{ALL_FILTER_KEYS.length}</span>
@@ -180,16 +187,18 @@
         </div>
 
         {showOptions && (
-          <div className="filters-panel">
+          <div id="gantt-filters-panel" className="filters-panel">
             {}
             <div className="filters-actions">
               <button
+                type="button"
                 onClick={handleToggleAllFilters}
                 className="btn-secondary btn-small"
               >
                 {allFiltersEnabled ? 'Disattiva tutti' : 'Attiva tutti'}
               </button>
               <button
+                type="button"
                 onClick={handleResetToDefaults}
                 className="btn-secondary btn-small"
               >
@@ -209,9 +218,11 @@
                       <span className="filter-group-icon">{group.icon}</span>
                       <span className="filter-group-title">{group.title}</span>
                       <button
+                        type="button"
                         className="filter-group-toggle"
                         onClick={() => handleToggleGroup(groupKey)}
                         title={allActive ? 'Disattiva gruppo' : 'Attiva gruppo'}
+                        aria-label={`${allActive ? 'Disattiva' : 'Attiva'} gruppo ${group.title}`}
                       >
                         {stats.active}/{stats.total}
                       </button>
