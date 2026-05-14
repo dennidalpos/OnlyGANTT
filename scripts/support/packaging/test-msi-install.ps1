@@ -25,6 +25,7 @@ try {
   Remove-OnlyGanttMachineState -LogsRoot $paths.LogsRoot -FallbackInstallRoot $installRoot
   Invoke-MsiExec -Arguments @('/i', $resolvedMsiPath) -LogPath $installLog
   Assert-OnlyGanttInstalled -ExpectedVersion $expectedVersion -InstallRoot $installRoot
+  Assert-OnlyGanttDesktopShortcuts -ExpectAdminShortcut
   Write-Host "MSI install test passed for $resolvedMsiPath"
 } finally {
   Remove-OnlyGanttMachineState -LogsRoot $paths.LogsRoot -FallbackInstallRoot $installRoot

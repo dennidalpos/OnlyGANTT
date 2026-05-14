@@ -235,36 +235,27 @@ function Draw-Lockup {
   }
 
   if ($Mode -eq 'setup-banner') {
-    Draw-Background -Graphics $Graphics -Width $Width -Height $Height
-    Draw-Mark -Graphics $Graphics -X 18 -Y 8 -Size 42
-    $titleFont = [System.Drawing.Font]::new('Segoe UI', 20, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $bodyFont = [System.Drawing.Font]::new('Segoe UI', 11, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
-    $textBrush = New-Brush $colors.Text
-    $mutedBrush = New-Brush $colors.Muted
-    $Graphics.DrawString('OnlyGANTT', $titleFont, $textBrush, 76, 10)
-    $Graphics.DrawString('Windows server installer', $bodyFont, $mutedBrush, 78, 35)
-    $titleFont.Dispose()
-    $bodyFont.Dispose()
-    $textBrush.Dispose()
-    $mutedBrush.Dispose()
+    $backgroundBrush = New-Brush ([System.Drawing.ColorTranslator]::FromHtml('#f8fafc'))
+    $Graphics.FillRectangle($backgroundBrush, 0, 0, $Width, $Height)
+    Draw-Mark -Graphics $Graphics -X 438 -Y 9 -Size 40
+    $backgroundBrush.Dispose()
     return
   }
 
   if ($Mode -eq 'setup-dialog') {
-    Draw-Background -Graphics $Graphics -Width $Width -Height $Height
-    Draw-Mark -Graphics $Graphics -X 54 -Y 52 -Size 120
-    $titleFont = [System.Drawing.Font]::new('Segoe UI', 34, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $bodyFont = [System.Drawing.Font]::new('Segoe UI', 16, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
-    $textBrush = New-Brush $colors.Text
-    $mutedBrush = New-Brush $colors.Muted
-    $Graphics.DrawString('OnlyGANTT', $titleFont, $textBrush, 204, 70)
-    $Graphics.DrawString('Interactive Gantt scheduling', $bodyFont, $mutedBrush, 208, 118)
-    $Graphics.DrawString('MSI setup asset', $bodyFont, $mutedBrush, 208, 146)
-    Draw-Timeline -Graphics $Graphics -X 84 -Y 224 -Width 326
-    $titleFont.Dispose()
-    $bodyFont.Dispose()
-    $textBrush.Dispose()
-    $mutedBrush.Dispose()
+    $backgroundBrush = New-Brush ([System.Drawing.ColorTranslator]::FromHtml('#f8fafc'))
+    $panelBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
+      [System.Drawing.Rectangle]::new(0, 0, 164, $Height),
+      $colors.Background,
+      $colors.Surface,
+      35
+    )
+    $Graphics.FillRectangle($backgroundBrush, 0, 0, $Width, $Height)
+    $Graphics.FillRectangle($panelBrush, 0, 0, 164, $Height)
+    Draw-Mark -Graphics $Graphics -X 32 -Y 54 -Size 110
+    Draw-Timeline -Graphics $Graphics -X 28 -Y 224 -Width 108
+    $panelBrush.Dispose()
+    $backgroundBrush.Dispose()
   }
 }
 

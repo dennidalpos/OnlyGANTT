@@ -109,9 +109,9 @@ The installer:
 - runs the cached official Node.js 24.15.0 x64 MSI prerequisite before installing OnlyGANTT when using the setup EXE;
 - blocks the standalone MSI before install when the machine-wide Node.js registry entry is missing, with an actionable Node.js requirement message;
 - validates Node.js 20 or newer again during manual service install and service first startup, with an actionable error if the runtime is missing or too old;
-- asks for service installation, server port, desktop shortcut URL and optional initial admin reset code;
+- asks for service installation, server port, desktop shortcut URL, optional admin desktop shortcut and optional initial admin reset code;
 - installs the server, public assets, dependencies, native service host and Windows service configuration;
-- creates an all-users desktop shortcut to the configured homepage URL;
+- creates an all-users desktop shortcut to the configured homepage URL and can create an additional all-users shortcut that opens the admin login UI;
 - uses the Windows brand icon from `src/public/brand/onlygantt.ico`;
 - stores package outputs under `artifacts/packages/`.
 

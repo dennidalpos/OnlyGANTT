@@ -13,6 +13,17 @@
   const api = window.OnlyGantt.api;
   const storage = window.OnlyGantt.storage;
 
+  function getRequestedLoginTab() {
+    try {
+      const hash = window.location.hash.toLowerCase();
+      const searchParams = new URLSearchParams(window.location.search);
+      const requestedLogin = (searchParams.get('login') || searchParams.get('view') || '').toLowerCase();
+      return hash === '#admin' || requestedLogin === 'admin' ? 'admin' : null;
+    } catch {
+      return null;
+    }
+  }
+
   function LoginScreen({
     userName,
     onUserNameChange,
@@ -26,7 +37,7 @@
     pushNotification
   }) {
     
-    const [activeTab, setActiveTab] = useState(adminToken ? 'admin' : 'user');
+    const [activeTab, setActiveTab] = useState(() => adminToken ? 'admin' : getRequestedLoginTab() || 'user');
     const [departments, setDepartments] = useState([]);
     const [selectedDept, setSelectedDept] = useState('');
     const [deptPassword, setDeptPassword] = useState('');
@@ -77,6 +88,18 @@
       loadDepartments(controller.signal);
       return () => controller.abort();
     }, [loadDepartments]);
+
+    useEffect(() => {
+      const handleLocationChange = () => {
+        if (!adminToken && getRequestedLoginTab() === 'admin') {
+          setActiveTab('admin');
+        }
+      };
+
+      handleLocationChange();
+      window.addEventListener('hashchange', handleLocationChange);
+      return () => window.removeEventListener('hashchange', handleLocationChange);
+    }, [adminToken]);
 
     useEffect(() => {
       const controller = new AbortController();

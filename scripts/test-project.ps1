@@ -16,6 +16,7 @@ $securityLogPath = Join-Path $repoRoot 'artifacts\test-results\security-regressi
 $adminFlowLogPath = Join-Path $repoRoot 'artifacts\test-results\admin-flow-regression-check.log'
 $clientLogicLogPath = Join-Path $repoRoot 'artifacts\test-results\client-logic-regression-check.log'
 $prerequisiteLogPath = Join-Path $repoRoot 'artifacts\test-results\prerequisite-regression-check.log'
+$installerSourceLogPath = Join-Path $repoRoot 'artifacts\test-results\installer-source-regression-check.log'
 $serviceLifecycleLogPath = Join-Path $repoRoot 'artifacts\test-results\windows-service-lifecycle-check.log'
 $summaryPath = Join-Path $repoRoot 'artifacts\test-results\summary.json'
 $smokeScript = Join-Path $repoRoot 'tests\smoke-check.js'
@@ -23,6 +24,7 @@ $securityScript = Join-Path $repoRoot 'tests\security-regression-check.js'
 $adminFlowScript = Join-Path $repoRoot 'tests\admin-flow-regression-check.js'
 $clientLogicScript = Join-Path $repoRoot 'tests\client-logic-regression-check.js'
 $prerequisiteScript = Join-Path $repoRoot 'tests\prerequisite-regression-check.ps1'
+$installerSourceScript = Join-Path $repoRoot 'tests\installer-source-regression-check.ps1'
 $serviceLifecycleScript = Join-Path $repoRoot 'scripts\support\test-windows-service-lifecycle.ps1'
 
 function Get-AvailableTcpPort {
@@ -70,6 +72,12 @@ if ($exitCode -ne 0) {
   throw "Prerequisite regression check failed with exit code $exitCode"
 }
 
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $installerSourceScript 2>&1 | Tee-Object -FilePath $installerSourceLogPath
+$exitCode = $LASTEXITCODE
+if ($exitCode -ne 0) {
+  throw "Installer source regression check failed with exit code $exitCode"
+}
+
 $serviceLifecycleStatus = 'skipped'
 $serviceLifecyclePort = Get-AvailableTcpPort
 Write-Host "Windows service lifecycle check using TCP port $serviceLifecyclePort."
@@ -91,6 +99,7 @@ $summary = [ordered]@{
   adminFlows = 'passed'
   clientLogic = 'passed'
   prerequisites = 'passed'
+  installerSource = 'passed'
   serviceLifecycle = $serviceLifecycleStatus
   serviceLifecyclePort = $serviceLifecyclePort
   entrypoint = 'tests/smoke-check.js'
@@ -99,6 +108,7 @@ $summary = [ordered]@{
     'tests/admin-flow-regression-check.js',
     'tests/client-logic-regression-check.js',
     'tests/prerequisite-regression-check.ps1',
+    'tests/installer-source-regression-check.ps1',
     'scripts/support/test-windows-service-lifecycle.ps1'
   )
 }

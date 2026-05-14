@@ -46,6 +46,7 @@ $manifest = [ordered]@{
     'tests/admin-flow-regression-check.js',
     'tests/client-logic-regression-check.js',
     'tests/prerequisite-regression-check.ps1',
+    'tests/installer-source-regression-check.ps1',
     'scripts/support/test-windows-service-lifecycle.ps1'
   )
   packaging = [ordered]@{

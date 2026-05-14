@@ -2,10 +2,10 @@
   "project_name": "OnlyGANTT",
   "status": "active",
   "current_phase": "security-remediation",
-  "last_updated": "2026-05-14T11:24:00+02:00",
+  "last_updated": "2026-05-14T13:34:20+02:00",
   "production_target": true,
   "summary": "Windows-oriented Node/Express and React Gantt application with JSON-file persistence, optional LDAP, admin flows, Windows service host and WiX packaging.",
-  "active_objective": "Continue post-audit remediation after completing backend authorization for department data endpoints.",
+  "active_objective": "Continue post-audit remediation after validating MSI desktop shortcut creation with a real install.",
   "assumptions": [
     "Audit was performed in a local Windows test workspace.",
     "The application code was not changed during the audit.",
@@ -14,7 +14,11 @@
   "decisions": [
     "Classify the project as Rischioso until server-side authorization and data-integrity risks are addressed.",
     "Keep audit output as root-level markdown and JSON artifacts for follow-up planning.",
-    "Department project read, export, save, import and upload now require a valid user/admin session; password-protected departments require per-session password verification before data access."
+    "Department project read, export, save, import and upload now require a valid user/admin session; password-protected departments require per-session password verification before data access.",
+    "Keep WiX setup dialog and banner bitmaps text-free in areas where standard WiX dialogs draw their own title, description and body controls.",
+    "Use #admin as the client deep link for desktop shortcuts that should open the Admin login tab.",
+    "Bump package version to 1.0.1 so rebuilt MSI/setup artifacts are applied as a new installer release.",
+    "Suppress WiX ICE38 for the per-machine DesktopFolder URL shortcut components; install validation verifies the files are created on the public desktop."
   ],
   "current_tasks": [],
   "next_tasks": [
@@ -26,8 +30,7 @@
   "risks": [
     "Initial username-only login can grant edit-capable sessions when LDAP and local users are absent.",
     "Users with no department assignment retain all-department scope until role-based department authorization is specified.",
-    "JSON file persistence is not safe against multiprocess writes or crash windows.",
-    "Clean-machine installer validation still requires a dedicated Windows 10/11 VM without preinstalled runtimes."
+    "JSON file persistence is not safe against multiprocess writes or crash windows."
   ],
   "dependencies": {
     "runtime": [
@@ -71,11 +74,11 @@
       "Data/config/system-config.local.json"
     ]
   },
-  "last_completed_work": "Implemented backend authorization for department project read/export/save/import/upload APIs, updated client token forwarding and added security regressions; npm run test passed.",
+  "last_completed_work": "Ran elevated MSI install validation for 1.0.1; fixed desktop shortcut target from CommonDesktopFolder to DesktopFolder, verified OnlyGANTT.url and OnlyGANTT Admin.url are created under C:\\Users\\Public\\Desktop, cleaned up installed state, and reran npm run pack/test successfully.",
   "open_questions": [
     "Is username-only standard login acceptable outside an explicit demo mode?",
     "What role/reparto authorization model is required for local and LDAP users?",
     "Should generated tool caches remain inside the repository workspace?"
   ],
-  "handoff_notes": "AUD-001 backend authorization is implemented and covered by regression tests. Continue with username-only login hardening, first department password setup protection, config range validation and persistence hardening before treating the system as production-ready."
+  "handoff_notes": "AUD-001 backend authorization is implemented and covered by regression tests. MSI banner/dialog assets are adjusted, installer URL shortcuts use WiX InternetShortcut targeting DesktopFolder, package version is 1.0.1, real MSI install validation confirmed public desktop shortcuts are created, and package/test gates pass. Continue with username-only login hardening, first department password setup protection, config range validation and persistence hardening before treating the system as production-ready."
 }

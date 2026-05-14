@@ -30,6 +30,7 @@
     <Property Id="APPPORT" Value="3000" />
     <Property Id="INSTALLSERVICE" Value="1" />
     <Property Id="SHORTCUTURL" Value="http://localhost:3000/" />
+    <Property Id="CREATEADMINSHORTCUT" Value="1" />
     <Property Id="ADMINRESETCODE" Secure="yes" Hidden="yes" />
 
     <Property Id="NODEINSTALLDIR">
@@ -68,6 +69,7 @@
       <ComponentRef Id="CmpDemoDepartment" />
       <ComponentRef Id="CmpDataUsers" />
       <ComponentRef Id="CmpDesktopShortcut" />
+      <ComponentRef Id="CmpAdminDesktopShortcut" />
       <ComponentRef Id="CmpNativeService" />
     </Feature>
 
@@ -84,22 +86,23 @@
   <Fragment>
     <UI>
       <Dialog Id="OnlyGanttConfigDlg" Width="370" Height="270" Title="[ProductName] server configuration">
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Server configuration" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="20" Transparent="yes" NoPrefix="yes" Text="Configure the local service and browser shortcut." />
         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Server configuration" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="20" Transparent="yes" NoPrefix="yes" Text="Configure the local service and browser shortcut." />
 
-        <Control Id="PortLabel" Type="Text" X="25" Y="62" Width="90" Height="15" Text="Server port:" />
-        <Control Id="PortEdit" Type="Edit" X="120" Y="58" Width="70" Height="18" Property="APPPORT" Integer="yes" />
+        <Control Id="PortLabel" Type="Text" X="25" Y="60" Width="90" Height="15" Text="Server port:" />
+        <Control Id="PortEdit" Type="Edit" X="120" Y="56" Width="70" Height="18" Property="APPPORT" Integer="yes" />
 
-        <Control Id="ServiceCheckBox" Type="CheckBox" X="25" Y="88" Width="320" Height="18" Property="INSTALLSERVICE" CheckBoxValue="1" Text="Install and start OnlyGANTT as a Windows service" />
+        <Control Id="ServiceCheckBox" Type="CheckBox" X="25" Y="84" Width="320" Height="18" Property="INSTALLSERVICE" CheckBoxValue="1" Text="Install and start OnlyGANTT as a Windows service" />
 
-        <Control Id="ShortcutLabel" Type="Text" X="25" Y="118" Width="320" Height="15" Text="Desktop shortcut URL:" />
-        <Control Id="ShortcutEdit" Type="Edit" X="25" Y="135" Width="320" Height="18" Property="SHORTCUTURL" />
+        <Control Id="ShortcutLabel" Type="Text" X="25" Y="111" Width="320" Height="15" Text="Desktop shortcut URL:" />
+        <Control Id="ShortcutEdit" Type="Edit" X="25" Y="128" Width="320" Height="18" Property="SHORTCUTURL" />
+        <Control Id="AdminShortcutCheckBox" Type="CheckBox" X="25" Y="153" Width="320" Height="18" Property="CREATEADMINSHORTCUT" CheckBoxValue="1" Text="Create desktop shortcut to the admin login" />
 
-        <Control Id="ResetCodeLabel" Type="Text" X="25" Y="165" Width="320" Height="15" Text="Initial admin reset code (optional):" />
-        <Control Id="ResetCodeEdit" Type="Edit" X="25" Y="182" Width="320" Height="18" Property="ADMINRESETCODE" Password="yes" />
-        <Control Id="ResetCodeHint" Type="Text" X="25" Y="204" Width="320" Height="24" Text="Leave empty to configure admin access after first start without setup-managed reset." />
+        <Control Id="ResetCodeLabel" Type="Text" X="25" Y="178" Width="320" Height="15" Text="Initial admin reset code (optional):" />
+        <Control Id="ResetCodeEdit" Type="Edit" X="25" Y="195" Width="320" Height="18" Property="ADMINRESETCODE" Password="yes" />
+        <Control Id="ResetCodeHint" Type="Text" X="25" Y="216" Width="320" Height="16" Text="Leave empty to configure admin access after first start." />
 
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
@@ -136,7 +139,7 @@
           <Directory Id="SERVICEHOSTDIR" Name="service" />
         </Directory>
       </Directory>
-      <Directory Id="CommonDesktopFolder" />
+      <Directory Id="DesktopFolder" />
     </Directory>
   </Fragment>
 
@@ -175,17 +178,29 @@
   </Fragment>
 
   <Fragment>
-    <DirectoryRef Id="CommonDesktopFolder">
+    <DirectoryRef Id="DesktopFolder">
       <Component Id="CmpDesktopShortcut" Guid="9D4420AB-7900-4C78-9E81-3BEE8481F79F" Win64="yes">
-        <IniFile Id="DesktopShortcutUrl" Action="addLine" Directory="CommonDesktopFolder" Name="OnlyGANTT.url" Section="InternetShortcut" Key="URL" Value="[SHORTCUTURL]" />
-        <IniFile Id="DesktopShortcutIcon" Action="addLine" Directory="CommonDesktopFolder" Name="OnlyGANTT.url" Section="InternetShortcut" Key="IconFile" Value="[INSTALLDIR]src\public\brand\onlygantt.ico" />
-        <RemoveFile Id="RemoveDesktopShortcut" Directory="CommonDesktopFolder" Name="OnlyGANTT.url" On="uninstall" />
+        <util:InternetShortcut Id="DesktopShortcutUrl" Directory="DesktopFolder" Name="OnlyGANTT" Target="[SHORTCUTURL]" Type="url" IconFile="[INSTALLDIR]src\public\brand\onlygantt.ico" />
+        <RemoveFile Id="RemoveDesktopShortcut" Directory="DesktopFolder" Name="OnlyGANTT.url" On="uninstall" />
         <RegistryValue
           Root="HKLM"
           Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
           Name="DesktopShortcut"
           Type="string"
           Value="[SHORTCUTURL]"
+          KeyPath="yes" />
+      </Component>
+
+      <Component Id="CmpAdminDesktopShortcut" Guid="8A1D900C-7B10-4859-A624-3956A6291A3C" Win64="yes">
+        <Condition>CREATEADMINSHORTCUT = "1"</Condition>
+        <util:InternetShortcut Id="AdminDesktopShortcutUrl" Directory="DesktopFolder" Name="OnlyGANTT Admin" Target="[SHORTCUTURL]#admin" Type="url" IconFile="[INSTALLDIR]src\public\brand\onlygantt.ico" />
+        <RemoveFile Id="RemoveAdminDesktopShortcut" Directory="DesktopFolder" Name="OnlyGANTT Admin.url" On="uninstall" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Danny Perondi\OnlyGANTT\Installer"
+          Name="AdminDesktopShortcut"
+          Type="string"
+          Value="[SHORTCUTURL]#admin"
           KeyPath="yes" />
       </Component>
     </DirectoryRef>

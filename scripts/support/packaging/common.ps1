@@ -249,6 +249,43 @@ function Assert-OnlyGanttInstalled {
   }
 }
 
+function Assert-OnlyGanttDesktopShortcuts {
+  param(
+    [string]$ShortcutUrl = 'http://localhost:3000/',
+    [switch]$ExpectAdminShortcut
+  )
+
+  $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
+  if (-not $desktopRoot) {
+    throw 'Common desktop directory could not be resolved.'
+  }
+
+  $expectedShortcuts = @(
+    [pscustomobject]@{
+      Path = Join-Path $desktopRoot 'OnlyGANTT.url'
+      Url = $ShortcutUrl
+    }
+  )
+
+  if ($ExpectAdminShortcut) {
+    $expectedShortcuts += [pscustomobject]@{
+      Path = Join-Path $desktopRoot 'OnlyGANTT Admin.url'
+      Url = "$ShortcutUrl#admin"
+    }
+  }
+
+  foreach ($shortcut in $expectedShortcuts) {
+    if (-not (Test-Path $shortcut.Path)) {
+      throw "Expected desktop shortcut not found: $($shortcut.Path)"
+    }
+
+    $shortcutContent = Get-Content -Path $shortcut.Path -Raw
+    if ($shortcutContent -notmatch [regex]::Escape("URL=$($shortcut.Url)")) {
+      throw "Desktop shortcut '$($shortcut.Path)' does not target '$($shortcut.Url)'."
+    }
+  }
+}
+
 function Assert-OnlyGanttRemoved {
   param(
     [string]$ServiceName = 'OnlyGanttWeb',
@@ -341,6 +378,16 @@ function Remove-OnlyGanttMachineState {
   $registryRoot = 'HKLM:\SOFTWARE\Danny Perondi\OnlyGANTT'
   if (Test-Path $registryRoot) {
     Remove-Item -Path $registryRoot -Recurse -Force
+  }
+
+  $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
+  if ($desktopRoot) {
+    foreach ($shortcutName in @('OnlyGANTT.url', 'OnlyGANTT Admin.url')) {
+      $shortcutPath = Join-Path $desktopRoot $shortcutName
+      if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force
+      }
+    }
   }
 
   $global:LASTEXITCODE = 0

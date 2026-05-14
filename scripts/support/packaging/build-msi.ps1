@@ -268,6 +268,64 @@ function Write-AppFilesFragment {
   }
 }
 
+function Get-MsiTableRows {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$MsiPath,
+    [Parameter(Mandatory = $true)]
+    [string]$Query
+  )
+
+  $installer = New-Object -ComObject WindowsInstaller.Installer
+  $database = $installer.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $installer, @($MsiPath, 0))
+  $view = $database.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $database, @($Query))
+  try {
+    $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
+    $rows = @()
+    while ($true) {
+      $record = $view.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view, $null)
+      if ($null -eq $record) {
+        break
+      }
+
+      $values = for ($index = 1; $index -le 8; $index++) {
+        $record.GetType().InvokeMember('StringData', 'GetProperty', $null, $record, @($index))
+      }
+      $rows += ,$values
+    }
+    return ,$rows
+  } finally {
+    if ($null -ne $view) {
+      $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
+    }
+  }
+}
+
+function Assert-InternetShortcutsPresent {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$MsiPath
+  )
+
+  $rows = Get-MsiTableRows -MsiPath $MsiPath -Query 'SELECT * FROM `WixInternetShortcut`'
+  $expectedShortcuts = @(
+    @{ Id = 'DesktopShortcutUrl'; Directory = 'DesktopFolder'; Name = 'OnlyGANTT.url'; Target = '[SHORTCUTURL]'; Type = '1' },
+    @{ Id = 'AdminDesktopShortcutUrl'; Directory = 'DesktopFolder'; Name = 'OnlyGANTT Admin.url'; Target = '[SHORTCUTURL]#admin'; Type = '1' }
+  )
+
+  foreach ($expected in $expectedShortcuts) {
+    $matchingRows = @($rows | Where-Object {
+      $null -ne $_ -and $_.Count -ge 6 -and
+      $_[0] -eq $expected.Id -and $_[2] -eq $expected.Directory -and $_[3] -eq $expected.Name -and $_[4] -eq $expected.Target -and $_[5] -eq $expected.Type
+    })
+    if ($matchingRows.Count -ne 1) {
+      throw "MSI is missing expected URL shortcut '$($expected.Id)' with target '$($expected.Target)'."
+    }
+  }
+
+  Write-Host 'MSI URL shortcut table verified.'
+}
+
 $script:WixNamespace = 'http://schemas.microsoft.com/wix/2006/wi'
 $script:XmlNamespaceManager = New-Object System.Xml.XmlNamespaceManager((New-Object System.Xml.NameTable))
 $script:XmlNamespaceManager.AddNamespace('wix', $script:WixNamespace)
@@ -408,6 +466,7 @@ $lightArguments = @(
   '-nologo'
   '-sice:ICE61'
   '-sice:ICE43'
+  '-sice:ICE38'
   '-out', $msiOutputPath
   '-ext', 'WixUIExtension'
   '-ext', 'WixUtilExtension'
@@ -420,6 +479,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "MSI created: $msiOutputPath"
+Assert-InternetShortcutsPresent -MsiPath $msiOutputPath
 
 if (-not $KeepBuildArtifacts) {
   $temporaryPaths = @($stageRoot, $objRoot, $appFilesWxs, $licenseRtfPath) | Where-Object { Test-Path $_ }

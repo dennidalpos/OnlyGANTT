@@ -1,6 +1,6 @@
 {
   "name": "onlygantt",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OnlyGANTT - Interactive Gantt chart application with multi-user locking",
   "main": "src/server/server.js",
   "scripts": {
