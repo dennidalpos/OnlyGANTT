@@ -630,15 +630,18 @@ function revokeUserSessionsForUser(userName) {
   releaseLocksOwnedByUser(userName);
 }
 
-function createUserSession(userName, { userType = 'user' } = {}) {
+function createUserSession(userName, { userType = 'user', department = null } = {}) {
   const token = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : crypto.randomBytes(16).toString('hex');
   const now = new Date();
   const expiresAt = new Date(now.getTime() + CONFIG.userSessionTtlHours * 60 * 60 * 1000);
+  const normalizedDepartment = normalizeDepartmentName(department);
   userSessions.set(token, {
     userName,
     userType,
+    department: normalizedDepartment,
+    departmentGrants: [],
     createdAt: now.toISOString(),
     lastSeenAt: now.toISOString(),
     expiresAt: expiresAt.toISOString()
@@ -648,7 +651,10 @@ function createUserSession(userName, { userType = 'user' } = {}) {
 
 function createAuthLoginResponse(userId, { authType, sessionUserType = authType, user }) {
   revokeUserSessionsForUser(userId);
-  const token = createUserSession(userId, { userType: sessionUserType });
+  const token = createUserSession(userId, {
+    userType: sessionUserType,
+    department: user?.department || null
+  });
   return {
     ok: true,
     authType,
@@ -662,6 +668,12 @@ function createAuthLoginResponse(userId, { authType, sessionUserType = authType,
 
 function getUserToken(req) {
   return req.headers['x-user-token'] || req.body?.userToken || null;
+}
+
+function getBearerToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  return authHeader.substring(7);
 }
 
 function validateUserSession(req, res, userName) {
@@ -698,7 +710,8 @@ function validateUserSession(req, res, userName) {
     req.body.userName = normalizedUserName;
   }
 
-  return true;
+  req.userSession = session;
+  return session;
 }
 
 function getValidUserSession(token) {
@@ -720,15 +733,104 @@ function getValidUserSession(token) {
 }
 
 function requireAdmin(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = getBearerToken(req);
+  if (!token) {
     return errorResponse(res, 401, 'UNAUTHORIZED', 'Admin authentication required');
   }
-  const token = authHeader.substring(7);
   if (!isValidAdminToken(token)) {
     return errorResponse(res, 401, 'UNAUTHORIZED', 'Invalid or expired admin token');
   }
   next();
+}
+
+function getRequestPrincipal(req) {
+  const userToken = getUserToken(req);
+  const userSession = getValidUserSession(userToken);
+  if (userSession) {
+    return { type: userSession.userType === 'admin' ? 'admin' : 'user', session: userSession };
+  }
+
+  const adminToken = getBearerToken(req);
+  if (isValidAdminToken(adminToken)) {
+    return {
+      type: 'admin',
+      session: {
+        userName: CONFIG.adminUser,
+        userType: 'admin',
+        department: null,
+        departmentGrants: []
+      }
+    };
+  }
+
+  return null;
+}
+
+function sessionHasDepartmentScope(session, department) {
+  if (!session?.department) return true;
+  const scopedDepartment = normalizeDepartmentName(session.department);
+  const requestedDepartment = normalizeDepartmentName(department);
+  return !!scopedDepartment &&
+    !!requestedDepartment &&
+    scopedDepartment.toLowerCase() === requestedDepartment.toLowerCase();
+}
+
+function sessionHasDepartmentGrant(session, department, data) {
+  if (!hasDepartmentPassword(data)) return true;
+  const requestedDepartment = normalizeDepartmentName(department);
+  if (!requestedDepartment) return false;
+  return Array.isArray(session?.departmentGrants) &&
+    session.departmentGrants.some((item) => (
+      typeof item === 'string' &&
+      item.toLowerCase() === requestedDepartment.toLowerCase()
+    ));
+}
+
+function grantDepartmentAccess(req, department) {
+  const token = getUserToken(req);
+  const session = getValidUserSession(token);
+  const normalizedDepartment = normalizeDepartmentName(department);
+  if (!session || !normalizedDepartment || session.userType === 'admin') {
+    return;
+  }
+  if (!Array.isArray(session.departmentGrants)) {
+    session.departmentGrants = [];
+  }
+  if (!session.departmentGrants.some((item) => item.toLowerCase() === normalizedDepartment.toLowerCase())) {
+    session.departmentGrants.push(normalizedDepartment);
+  }
+}
+
+function requireDepartmentAccess(req, res, department, data) {
+  const normalizedDepartment = normalizeDepartmentName(department);
+  if (!normalizedDepartment) {
+    errorResponse(res, 400, 'INVALID_NAME', 'Invalid department name');
+    return null;
+  }
+
+  const principal = getRequestPrincipal(req);
+  if (!principal) {
+    errorResponse(res, 401, 'UNAUTHORIZED', 'User session required');
+    return null;
+  }
+
+  if (principal.type === 'admin') {
+    req.userSession = principal.session;
+    return principal.session;
+  }
+
+  if (!sessionHasDepartmentScope(principal.session, normalizedDepartment)) {
+    errorResponse(res, 403, 'DEPARTMENT_FORBIDDEN', 'User is not authorized for this department');
+    return null;
+  }
+
+  if (hasDepartmentPassword(data) && !sessionHasDepartmentGrant(principal.session, normalizedDepartment, data)) {
+    errorResponse(res, 403, 'DEPARTMENT_PASSWORD_REQUIRED', 'Department password verification required');
+    return null;
+  }
+
+  req.userSession = principal.session;
+  return principal.session;
 }
 
 function cleanExpiredLocks() {
@@ -1055,6 +1157,7 @@ app.post('/api/departments/:name/verify', (req, res) => {
       if (typeof data.password === 'string' && data.password.trim()) {
         writeDepartmentData(name, data);
       }
+      grantDepartmentAccess(req, name);
       return res.json({ ok: true });
     }
     return res.status(401).json({
@@ -1116,6 +1219,7 @@ app.get('/api/projects/:department', (req, res) => {
     const { department } = req.params;
     const data = getDepartmentDataOrRespond(res, department);
     if (!data) return;
+    if (!requireDepartmentAccess(req, res, department, data)) return;
     const validationErrors = validateDepartmentData(data);
     res.json({
       projects: data.projects || [],
@@ -1132,6 +1236,7 @@ app.get('/api/departments/:name/export', (req, res) => {
     const { name } = req.params;
     const data = getDepartmentDataOrRespond(res, name);
     if (!data) return;
+    if (!requireDepartmentAccess(req, res, name, data)) return;
     const validationErrors = validateDepartmentData(data);
     const exportData = {
       ...data,
@@ -1155,6 +1260,9 @@ app.post('/api/departments/:name/import', (req, res) => {
     if (!validateUserSession(req, res, userName)) {
       return;
     }
+    const existingData = getDepartmentDataOrRespond(res, name);
+    if (!existingData) return;
+    if (!requireDepartmentAccess(req, res, name, existingData)) return;
     cleanExpiredLocks();
     if (!isLockOwner(name, userName)) {
       const lockInfo = getLockInfo(name);
@@ -1168,8 +1276,6 @@ app.post('/api/departments/:name/import', (req, res) => {
     if (errors.length > 0) {
       return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid department data', { errors });
     }
-    const existingData = getDepartmentDataOrRespond(res, name);
-    if (!existingData) return;
     if (data.password === undefined) {
       data.password = existingData.password || null;
     }
@@ -1195,6 +1301,9 @@ app.post('/api/projects/:department', (req, res) => {
     if (!validateUserSession(req, res, userName)) {
       return;
     }
+    const data = getDepartmentDataOrRespond(res, department);
+    if (!data) return;
+    if (!requireDepartmentAccess(req, res, department, data)) return;
     cleanExpiredLocks();
     if (!isLockOwner(department, userName)) {
       const lockInfo = getLockInfo(department);
@@ -1204,8 +1313,6 @@ app.post('/api/projects/:department', (req, res) => {
         return errorResponse(res, 423, 'LOCK_REQUIRED', 'Lock required to save');
       }
     }
-    const data = getDepartmentDataOrRespond(res, department);
-    if (!data) return;
     const currentRevision = data.meta?.revision || 0;
     if (currentRevision !== expectedRevision) {
       return res.status(409).json({
@@ -1268,6 +1375,9 @@ app.post('/api/upload/:department', handleJsonUpload, (req, res) => {
     if (!validateUserSession(req, res, userName)) {
       return;
     }
+    const data = getDepartmentDataOrRespond(res, department);
+    if (!data) return;
+    if (!requireDepartmentAccess(req, res, department, data)) return;
     if (!isLockOwner(department, userName)) {
       const lockInfo = getLockInfo(department);
       if (lockInfo.locked) {
@@ -1289,8 +1399,6 @@ app.post('/api/upload/:department', handleJsonUpload, (req, res) => {
     if (errors.length > 0) {
       return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid data schema', { errors });
     }
-    const data = getDepartmentDataOrRespond(res, department);
-    if (!data) return;
     data.projects = uploadedData.projects || [];
     data.meta = {
       updatedAt: new Date().toISOString(),
@@ -1455,7 +1563,7 @@ app.post('/api/auth/login', async (req, res) => {
             type: 'ad',
             displayName: storeResult.user.displayName,
             mail: storeResult.user.mail,
-            department: storeResult.user.department
+            department: storeResult.user.department || department || null
           }
         }));
       }
@@ -1473,7 +1581,7 @@ app.post('/api/auth/login', async (req, res) => {
               type: 'local',
               displayName: localResult.user.displayName || normalizedUserId,
               mail: localResult.user.mail || null,
-              department: localResult.user.department || null
+              department: localResult.user.department || department || null
             }
           }));
         }
@@ -1510,7 +1618,7 @@ app.post('/api/auth/login', async (req, res) => {
         type: 'local',
         displayName: localResult.user.displayName || normalizedUserId,
         mail: localResult.user.mail || null,
-        department: localResult.user.department || null
+        department: localResult.user.department || department || null
       }
     }));
   } catch (err) {

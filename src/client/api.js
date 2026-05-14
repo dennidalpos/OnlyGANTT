@@ -124,7 +124,11 @@
   }
 
   async function exportDepartment(name, signal) {
-    return fetchJSON(`/api/departments/${encodeURIComponent(name)}/export`, { signal });
+    return fetchJSON(`/api/departments/${encodeURIComponent(name)}/export`, {
+      headers: buildUserHeaders(),
+      userSession: true,
+      signal
+    });
   }
 
   async function importDepartment(name, data, userName, signal) {
@@ -141,6 +145,7 @@
     return fetchJSON(`/api/departments/${encodeURIComponent(department)}/verify`, {
       method: 'POST',
       body: JSON.stringify({ password }),
+      headers: buildUserHeaders(),
       signal
     });
   }
@@ -149,6 +154,7 @@
     return fetchJSON(`/api/departments/${encodeURIComponent(department)}/change-password`, {
       method: 'POST',
       body: JSON.stringify({ oldPassword, newPassword }),
+      headers: buildUserHeaders(),
       signal
     });
   }
@@ -165,7 +171,11 @@
   }
 
   async function getProjects(department, signal) {
-    return fetchJSON(`/api/projects/${encodeURIComponent(department)}`, { signal });
+    return fetchJSON(`/api/projects/${encodeURIComponent(department)}`, {
+      headers: buildUserHeaders(),
+      userSession: true,
+      signal
+    });
   }
 
   async function saveProjects(department, projects, expectedRevision, userName, signal) {

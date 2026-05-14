@@ -183,7 +183,9 @@ async function main() {
       'X-User-Token': standardUserToken
     });
 
-    const standardProjects = await requestJson('GET', '/api/projects/Demo');
+    const standardProjects = await requestJson('GET', '/api/projects/Demo', null, {
+      'X-User-Token': standardUserToken
+    });
     await requestJson('POST', '/api/projects/Demo', {
       projects: [],
       expectedRevision: standardProjects.data?.meta?.revision,

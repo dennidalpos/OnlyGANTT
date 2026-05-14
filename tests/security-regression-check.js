@@ -97,6 +97,60 @@ function requestJson(method, requestPath, body = null, headers = {}) {
   });
 }
 
+function requestMultipartJson(method, requestPath, { fields = {}, fileField = 'file', fileName = 'data.json', fileContent = '{}' } = {}, headers = {}) {
+  const boundary = `----OnlyGanttTest${crypto.randomBytes(8).toString('hex')}`;
+  const chunks = [];
+
+  for (const [key, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"\r\n\r\n`));
+    chunks.push(Buffer.from(`${value ?? ''}\r\n`));
+  }
+
+  chunks.push(Buffer.from(`--${boundary}\r\n`));
+  chunks.push(Buffer.from(`Content-Disposition: form-data; name="${fileField}"; filename="${fileName}"\r\n`));
+  chunks.push(Buffer.from('Content-Type: application/json\r\n\r\n'));
+  chunks.push(Buffer.from(fileContent));
+  chunks.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  const payload = Buffer.concat(chunks);
+
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: HOST,
+      port: PORT,
+      path: requestPath,
+      method,
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': payload.length,
+        ...headers
+      }
+    }, (res) => {
+      const responseChunks = [];
+      res.on('data', (chunk) => responseChunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(responseChunks).toString('utf8');
+        const data = text ? JSON.parse(text) : null;
+        if (res.statusCode >= 400) {
+          const error = new Error(data?.error?.message || `HTTP ${res.statusCode}`);
+          error.status = res.statusCode;
+          error.code = data?.error?.code;
+          error.data = data;
+          reject(error);
+          return;
+        }
+
+        resolve({ status: res.statusCode, data });
+      });
+    });
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
 async function waitForServerReady() {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 15000) {
@@ -304,6 +358,151 @@ async function main() {
     if (userLogin.data?.authType !== 'local' || !userLogin.data?.token) {
       throw new Error('Expected local user login to succeed');
     }
+    const localUserToken = userLogin.data.token;
+
+    let anonymousProjectsReadError = null;
+    try {
+      await requestJson('GET', '/api/projects/Demo');
+    } catch (err) {
+      anonymousProjectsReadError = err;
+    }
+    if (!anonymousProjectsReadError || anonymousProjectsReadError.status !== 401 || anonymousProjectsReadError.code !== 'UNAUTHORIZED') {
+      throw new Error('Expected anonymous department project reads to be rejected');
+    }
+
+    let anonymousDepartmentExportError = null;
+    try {
+      await requestJson('GET', '/api/departments/Demo/export');
+    } catch (err) {
+      anonymousDepartmentExportError = err;
+    }
+    if (!anonymousDepartmentExportError || anonymousDepartmentExportError.status !== 401 || anonymousDepartmentExportError.code !== 'UNAUTHORIZED') {
+      throw new Error('Expected anonymous department export to be rejected');
+    }
+
+    const importPayload = {
+      password: null,
+      projects: [],
+      meta: {
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        updatedBy: 'security-import',
+        revision: 1
+      }
+    };
+
+    let anonymousDepartmentImportError = null;
+    try {
+      await requestJson('POST', '/api/departments/Demo/import', {
+        data: importPayload,
+        userName: 'local.user'
+      });
+    } catch (err) {
+      anonymousDepartmentImportError = err;
+    }
+    if (!anonymousDepartmentImportError || anonymousDepartmentImportError.status !== 401 || anonymousDepartmentImportError.code !== 'UNAUTHORIZED') {
+      throw new Error('Expected anonymous department import to be rejected');
+    }
+
+    let anonymousProjectSaveError = null;
+    try {
+      await requestJson('POST', '/api/projects/Demo', {
+        projects: [],
+        expectedRevision: 1,
+        userName: 'local.user'
+      });
+    } catch (err) {
+      anonymousProjectSaveError = err;
+    }
+    if (!anonymousProjectSaveError || anonymousProjectSaveError.status !== 401 || anonymousProjectSaveError.code !== 'UNAUTHORIZED') {
+      throw new Error('Expected anonymous project save to be rejected');
+    }
+
+    let anonymousUploadError = null;
+    try {
+      await requestMultipartJson('POST', '/api/upload/Demo', {
+        fields: { userName: 'local.user' },
+        fileContent: JSON.stringify(importPayload)
+      });
+    } catch (err) {
+      anonymousUploadError = err;
+    }
+    if (!anonymousUploadError || anonymousUploadError.status !== 401 || anonymousUploadError.code !== 'UNAUTHORIZED') {
+      throw new Error('Expected anonymous project upload to be rejected');
+    }
+
+    await requestJson('POST', '/api/departments/Demo/reset-password', {
+      newPassword: 'ProtectedDept123'
+    }, authHeaders);
+
+    let protectedReadWithoutPasswordError = null;
+    try {
+      await requestJson('GET', '/api/projects/Demo', null, {
+        'X-User-Token': localUserToken
+      });
+    } catch (err) {
+      protectedReadWithoutPasswordError = err;
+    }
+    if (!protectedReadWithoutPasswordError ||
+        protectedReadWithoutPasswordError.status !== 403 ||
+        protectedReadWithoutPasswordError.code !== 'DEPARTMENT_PASSWORD_REQUIRED') {
+      throw new Error('Expected protected department reads to require session password verification');
+    }
+
+    await requestJson('POST', '/api/departments/Demo/verify', {
+      password: 'ProtectedDept123'
+    }, {
+      'X-User-Token': localUserToken
+    });
+
+    const protectedProjects = await requestJson('GET', '/api/projects/Demo', null, {
+      'X-User-Token': localUserToken
+    });
+    if (!Array.isArray(protectedProjects.data?.projects)) {
+      throw new Error('Expected verified session to read protected department projects');
+    }
+
+    const protectedExport = await requestJson('GET', '/api/departments/Demo/export', null, {
+      'X-User-Token': localUserToken
+    });
+    if (protectedExport.data?.data?.passwordProtected !== true) {
+      throw new Error('Expected verified session to export protected department metadata');
+    }
+
+    await requestJson('POST', '/api/lock/Demo/acquire', {
+      userName: 'local.user',
+      clientHost: 'security-regression'
+    }, {
+      'X-User-Token': localUserToken
+    });
+
+    await requestJson('POST', '/api/projects/Demo', {
+      projects: [],
+      expectedRevision: protectedProjects.data?.meta?.revision,
+      userName: 'local.user'
+    }, {
+      'X-User-Token': localUserToken
+    });
+
+    await requestMultipartJson('POST', '/api/upload/Demo', {
+      fields: { userName: 'local.user' },
+      fileContent: JSON.stringify(importPayload)
+    }, {
+      'X-User-Token': localUserToken
+    });
+
+    await requestJson('POST', '/api/departments/Demo/import', {
+      data: {
+        projects: [],
+        meta: {
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          updatedBy: 'security-authorized-import',
+          revision: 1
+        }
+      },
+      userName: 'local.user'
+    }, {
+      'X-User-Token': localUserToken
+    });
 
     console.log('Security regression check passed');
   } finally {

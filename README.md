@@ -12,6 +12,7 @@ It is not a standalone desktop app. The supported product surface is a web UI ho
 - Department-based project files under `Data/reparti/`.
 - Multi-user editing locks with persisted lock state under `Data/config/locks.json`.
 - Local users, admin login, department password protection and password reset flows.
+- Server-side authorization for department project read, export, save, import and upload APIs.
 - Optional LDAP authentication with local fallback support.
 - Admin settings import/export with LDAP bind password kept out of the versioned seed config.
 - JSON import/export for department projects.
@@ -119,6 +120,8 @@ The installer:
 ## Configuration
 
 The server reads these supported environment variables at startup:
+
+Department project read/export/save/import/upload endpoints require an active user or admin session. For password-protected departments, the user session must verify the department password before project data is returned or changed.
 
 | Variable | Purpose |
 | --- | --- |
