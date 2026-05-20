@@ -53,6 +53,7 @@ const CONFIG = {
   userSessionTtlHours: parseNumber(process.env.ONLYGANTT_USER_SESSION_TTL_HOURS, 8),
   adminSessionTtlHours: parseNumber(process.env.ONLYGANTT_ADMIN_TTL_HOURS, 8),
   maxUploadBytes: parseNumber(process.env.ONLYGANTT_MAX_UPLOAD_BYTES, 2000000),
+  allowUsernameOnlyLogin: parseBoolean(process.env.ONLYGANTT_ALLOW_USERNAME_ONLY_LOGIN),
   adminUser: process.env.ONLYGANTT_ADMIN_USER || DEFAULT_ADMIN_USER,
   adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null,
   ldapEnabled: parseBoolean(process.env.LDAP_ENABLED),
@@ -664,6 +665,10 @@ function createAuthLoginResponse(userId, { authType, sessionUserType = authType,
       ...user
     }
   };
+}
+
+function isUsernameOnlyLoginEnabled(authSnapshot) {
+  return CONFIG.allowUsernameOnlyLogin && !CONFIG.ldapEnabled && authSnapshot.localUsers === 0;
 }
 
 function getUserToken(req) {
@@ -1526,6 +1531,7 @@ app.get('/api/auth/config', (req, res) => {
       ldapEnabled: CONFIG.ldapEnabled,
       localFallback: CONFIG.ldapLocalFallback,
       localUsers: snapshot.localUsers,
+      usernameOnlyLoginEnabled: isUsernameOnlyLoginEnabled(snapshot),
       adminConfigured: isAdminConfigured(),
       adminManagedByEnv: isAdminManagedByEnv(),
       adminResetEnabled: !!CONFIG.adminResetCode
@@ -1596,7 +1602,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const isUsernameOnlyLogin = password === undefined || password === null || password === '';
-    if (authSnapshot.localUsers === 0 && isUsernameOnlyLogin) {
+    if (authSnapshot.localUsers === 0 && isUsernameOnlyLogin && isUsernameOnlyLoginEnabled(authSnapshot)) {
       return res.json(createAuthLoginResponse(normalizedUserId, {
         authType: 'standard',
         user: {
@@ -1606,6 +1612,15 @@ app.post('/api/auth/login', async (req, res) => {
           department: department || null
         }
       }));
+    }
+
+    if (authSnapshot.localUsers === 0) {
+      return errorResponse(
+        res,
+        403,
+        'USER_LOGIN_NOT_CONFIGURED',
+        'User login requires LDAP, a local user, or explicit username-only compatibility mode'
+      );
     }
 
     const localResult = userStore.verifyLocalUser(normalizedUserId, password);

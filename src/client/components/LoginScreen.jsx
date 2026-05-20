@@ -47,6 +47,7 @@
       ldapEnabled: false,
       localFallback: false,
       localUsers: 0,
+      usernameOnlyLoginEnabled: false,
       adminConfigured: true,
       adminManagedByEnv: false,
       adminResetEnabled: false
@@ -111,6 +112,7 @@
             ldapEnabled: !!data.ldapEnabled,
             localFallback: !!data.localFallback,
             localUsers: data.localUsers || 0,
+            usernameOnlyLoginEnabled: !!data.usernameOnlyLoginEnabled,
             adminConfigured: data.adminConfigured !== false,
             adminManagedByEnv: !!data.adminManagedByEnv,
             adminResetEnabled: !!data.adminResetEnabled
@@ -121,6 +123,7 @@
             ldapEnabled: false,
             localFallback: false,
             localUsers: 0,
+            usernameOnlyLoginEnabled: false,
             adminConfigured: true,
             adminManagedByEnv: false,
             adminResetEnabled: false
@@ -175,7 +178,7 @@
     const isUserNameValid = pendingUserName.trim().length >= 2;
     const hasDepartments = departments.length > 0;
     const needsPassword = selectedDeptObj?.protected && !adminToken;
-    const requiresUserPassword = !adminToken && (authConfig.ldapEnabled || authConfig.localUsers > 0);
+    const requiresUserPassword = !adminToken && !authConfig.usernameOnlyLoginEnabled;
     const canShowAdminPasswordReset = authConfig.adminResetEnabled && !authConfig.adminManagedByEnv;
 
     
@@ -331,6 +334,8 @@
           setError('Utente non presente nel gruppo richiesto');
         } else if (err.code === 'ADMIN_LOCAL_ONLY') {
           setError('Accesso admin consentito solo localmente');
+        } else if (err.code === 'USER_LOGIN_NOT_CONFIGURED') {
+          setError('Accesso utenti non configurato');
         } else {
           setError(err.message || 'Errore durante l\'accesso');
         }
@@ -513,9 +518,9 @@
                       disabled={isLoading}
                       autoComplete="current-password"
                     />
-                    {authConfig.ldapEnabled && (
-                      <span className="input-hint">Autenticazione LDAP attiva</span>
-                    )}
+                    <span className="input-hint">
+                      {authConfig.ldapEnabled ? 'Autenticazione LDAP attiva' : 'Autenticazione locale attiva'}
+                    </span>
                   </div>
                 )}
               </div>

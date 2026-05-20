@@ -8,6 +8,8 @@ const SERVER_ENTRY = path.join(__dirname, '..', 'src', 'server', 'server.js');
 const HOST = '127.0.0.1';
 const PORT = 3321;
 const ADMIN_PASSWORD = 'SmokePass123';
+const LOCAL_USER_ID = 'smoke.user';
+const LOCAL_USER_PASSWORD = 'SmokeUserPass123';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,7 +55,7 @@ function requestJson(method, requestPath, body = null, headers = {}) {
         const text = Buffer.concat(chunks).toString('utf8');
         const data = text ? JSON.parse(text) : null;
         if (res.statusCode >= 400) {
-          const error = new Error(data?.error?.message || `HTTP ${res.statusCode}`);
+          const error = new Error(`${method} ${requestPath} failed: ${data?.error?.message || `HTTP ${res.statusCode}`}`);
           error.status = res.statusCode;
           error.code = data?.error?.code;
           error.data = data;
@@ -86,7 +88,7 @@ function requestText(method, requestPath, headers = {}) {
       res.on('end', () => {
         const text = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode >= 400) {
-          const error = new Error(`HTTP ${res.statusCode}`);
+          const error = new Error(`${method} ${requestPath} failed: HTTP ${res.statusCode}`);
           error.status = res.statusCode;
           error.body = text;
           reject(error);
@@ -152,14 +154,49 @@ async function main() {
     if (!authConfig.data?.adminConfigured) {
       throw new Error('Expected admin to be configured during smoke run');
     }
+    if (authConfig.data?.usernameOnlyLoginEnabled !== false) {
+      throw new Error('Username-only login must be disabled by default');
+    }
 
-    const standardLogin = await requestJson('POST', '/api/auth/login', {
-      userId: 'standard-user',
+    let usernameOnlyLoginError = null;
+    try {
+      await requestJson('POST', '/api/auth/login', {
+        userId: 'standard-user',
+        department: 'Demo'
+      });
+    } catch (err) {
+      usernameOnlyLoginError = err;
+    }
+    if (!usernameOnlyLoginError || usernameOnlyLoginError.status !== 403 || usernameOnlyLoginError.code !== 'USER_LOGIN_NOT_CONFIGURED') {
+      throw new Error('Username-only standard login must be rejected by default');
+    }
+
+    const setupAdminLogin = await requestJson('POST', '/api/admin/login', {
+      userId: 'admin',
+      password: ADMIN_PASSWORD
+    });
+    const setupAdminToken = setupAdminLogin.data?.token;
+    if (!setupAdminToken) {
+      throw new Error('Admin login did not return a setup token');
+    }
+
+    await requestJson('POST', '/api/admin/users/local', {
+      userId: LOCAL_USER_ID,
+      displayName: 'Smoke User',
+      department: 'Demo',
+      password: LOCAL_USER_PASSWORD
+    }, {
+      Authorization: `Bearer ${setupAdminToken}`
+    });
+
+    const localLogin = await requestJson('POST', '/api/auth/login', {
+      userId: LOCAL_USER_ID,
+      password: LOCAL_USER_PASSWORD,
       department: 'Demo'
     });
-    const standardUserToken = standardLogin.data?.token;
-    if (standardLogin.data?.authType !== 'standard' || !standardUserToken) {
-      throw new Error('Username-only standard login did not return a user token');
+    const localUserToken = localLogin.data?.token;
+    if (localLogin.data?.authType !== 'local' || !localUserToken) {
+      throw new Error('Local user login did not return a user token');
     }
 
     let unauthorizedSaveStatus = null;
@@ -167,7 +204,7 @@ async function main() {
       await requestJson('POST', '/api/projects/Demo', {
         projects: [],
         expectedRevision: 1,
-        userName: 'standard-user'
+        userName: LOCAL_USER_ID
       });
     } catch (err) {
       unauthorizedSaveStatus = err.status;
@@ -177,31 +214,31 @@ async function main() {
     }
 
     await requestJson('POST', '/api/lock/Demo/acquire', {
-      userName: 'standard-user',
+      userName: LOCAL_USER_ID,
       clientHost: 'smoke-check'
     }, {
-      'X-User-Token': standardUserToken
+      'X-User-Token': localUserToken
     });
 
-    const standardProjects = await requestJson('GET', '/api/projects/Demo', null, {
-      'X-User-Token': standardUserToken
+    const localProjects = await requestJson('GET', '/api/projects/Demo', null, {
+      'X-User-Token': localUserToken
     });
     await requestJson('POST', '/api/projects/Demo', {
       projects: [],
-      expectedRevision: standardProjects.data?.meta?.revision,
-      userName: 'standard-user'
+      expectedRevision: localProjects.data?.meta?.revision,
+      userName: LOCAL_USER_ID
     }, {
-      'X-User-Token': standardUserToken
+      'X-User-Token': localUserToken
     });
 
     await requestJson('POST', '/api/lock/Demo/release', {
-      userName: 'standard-user'
+      userName: LOCAL_USER_ID
     }, {
-      'X-User-Token': standardUserToken
+      'X-User-Token': localUserToken
     });
 
     await requestJson('POST', '/api/auth/logout', {}, {
-      'X-User-Token': standardUserToken
+      'X-User-Token': localUserToken
     });
 
     const adminLogin = await requestJson('POST', '/api/admin/login', {

@@ -235,7 +235,7 @@ async function main() {
     } catch (err) {
       deletedUserLoginError = err;
     }
-    if (!deletedUserLoginError || deletedUserLoginError.status !== 401 || deletedUserLoginError.code !== 'INVALID_CREDENTIALS') {
+    if (!deletedUserLoginError || deletedUserLoginError.status !== 403 || deletedUserLoginError.code !== 'USER_LOGIN_NOT_CONFIGURED') {
       throw new Error('Expected deleted local users to be unable to log in');
     }
 

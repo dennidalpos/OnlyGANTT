@@ -135,6 +135,7 @@ Department project read/export/save/import/upload endpoints require an active us
 | `ONLYGANTT_ADMIN_TTL_HOURS` | Admin session TTL. Defaults to `8`. |
 | `ONLYGANTT_MAX_UPLOAD_BYTES` | JSON upload limit. Defaults to `2000000`. |
 | `ONLYGANTT_ENABLE_BAK` | Enables `.bak` writes for data updates. Defaults to enabled. |
+| `ONLYGANTT_ALLOW_USERNAME_ONLY_LOGIN` | Compatibility switch for legacy username-only department access when LDAP is disabled and no local users exist. Defaults to disabled. |
 | `LDAP_ENABLED`, `LOG_LDAP`, `LDAP_URL`, `LDAP_BIND_DN`, `LDAP_BIND_PASSWORD`, `LDAP_BASE_DN`, `LDAP_USER_FILTER`, `LDAP_REQUIRED_GROUP`, `LDAP_GROUP_SEARCH_BASE`, `LDAP_LOCAL_FALLBACK` | Optional LDAP settings used by the admin configuration flow. |
 | `HTTPS_ENABLED`, `HTTPS_KEY_PATH`, `HTTPS_CERT_PATH` | Optional HTTPS listener settings. |
 
