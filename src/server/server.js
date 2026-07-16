@@ -53,7 +53,6 @@ const CONFIG = {
   userSessionTtlHours: parseNumber(process.env.ONLYGANTT_USER_SESSION_TTL_HOURS, 8),
   adminSessionTtlHours: parseNumber(process.env.ONLYGANTT_ADMIN_TTL_HOURS, 8),
   maxUploadBytes: parseNumber(process.env.ONLYGANTT_MAX_UPLOAD_BYTES, 2000000),
-  allowUsernameOnlyLogin: parseBoolean(process.env.ONLYGANTT_ALLOW_USERNAME_ONLY_LOGIN),
   adminUser: process.env.ONLYGANTT_ADMIN_USER || DEFAULT_ADMIN_USER,
   adminResetCode: process.env.ONLYGANTT_ADMIN_RESET_CODE || null,
   ldapEnabled: parseBoolean(process.env.LDAP_ENABLED),
@@ -147,14 +146,19 @@ function atomicWrite(filePath, data) {
   const tmpPath = filePath + '.tmp';
   const bakPath = filePath + '.bak';
   fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  if (CONFIG.enableBak && fs.existsSync(filePath)) {
-    if (fs.existsSync(bakPath)) {
-      fs.unlinkSync(bakPath);
-    }
-    fs.copyFileSync(filePath, bakPath);
+  try {
+    const fd = fs.openSync(tmpPath, 'r+');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+  } catch (err) {
+    console.warn(`Unable to fsync temp file ${tmpPath}:`, err.message);
   }
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  if (CONFIG.enableBak && fs.existsSync(filePath)) {
+    try {
+      fs.copyFileSync(filePath, bakPath);
+    } catch (err) {
+      console.warn(`Unable to write backup file ${bakPath}:`, err.message);
+    }
   }
   fs.renameSync(tmpPath, filePath);
 }
@@ -666,11 +670,6 @@ function createAuthLoginResponse(userId, { authType, sessionUserType = authType,
     }
   };
 }
-
-function isUsernameOnlyLoginEnabled(authSnapshot) {
-  return CONFIG.allowUsernameOnlyLogin && !CONFIG.ldapEnabled && authSnapshot.localUsers === 0;
-}
-
 function getUserToken(req) {
   return req.headers['x-user-token'] || req.body?.userToken || null;
 }
@@ -1531,7 +1530,7 @@ app.get('/api/auth/config', (req, res) => {
       ldapEnabled: CONFIG.ldapEnabled,
       localFallback: CONFIG.ldapLocalFallback,
       localUsers: snapshot.localUsers,
-      usernameOnlyLoginEnabled: isUsernameOnlyLoginEnabled(snapshot),
+      usernameOnlyLoginEnabled: false,
       adminConfigured: isAdminConfigured(),
       adminManagedByEnv: isAdminManagedByEnv(),
       adminResetEnabled: !!CONFIG.adminResetCode
@@ -1601,25 +1600,12 @@ app.post('/api/auth/login', async (req, res) => {
       return errorResponse(res, statusCode, ldapResult.code, ldapResult.message);
     }
 
-    const isUsernameOnlyLogin = password === undefined || password === null || password === '';
-    if (authSnapshot.localUsers === 0 && isUsernameOnlyLogin && isUsernameOnlyLoginEnabled(authSnapshot)) {
-      return res.json(createAuthLoginResponse(normalizedUserId, {
-        authType: 'standard',
-        user: {
-          type: 'standard',
-          displayName: normalizedUserId,
-          mail: null,
-          department: department || null
-        }
-      }));
-    }
-
     if (authSnapshot.localUsers === 0) {
       return errorResponse(
         res,
         403,
         'USER_LOGIN_NOT_CONFIGURED',
-        'User login requires LDAP, a local user, or explicit username-only compatibility mode'
+        'User login requires LDAP or a local user'
       );
     }
 
@@ -1851,10 +1837,34 @@ app.post('/api/admin/system-config', requireAdmin, (req, res) => {
       https: { ...currentConfig.https }
     };
 
-    if ('lockTimeoutMinutes' in serverPayload) nextConfig.server.lockTimeoutMinutes = parseNumber(serverPayload.lockTimeoutMinutes, currentConfig.server.lockTimeoutMinutes);
-    if ('userSessionTtlHours' in serverPayload) nextConfig.server.userSessionTtlHours = parseNumber(serverPayload.userSessionTtlHours, currentConfig.server.userSessionTtlHours);
-    if ('adminSessionTtlHours' in serverPayload) nextConfig.server.adminSessionTtlHours = parseNumber(serverPayload.adminSessionTtlHours, currentConfig.server.adminSessionTtlHours);
-    if ('maxUploadBytes' in serverPayload) nextConfig.server.maxUploadBytes = parseNumber(serverPayload.maxUploadBytes, currentConfig.server.maxUploadBytes);
+    if ('lockTimeoutMinutes' in serverPayload) {
+      const val = parseNumber(serverPayload.lockTimeoutMinutes, null);
+      if (val === null || val < 1 || val > 1440 || !Number.isInteger(val)) {
+        return errorResponse(res, 400, 'VALIDATION_ERROR', 'lockTimeoutMinutes must be an integer between 1 and 1440');
+      }
+      nextConfig.server.lockTimeoutMinutes = val;
+    }
+    if ('userSessionTtlHours' in serverPayload) {
+      const val = parseNumber(serverPayload.userSessionTtlHours, null);
+      if (val === null || val < 1 || val > 168 || !Number.isInteger(val)) {
+        return errorResponse(res, 400, 'VALIDATION_ERROR', 'userSessionTtlHours must be an integer between 1 and 168');
+      }
+      nextConfig.server.userSessionTtlHours = val;
+    }
+    if ('adminSessionTtlHours' in serverPayload) {
+      const val = parseNumber(serverPayload.adminSessionTtlHours, null);
+      if (val === null || val < 1 || val > 168 || !Number.isInteger(val)) {
+        return errorResponse(res, 400, 'VALIDATION_ERROR', 'adminSessionTtlHours must be an integer between 1 and 168');
+      }
+      nextConfig.server.adminSessionTtlHours = val;
+    }
+    if ('maxUploadBytes' in serverPayload) {
+      const val = parseNumber(serverPayload.maxUploadBytes, null);
+      if (val === null || val < 1024 || val > 50000000 || !Number.isInteger(val)) {
+        return errorResponse(res, 400, 'VALIDATION_ERROR', 'maxUploadBytes must be an integer between 1024 and 50000000');
+      }
+      nextConfig.server.maxUploadBytes = val;
+    }
     if ('enableBak' in serverPayload) nextConfig.server.enableBak = parseBoolean(serverPayload.enableBak);
 
     if ('enabled' in ldapPayload) nextConfig.ldap.enabled = parseBoolean(ldapPayload.enabled);

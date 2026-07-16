@@ -236,6 +236,31 @@ async function main() {
       throw new Error('Expected server settings update to persist via /api/admin/system-config');
     }
 
+    // Range validation tests for system configuration
+    const invalidConfigPayloads = [
+      { server: { lockTimeoutMinutes: 0 } },
+      { server: { lockTimeoutMinutes: -10 } },
+      { server: { lockTimeoutMinutes: 2000 } },
+      { server: { userSessionTtlHours: 0 } },
+      { server: { userSessionTtlHours: 500 } },
+      { server: { adminSessionTtlHours: -1 } },
+      { server: { maxUploadBytes: 500 } },
+      { server: { maxUploadBytes: 60000000 } },
+      { server: { lockTimeoutMinutes: 'invalid' } }
+    ];
+
+    for (const invalidPayload of invalidConfigPayloads) {
+      let validationError = null;
+      try {
+        await requestJson('POST', '/api/admin/system-config', invalidPayload, authHeaders);
+      } catch (err) {
+        validationError = err;
+      }
+      if (!validationError || validationError.status !== 400 || validationError.code !== 'VALIDATION_ERROR') {
+        throw new Error(`Expected invalid system configuration ${JSON.stringify(invalidPayload)} to be rejected with 400 VALIDATION_ERROR`);
+      }
+    }
+
     const systemConfig = await requestJson('GET', '/api/admin/system-config', null, authHeaders);
     if (systemConfig.data?.ldap?.bindPasswordSet !== true) {
       throw new Error('Expected bindPasswordSet to report saved LDAP secret');

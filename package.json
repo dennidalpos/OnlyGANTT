@@ -28,16 +28,16 @@
   "author": "Danny Perondi",
   "license": "UNLICENSED",
   "dependencies": {
-    "express": "^4.18.2",
-    "ldapts": "^8.1.7",
-    "multer": "^2.0.2",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "express": "^5.2.1",
+    "ldapts": "^9.0.0",
+    "multer": "^2.2.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "esbuild": "0.27.4"
+    "esbuild": "^0.28.1"
   }
 }

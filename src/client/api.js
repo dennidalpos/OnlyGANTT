@@ -54,10 +54,18 @@
     }
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    const contentType = response.headers.get('Content-Type') || '';
+    if (text && contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.warn('Failed to parse response JSON:', err.message);
+      }
+    }
 
     if (!response.ok) {
-      const error = new Error(data?.error?.message || 'Request failed');
+      const error = new Error(data?.error?.message || response.statusText || 'Request failed');
       error.status = response.status;
       error.code = data?.error?.code;
       error.details = data?.error?.details;

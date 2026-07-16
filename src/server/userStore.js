@@ -120,14 +120,19 @@ function createUserStore({ dataDir, enableBak }) {
     const tmpPath = `${filePath}.tmp`;
     const bakPath = `${filePath}.bak`;
     fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    if (enableBak && fs.existsSync(filePath)) {
-      if (fs.existsSync(bakPath)) {
-        fs.unlinkSync(bakPath);
-      }
-      fs.copyFileSync(filePath, bakPath);
+    try {
+      const fd = fs.openSync(tmpPath, 'r+');
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+    } catch (err) {
+      console.warn(`[userStore] Unable to fsync temp file ${tmpPath}:`, err.message);
     }
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (enableBak && fs.existsSync(filePath)) {
+      try {
+        fs.copyFileSync(filePath, bakPath);
+      } catch (err) {
+        console.warn(`[userStore] Unable to write backup file ${bakPath}:`, err.message);
+      }
     }
     fs.renameSync(tmpPath, filePath);
   };

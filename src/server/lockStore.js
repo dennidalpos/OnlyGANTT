@@ -15,8 +15,12 @@ function createLockStore({ dataDir, fileName = 'locks.json', logger = console })
     ensureDataDir();
     const tmpPath = `${filePath}.tmp`;
     fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    try {
+      const fd = fs.openSync(tmpPath, 'r+');
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+    } catch (err) {
+      logger.warn(`Unable to fsync temp file ${tmpPath}:`, err.message);
     }
     fs.renameSync(tmpPath, filePath);
   }
