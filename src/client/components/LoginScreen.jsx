@@ -57,11 +57,14 @@
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingDepts, setLoadingDepts] = useState(true);
+    const [initialAdminPassword, setInitialAdminPassword] = useState('');
+    const [initialAdminConfirmPassword, setInitialAdminConfirmPassword] = useState('');
+    const [setupError, setSetupError] = useState('');
+    const [isSettingUp, setIsSettingUp] = useState(false);
     const [showAdminPasswordReset, setShowAdminPasswordReset] = useState(false);
     const [adminResetCode, setAdminResetCode] = useState('');
     const [newAdminPassword, setNewAdminPassword] = useState('');
 
-    
     const userNameRef = useRef(null);
     const deptSelectRef = useRef(null);
     const deptPasswordRef = useRef(null);
@@ -69,7 +72,6 @@
     const adminIdRef = useRef(null);
     const adminPasswordRef = useRef(null);
 
-    
     const loadDepartments = useCallback(async (signal) => {
       setLoadingDepts(true);
       try {
@@ -392,20 +394,15 @@
     };
 
     const handleAdminPasswordReset = async () => {
-      if (!adminResetCode || !newAdminPassword) {
-        setError('Inserisci codice reset e nuova password');
-        return;
-      }
-
-      setError('');
+      if (!adminResetCode || !newAdminPassword) return;
       setIsLoading(true);
-
+      setError('');
+      setLoginError('');
       try {
         await api.adminResetPassword(adminResetCode, newAdminPassword);
         setAdminResetCode('');
         setNewAdminPassword('');
         setShowAdminPasswordReset(false);
-        setError('');
         if (pushNotification) {
           pushNotification({
             type: 'success',
@@ -418,6 +415,96 @@
         setIsLoading(false);
       }
     };
+
+    const handleInitialAdminSetup = async (e) => {
+      e?.preventDefault();
+      if (!initialAdminPassword || initialAdminPassword.length < 6) {
+        setSetupError('La password deve contenere almeno 6 caratteri.');
+        return;
+      }
+      if (initialAdminPassword !== initialAdminConfirmPassword) {
+        setSetupError('Le password inserite non coincidono.');
+        return;
+      }
+      setIsSettingUp(true);
+      setSetupError('');
+      try {
+        await api.setupAdminPassword(initialAdminPassword);
+        if (pushNotification) {
+          pushNotification({
+            type: 'success',
+            message: 'Password amministratore configurata con successo!'
+          });
+        }
+        const data = await api.getAuthConfig();
+        setAuthConfig((prev) => ({
+          ...prev,
+          adminConfigured: data.adminConfigured !== false
+        }));
+      } catch (err) {
+        setSetupError(err.message || 'Errore durante la configurazione della password admin');
+      } finally {
+        setIsSettingUp(false);
+      }
+    };
+
+    if (!authLoading && !authConfig.adminConfigured) {
+      return (
+        <div className="login-screen">
+          <div className="login-card">
+            <div className="login-header">
+              <h1 className="login-title">OnlyGANTT</h1>
+              <p className="login-subtitle">Configurazione Iniziale Password Amministratore</p>
+            </div>
+
+            <div className="login-form">
+              {setupError && (
+                <div className="login-error" role="alert" style={{ marginBottom: '1rem' }}>
+                  <span className="login-error-icon">!</span>
+                  <span className="login-error-text">{setupError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleInitialAdminSetup}>
+                <div className="form-group">
+                  <label htmlFor="setup-admin-password">Nuova Password Admin</label>
+                  <input
+                    id="setup-admin-password"
+                    type="password"
+                    value={initialAdminPassword}
+                    onChange={(e) => { setSetupError(''); setInitialAdminPassword(e.target.value); }}
+                    placeholder="Inserisci password admin (min 6 caratteri)"
+                    disabled={isSettingUp}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginTop: '1rem' }}>
+                  <label htmlFor="setup-admin-confirm">Conferma Password</label>
+                  <input
+                    id="setup-admin-confirm"
+                    type="password"
+                    value={initialAdminConfirmPassword}
+                    onChange={(e) => { setSetupError(''); setInitialAdminConfirmPassword(e.target.value); }}
+                    placeholder="Conferma password admin"
+                    disabled={isSettingUp}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="login-submit btn-success"
+                  style={{ marginTop: '1.5rem', width: '100%' }}
+                  disabled={isSettingUp || !initialAdminPassword || !initialAdminConfirmPassword}
+                >
+                  {isSettingUp ? 'Configurazione in corso...' : 'Imposta Password Admin e Salva'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="login-screen">
@@ -708,13 +795,6 @@
                     {isLoading ? 'Autenticazione...' : 'Accedi come admin'}
                   </button>
 
-                  {!authConfig.adminConfigured && (
-                    <p className="input-hint warning" style={{ marginTop: 'var(--spacing-sm)' }}>
-                      Password admin non configurata. Imposta `ONLYGANTT_ADMIN_PASSWORD` oppure usa il reset code per inizializzarla.
-                    </p>
-                  )}
-
-                  {}
                   <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--border-color)' }}>
                     {canShowAdminPasswordReset ? (
                       <>
@@ -781,6 +861,8 @@
                       </p>
                     )}
                   </div>
+
+
                 </>
               )}
             </div>

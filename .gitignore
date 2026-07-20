@@ -21,6 +21,8 @@ Data/config/*.bak
 Data/config/*.tmp
 Data/reparti/*.bak
 Data/reparti/*.tmp
+Data/reparti/*.migrated
+Data/*.db
 Data/utenti/*.json
 Data/utenti/*.bak
 Data/utenti/*.tmp

@@ -298,9 +298,15 @@ async function main() {
       throw new Error('Department password verification failed');
     }
 
-    const persistedDepartment = JSON.parse(
-      fs.readFileSync(path.join(dataDir, 'reparti', 'Demo.json'), 'utf8')
-    );
+    const { DatabaseSync } = require('node:sqlite');
+    const dbPath = path.join(dataDir, 'reparti.db');
+    const db = new DatabaseSync(dbPath);
+    const row = db.prepare('SELECT data FROM departments WHERE LOWER(name) = ?').get('demo');
+    db.close();
+    if (!row) {
+      throw new Error('Expected department row in SQLite database');
+    }
+    const persistedDepartment = JSON.parse(row.data);
     if (!persistedDepartment.password || typeof persistedDepartment.password !== 'object' || !persistedDepartment.password.hash) {
       throw new Error('Expected hashed department password');
     }
@@ -308,8 +314,12 @@ async function main() {
     console.log('Smoke check passed');
   } finally {
     server.kill('SIGTERM');
-    await sleep(250);
-    fs.rmSync(dataDir, { recursive: true, force: true });
+    await sleep(500);
+    try {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    } catch (_) {
+      // Ignore transient Windows file handle release delays during server shutdown
+    }
     if (server.exitCode && server.exitCode !== 0) {
       console.error(stdout);
       console.error(stderr);

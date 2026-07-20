@@ -1424,20 +1424,20 @@
                 </div>
 
                 <div>
-                      <ProjectList
-                        projects={projects}
-                        selectedProjectIds={selectedProjectIds}
-                        onSelectedProjectIdsChange={setSelectedProjectIds}
-                        onEditProject={handleEditProject}
-                        onDeleteProject={handleDeleteProject}
-                        onExportJSON={handleExportJSON}
-                        onImportJSON={handleImportJSON}
-                        validationErrors={validationErrors}
-                        readOnly={readOnlyDepartment}
-                        isSaving={isSavingProject}
-                        focusedProjectId={focusedProjectId}
-                        onFocusHandled={handleProjectFocusHandled}
-                      />
+                  <ProjectList
+                    projects={projects}
+                    selectedProjectIds={selectedProjectIds}
+                    onSelectedProjectIdsChange={setSelectedProjectIds}
+                    onEditProject={handleEditProject}
+                    onDeleteProject={handleDeleteProject}
+                    onExportJSON={handleExportJSON}
+                    onImportJSON={handleImportJSON}
+                    validationErrors={validationErrors}
+                    readOnly={readOnlyDepartment}
+                    isSaving={isSavingProject}
+                    focusedProjectId={focusedProjectId}
+                    onFocusHandled={handleProjectFocusHandled}
+                  />
                 </div>
 
                 <div>
@@ -1447,7 +1447,6 @@
             </>
           )}
         </main>
-
         {notifications.length > 0 && (
           <div className="notification-container" role="status" aria-live="polite">
             {notifications.map(item => (
@@ -1464,54 +1463,6 @@
                 </button>
               </div>
             ))}
-          </div>
-        )}
-
-        {showScreensaver && (
-          <div className="screensaver-overlay">
-            <div className="screensaver-card">
-              <h1 className="screensaver-title">OnlyGANTT</h1>
-              {isDepartmentProtected && department && !adminToken ? (
-                <>
-                  <p className="screensaver-subtitle">Inserisci la password del reparto per continuare</p>
-                  <div className="form-group" style={{ margin: '1rem 0 0', textAlign: 'left' }}>
-                    <label htmlFor="screensaver-password">Password reparto</label>
-                    <input
-                      id="screensaver-password"
-                      type="password"
-                      value={screensaverPassword}
-                      onChange={(event) => setScreensaverPassword(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          handleUnlockScreensaver();
-                        }
-                      }}
-                      placeholder="Inserisci password"
-                      autoComplete="current-password"
-                      autoFocus
-                      disabled={screensaverUnlocking}
-                    />
-                  </div>
-                  {screensaverError && (
-                    <div className="alert-item warning" style={{ marginTop: '0.75rem', textAlign: 'left' }}>
-                      {screensaverError}
-                    </div>
-                  )}
-                  <div className="dialog-actions" style={{ marginTop: '1rem', justifyContent: 'center' }}>
-                    <button
-                      type="button"
-                      className="btn-success"
-                      onClick={handleUnlockScreensaver}
-                      disabled={screensaverUnlocking}
-                    >
-                      {screensaverUnlocking ? 'Verifica in corso...' : 'Sblocca'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="screensaver-subtitle">Premi un tasto per continuare</p>
-              )}
-            </div>
           </div>
         )}
 

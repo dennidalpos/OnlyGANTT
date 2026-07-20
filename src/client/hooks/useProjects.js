@@ -152,6 +152,32 @@
       loadProjects();
     }, [loadProjects]);
 
+    useEffect(() => {
+      if (!department) return;
+
+      const eventSource = new EventSource(`/api/projects/${encodeURIComponent(department)}/events`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'update') {
+            if (readOnly) {
+              setProjects(ensureIds(message.projects || []));
+              setMeta(message.meta || null);
+              setValidationErrors(message.validationErrors || []);
+              setIsDirty(false);
+            }
+          }
+        } catch (err) {
+          console.error('[SSE] Error parsing update event:', err);
+        }
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    }, [department, readOnly]);
+
     return {
       projects,
       meta,

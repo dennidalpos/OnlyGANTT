@@ -195,7 +195,7 @@
     const isLockedByOther = !!(lockInfo?.locked && !isLocked);
 
     const handleLockClick = () => {
-      if (!department || readOnlyDepartment) return;
+      if (!department) return;
 
       if (isLocked) {
         handleMenuAction(onReleaseLock);
@@ -203,11 +203,7 @@
       }
 
       if (isLockedByOther) {
-        if (lockEnabled) {
-          handleMenuAction(onRefreshLock);
-        } else {
-          handleMenuAction(onEnableLock);
-        }
+        handleMenuAction(onRefreshLock);
         return;
       }
 
@@ -215,14 +211,14 @@
     };
 
     const lockStatus = isLocked
-      ? { icon: '🔒', label: 'Lock', className: 'status-lock--active', clickable: true, title: 'Clicca per liberare' }
+      ? { icon: '🔒', label: 'In Modifica', className: 'status-lock--active', clickable: true, title: 'Clicca per rilasciare la modifica' }
       : isLockedByOther
-        ? { icon: '🔒', label: lockInfo.lockedBy, className: 'status-lock--other', clickable: true, title: 'Clicca per richiedere modifica' }
-        : { icon: '🔓', label: 'Libero', className: 'status-lock--free', clickable: true, title: 'Clicca per modificare' };
+        ? { icon: '🔒', label: `Modifica: ${lockInfo?.lockedBy || 'altro utente'}`, className: 'status-lock--other', clickable: false, title: `In modifica da ${lockInfo?.lockedBy || 'altro utente'}` }
+        : { icon: '📝', label: 'Abilita Modifica', className: 'status-lock--free', clickable: true, title: 'Clicca per iniziare a modificare' };
 
     return (
       <header className="topbar">
-        {}
+        {/* Topbar left: title & department context */}
         <div className="topbar__left">
           <h1 className="topbar__title">OnlyGANTT</h1>
           {department && (
@@ -240,17 +236,17 @@
           )}
         </div>
 
-        {}
+        {/* Topbar right: lock status & menu toggle */}
         <div className="topbar__right">
-          {}
+          {/* Status indicators */}
           <div className="topbar__status">
             {department && (
               <button
                 className={`topbar__status-item ${lockStatus.className} ${lockStatus.clickable ? 'clickable' : ''}`}
-                title={lockStatus.clickable ? lockStatus.title : `Lock: ${lockStatus.label}`}
+                title={lockStatus.title}
                 onClick={lockStatus.clickable ? handleLockClick : undefined}
-                disabled={!lockStatus.clickable || readOnlyDepartment}
-                style={{ border: 'none', background: 'transparent', padding: '0.25rem 0.75rem', cursor: lockStatus.clickable && !readOnlyDepartment ? 'pointer' : 'default' }}
+                disabled={!lockStatus.clickable}
+                style={{ border: 'none', background: 'transparent', padding: '0.25rem 0.75rem', cursor: lockStatus.clickable ? 'pointer' : 'default' }}
               >
                 <span className="topbar__status-icon">{lockStatus.icon}</span>
                 <span className="topbar__status-text">{lockStatus.label}</span>
@@ -262,14 +258,6 @@
                 <span className="topbar__status-text">Admin</span>
               </span>
             )}
-            <button
-              className={`topbar__icon-btn ${screensaverEnabled ? 'active' : ''}`}
-              onClick={onToggleScreensaver}
-              title={screensaverEnabled ? 'Screensaver: ON (15s inattività)' : 'Screensaver: OFF'}
-              aria-label={screensaverEnabled ? 'Disattiva screensaver' : 'Attiva screensaver'}
-            >
-              {screensaverEnabled ? '🌙' : '☀️'}
-            </button>
           </div>
 
           {}

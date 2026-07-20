@@ -455,6 +455,14 @@
     });
   }
 
+  async function setupAdminPassword(password, signal) {
+    return fetchJSON('/api/admin/setup', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+      signal
+    });
+  }
+
   window.OnlyGantt.api = {
     setUserToken,
     getUserToken,
@@ -466,6 +474,7 @@
     verifyPassword,
     changePassword,
     resetPassword,
+    setupAdminPassword,
     getProjects,
     saveProjects,
     uploadJSON,
