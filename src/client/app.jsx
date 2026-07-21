@@ -204,16 +204,29 @@ export function App() {
 
   const checkDepartmentProtection = useCallback(async (deptName) => {
     if (!deptName) return false;
+
+    if (Array.isArray(departmentsList) && departmentsList.length > 0) {
+      const match = departmentsList.find(d => (typeof d === 'string' ? d === deptName : d?.name === deptName));
+      if (match && typeof match === 'object') {
+        const isProt = !!match.protected;
+        auth.setIsDepartmentProtected(isProt);
+        return isProt;
+      }
+    }
+
     try {
-      const result = await api.verifyPassword(deptName, '');
-      const isProtected = result && result.protected === true;
-      auth.setIsDepartmentProtected(isProtected);
-      return isProtected;
+      await api.verifyPassword(deptName, '');
+      auth.setIsDepartmentProtected(false);
+      return false;
     } catch (err) {
+      if (err.status === 401 || err.code === 'INVALID_PASSWORD') {
+        auth.setIsDepartmentProtected(true);
+        return true;
+      }
       auth.setIsDepartmentProtected(false);
       return false;
     }
-  }, [auth]);
+  }, [auth, departmentsList]);
 
   const confirmPendingChanges = async (actionDescription = 'procedere') => {
     if (!draftState.hasDraftChanges) return true;
@@ -250,6 +263,8 @@ export function App() {
     }
 
     const isProtected = await checkDepartmentProtection(newDept);
+    const userRole = auth.adminToken ? 'supervisor' : (auth.userPermissions?.[newDept] || 'editor');
+    const isReadOnly = !auth.adminToken && userRole === 'viewer';
 
     if (isProtected && !auth.adminToken) {
       const storedPassword = storage.getPassword(auth.effectiveUserName, newDept);
@@ -259,11 +274,11 @@ export function App() {
           if (verifyResult && verifyResult.ok) {
             auth.setDepartment(newDept);
             auth.setLockEnabled(false);
-            auth.setReadOnlyDepartment(true);
+            auth.setReadOnlyDepartment(isReadOnly);
             draftState.closeProjectForm();
             filtersState.setSelectedProjectIds(new Set());
             setDepartmentValidationErrors([]);
-            storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+            storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken, userPermissions: auth.userPermissions });
             return;
           }
         } catch (err) {}
@@ -292,11 +307,11 @@ export function App() {
           storage.setPassword(auth.effectiveUserName, newDept, values.password.trim());
           auth.setDepartment(newDept);
           auth.setLockEnabled(false);
-          auth.setReadOnlyDepartment(true);
+          auth.setReadOnlyDepartment(isReadOnly);
           draftState.closeProjectForm();
           filtersState.setSelectedProjectIds(new Set());
           setDepartmentValidationErrors([]);
-          storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+          storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken, userPermissions: auth.userPermissions });
         }
       } catch (err) {
         notify.pushNotification({ type: 'error', message: err.message || 'Password reparto errata' });
@@ -306,11 +321,11 @@ export function App() {
 
     auth.setDepartment(newDept);
     auth.setLockEnabled(false);
-    auth.setReadOnlyDepartment(true);
+    auth.setReadOnlyDepartment(isReadOnly);
     draftState.closeProjectForm();
     filtersState.setSelectedProjectIds(new Set());
     setDepartmentValidationErrors([]);
-    storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+    storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken, userPermissions: auth.userPermissions });
   };
 
   const handleEnableLock = async () => {
@@ -834,6 +849,7 @@ export function App() {
               userName={auth.userName}
               onUserNameChange={handleUserNameChange}
               onDepartmentChange={handleDepartmentChange}
+              userToken={auth.userToken}
               adminToken={auth.adminToken}
               onAdminLogin={handleAdminLogin}
               onAdminLogout={handleUserLogout}
@@ -891,9 +907,9 @@ export function App() {
                           isSaving={draftState.isSavingProject}
                           hoveredProjectId={hoveredProjectId}
                           onProjectHover={setHoveredProjectId}
-                          scrollTop={verticalScrollTop}
-                          onScrollChange={setVerticalScrollTop}
-                          ganttHeaderHeight={AppConfig.gantt.CANVAS_TOP_MARGIN}
+                          verticalScrollTop={verticalScrollTop}
+                          onVerticalScrollChange={setVerticalScrollTop}
+                          ganttHeaderHeight={(AppConfig?.gantt?.CANVAS_TOP_MARGIN || AppConfig?.default?.gantt?.CANVAS_TOP_MARGIN || 156)}
                           onCollapsedChange={setSidebarCollapsed}
                           viewMode={filtersState.viewMode}
                         />

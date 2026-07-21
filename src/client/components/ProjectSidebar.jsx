@@ -4,9 +4,7 @@ import AppConfig from '../../app-config.js';
 const { useState, useEffect, useCallback, useRef } = React;
 
 const STORAGE_KEY_COLLAPSED = 'onlygantt_sidebar_collapsed';
-const SIDEBAR_WIDTH_EXPANDED = 280;
-const SIDEBAR_WIDTH_COLLAPSED = 72;
-const SCROLLBAR_HEIGHT = 20;
+const SIDEBAR_HEADER_HEIGHT = 36;
 
 function getProjectAbbreviation(projectName) {
   const words = String(projectName || '')
@@ -47,6 +45,7 @@ export function ProjectSidebar({
   });
 
   const scrollContainerRef = useRef(null);
+  const isSyncingScrollRef = useRef(false);
 
   useEffect(() => {
     if (onCollapsedChange) {
@@ -65,6 +64,7 @@ export function ProjectSidebar({
   }, []);
 
   const handleScroll = useCallback((e) => {
+    if (isSyncingScrollRef.current) return;
     if (onVerticalScrollChange) {
       onVerticalScrollChange(e.target.scrollTop);
     }
@@ -73,7 +73,11 @@ export function ProjectSidebar({
   useEffect(() => {
     if (scrollContainerRef.current && verticalScrollTop !== undefined) {
       if (Math.abs(scrollContainerRef.current.scrollTop - verticalScrollTop) > 0.5) {
+        isSyncingScrollRef.current = true;
         scrollContainerRef.current.scrollTop = verticalScrollTop;
+        requestAnimationFrame(() => {
+          isSyncingScrollRef.current = false;
+        });
       }
     }
   }, [verticalScrollTop]);
@@ -96,22 +100,18 @@ export function ProjectSidebar({
     onSelectedProjectIdsChange(next);
   };
 
-  const currentWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
+  const topSpacerHeight = Math.max(0, AppConfig.gantt.CANVAS_TOP_MARGIN - SIDEBAR_HEADER_HEIGHT);
 
   return (
-    <aside
-      className={`project-sidebar ${collapsed ? 'project-sidebar--collapsed' : ''}`}
-      style={{
-        width: `${currentWidth}px`,
-        flexShrink: 0
-      }}
-    >
-      <div className="project-sidebar__header">
-        {!collapsed && (
-          <div className="project-sidebar__title-area">
-            <h3 className="project-sidebar__title">Progetti ({projects.length})</h3>
+    <aside className={`project-sidebar ${collapsed ? 'collapsed' : 'expanded'}`}>
+      <div className="sidebar-header">
+        {!collapsed ? (
+          <>
+            <div className="sidebar-title">
+              Progetti <span className="sidebar-count">({projects.length})</span>
+            </div>
             {projects.length > 0 && (
-              <label className="checkbox-label" style={{ fontSize: '0.75rem' }}>
+              <label className="checkbox-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 <input
                   type="checkbox"
                   checked={selectedProjectIds.size === projects.length && projects.length > 0}
@@ -120,11 +120,13 @@ export function ProjectSidebar({
                 Tutti
               </label>
             )}
-          </div>
+          </>
+        ) : (
+          <span className="sidebar-count compact">{projects.length}</span>
         )}
         <button
           type="button"
-          className="project-sidebar__toggle"
+          className="sidebar-btn"
           onClick={toggleCollapsed}
           title={collapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
           aria-label={collapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
@@ -133,84 +135,93 @@ export function ProjectSidebar({
         </button>
       </div>
 
-      <div className="project-sidebar__spacer-top" style={{ height: `${AppConfig.gantt.CANVAS_TOP_MARGIN}px` }} />
-
       <div
         ref={scrollContainerRef}
-        className="project-sidebar__scroll-area"
+        className="sidebar-scroll-container"
         onScroll={handleScroll}
-        style={{
-          maxHeight: '70vh',
-          overflowY: 'auto'
-        }}
       >
-        {projects.length === 0 ? (
-          <div className="project-sidebar__empty">
-            {collapsed ? '—' : 'Nessun progetto'}
-          </div>
-        ) : (
-          projects.map((project) => {
-            const isSelected = selectedProjectIds.has(project.id);
-            const isHovered = hoveredProjectId === project.id;
-            const percentage = logic.calculateProjectPercentage(project);
-            const alerts = logic.getProjectAlerts(project);
-            const severity = logic.getProjectAlertSeverity(alerts);
+        <div
+          className="sidebar-header-spacer"
+          style={{ height: `${topSpacerHeight}px` }}
+        />
 
-            return (
-              <div
-                key={project.id}
-                className={`project-sidebar__item ${isHovered ? 'project-sidebar__item--hovered' : ''}`}
-                style={{
-                  height: `${AppConfig.gantt.ROW_HEIGHT}px`,
-                  borderLeft: `4px solid ${project.colore || '#3b82f6'}`
-                }}
-                onMouseEnter={() => onProjectHover && onProjectHover(project.id)}
-                onMouseLeave={() => onProjectHover && onProjectHover(null)}
-                onClick={() => onSelectProject && onSelectProject(project.id)}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    toggleSelectProject(project.id);
+        <div className="sidebar-projects">
+          {projects.length === 0 ? (
+            <div className="sidebar-empty">
+              {collapsed ? '—' : 'Nessun progetto'}
+            </div>
+          ) : (
+            projects.map((project) => {
+              const isSelected = selectedProjectIds.has(project.id);
+              const isHovered = hoveredProjectId === project.id;
+              const percentage = logic.calculateProjectPercentage(project);
+              const alerts = logic.getProjectAlerts(project);
+              const severity = logic.getProjectAlertSeverity(alerts);
+
+              return (
+                <div
+                  key={project.id}
+                  className={`sidebar-project-row ${isSelected ? 'selected' : ''} ${isHovered ? 'hovered' : ''} ${severity ? `severity-${severity}` : 'severity-none'}`}
+                  style={{
+                    height: `${AppConfig.gantt.ROW_HEIGHT}px`,
+                    borderLeft: `4px solid ${project.colore || '#3b82f6'}`
                   }}
-                  aria-label={`Seleziona ${project.nome}`}
-                  className="project-sidebar__checkbox"
-                />
-
-                {collapsed ? (
-                  <div className="project-sidebar__collapsed-info" title={`${project.nome} (${percentage}%)`}>
-                    <span className="project-sidebar__abbr">
-                      {getProjectAbbreviation(project.nome)}
-                    </span>
-                    {severity && (
-                      <span className={`alert-badge alert-badge--${severity} alert-badge--tiny`}>
-                        ⚠
+                  onMouseEnter={() => onProjectHover && onProjectHover(project.id)}
+                  onMouseLeave={() => onProjectHover && onProjectHover(null)}
+                >
+                  {collapsed ? (
+                    <button
+                      type="button"
+                      className="sidebar-project-collapsed"
+                      onClick={() => onSelectProject && onSelectProject(project.id)}
+                      title={`${project.nome} (${percentage}%)`}
+                    >
+                      <span
+                        className="sidebar-project-acronym"
+                        style={{ backgroundColor: project.colore || '#3b82f6' }}
+                      >
+                        {getProjectAbbreviation(project.nome)}
                       </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="project-sidebar__expanded-info">
-                    <span className="project-sidebar__name" title={project.nome}>
-                      {project.nome}
-                    </span>
+                      <span className="sidebar-project-mini-percent">{percentage}%</span>
+                      {isSelected && <span className="sidebar-check-indicator">✓</span>}
+                    </button>
+                  ) : (
+                    <div className="sidebar-project-expanded">
+                      <div className="sidebar-project-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleSelectProject(project.id);
+                          }}
+                          aria-label={`Seleziona ${project.nome}`}
+                        />
+                      </div>
 
-                    {severity && (
-                      <span className={`alert-badge alert-badge--${severity} alert-badge--tiny`}>
-                        ⚠
-                      </span>
-                    )}
+                      <button
+                        type="button"
+                        className="sidebar-project-info"
+                        onClick={() => onSelectProject && onSelectProject(project.id)}
+                      >
+                        <span className="sidebar-project-name" title={project.nome}>
+                          {project.nome}
+                        </span>
 
-                    <span className="project-sidebar__percentage">
-                      {percentage}%
-                    </span>
+                        {severity && (
+                          <span className={`alert-badge alert-badge--${severity} alert-badge--tiny`}>
+                            ⚠
+                          </span>
+                        )}
 
-                    {!readOnly && (
-                      <div className="project-sidebar__actions">
+                        <span className="sidebar-project-percent">{percentage}%</span>
+                      </button>
+
+                      {!readOnly && (
                         <button
                           type="button"
-                          className="btn-icon-small"
+                          className="sidebar-btn"
+                          style={{ width: '22px', height: '22px', fontSize: '0.7rem', flexShrink: 0 }}
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditProject(project);
@@ -219,17 +230,20 @@ export function ProjectSidebar({
                         >
                           ✏
                         </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
 
-      <div className="project-sidebar__spacer-bottom" style={{ height: `${AppConfig.gantt.CANVAS_BOTTOM_MARGIN + SCROLLBAR_HEIGHT}px` }} />
+        <div
+          className="sidebar-header-spacer"
+          style={{ height: `${AppConfig.gantt.CANVAS_BOTTOM_MARGIN}px` }}
+        />
+      </div>
     </aside>
   );
 }

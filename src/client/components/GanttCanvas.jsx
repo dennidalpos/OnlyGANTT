@@ -34,14 +34,16 @@ export function GanttCanvas({
   const scrollRafRef = useRef(null);
   const pendingScrollLeftRef = useRef(0);
   const handledScrollToTodayTriggerRef = useRef(0);
-  const verticalScrollContainerRef = useRef(null);
-  const syncedVerticalScrollTopRef = useRef(null);
+  const isSyncingVerticalScrollRef = useRef(false);
 
   useEffect(() => {
     if (verticalScrollContainerRef.current && verticalScrollTop !== undefined) {
       if (Math.abs(verticalScrollContainerRef.current.scrollTop - verticalScrollTop) > 0.5) {
-        syncedVerticalScrollTopRef.current = verticalScrollTop;
+        isSyncingVerticalScrollRef.current = true;
         verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
+        requestAnimationFrame(() => {
+          isSyncingVerticalScrollRef.current = false;
+        });
       }
     }
   }, [verticalScrollTop]);
@@ -49,13 +51,7 @@ export function GanttCanvas({
   const currentVerticalScrollTop = verticalScrollTop || 0;
 
   const handleVerticalScroll = useCallback((e) => {
-    const syncedScrollTop = syncedVerticalScrollTopRef.current;
-    if (syncedScrollTop !== null && Math.abs(e.target.scrollTop - syncedScrollTop) <= 0.5) {
-      syncedVerticalScrollTopRef.current = null;
-      return;
-    }
-
-    syncedVerticalScrollTopRef.current = null;
+    if (isSyncingVerticalScrollRef.current) return;
     if (onVerticalScrollChange) {
       onVerticalScrollChange(e.target.scrollTop);
     }
@@ -485,24 +481,48 @@ export function GanttCanvas({
       </div>
 
       {isScrollable && (
-        <div ref={bottomScrollbarRef} className="gantt-scrollbar">
+        <div ref={bottomScrollbarRef} className="gantt-scrollbar" onScroll={handleScrollbarScroll}>
           <div className="gantt-scrollbar-content"></div>
         </div>
       )}
 
-      {tooltip && (
-        <div
-          className="gantt-tooltip"
-          style={{
-            left: `${tooltip.x + 10}px`,
-            top: `${tooltip.y + 10}px`
-          }}
-          role="tooltip"
-        >
-          {tooltip.text.split('\n').map((line, i) => (
-            <div key={i}>{line}</div>
-          ))}
-        </div>
+      {tooltip && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal ? (
+        ReactDOM.createPortal(
+          <div
+            className="gantt-tooltip"
+            style={{
+              position: 'fixed',
+              left: `${Math.min(tooltip.x + 12, window.innerWidth - 320)}px`,
+              top: `${Math.min(tooltip.y + 12, window.innerHeight - 100)}px`,
+              pointerEvents: 'none',
+              zIndex: 9999
+            }}
+            role="tooltip"
+          >
+            {tooltip.text.split('\n').map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>,
+          document.body
+        )
+      ) : (
+        tooltip && (
+          <div
+            className="gantt-tooltip"
+            style={{
+              position: 'fixed',
+              left: `${Math.min(tooltip.x + 12, window.innerWidth - 320)}px`,
+              top: `${Math.min(tooltip.y + 12, window.innerHeight - 100)}px`,
+              pointerEvents: 'none',
+              zIndex: 9999
+            }}
+            role="tooltip"
+          >
+            {tooltip.text.split('\n').map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        )
       )}
 
       {contextMenu && (

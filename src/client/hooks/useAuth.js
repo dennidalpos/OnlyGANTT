@@ -15,6 +15,7 @@ export function useAuth() {
   const [userToken, setUserToken] = useState(initialUserToken);
   const [adminToken, setAdminToken] = useState(initialAdminToken);
   const [department, setDepartment] = useState(initialDept);
+  const [userPermissions, setUserPermissions] = useState(restoredSession.userPermissions || {});
   const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
   const [lockEnabled, setLockEnabled] = useState(false);
   const [isDepartmentProtected, setIsDepartmentProtected] = useState(false);
@@ -27,6 +28,7 @@ export function useAuth() {
     setUserToken(null);
     setAdminToken(null);
     setDepartment(null);
+    setUserPermissions({});
     setReadOnlyDepartment(false);
     storage.clearSession();
   }, []);
@@ -40,6 +42,8 @@ export function useAuth() {
     setAdminToken,
     department,
     setDepartment,
+    userPermissions,
+    setUserPermissions,
     readOnlyDepartment,
     setReadOnlyDepartment,
     lockEnabled,

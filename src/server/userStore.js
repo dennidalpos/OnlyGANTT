@@ -258,6 +258,7 @@ function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
         displayName: user.displayName || user.userId,
         mail: user.mail || null,
         department: user.department || null,
+        departmentPermissions: user.departmentPermissions || {},
         userType: 'local',
         lastLoginAt: user.lastLoginAt || user.createdAt || null,
         loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
@@ -271,6 +272,7 @@ function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
       displayName: user.displayName || user.userId,
       mail: user.mail || null,
       department: user.department || null,
+      departmentPermissions: user.departmentPermissions || {},
       userType: user.type === 'ad' ? 'ad' : 'local',
       lastLoginAt: user.lastLoginAt || user.ldapProvisionedAt || user.createdAt || null,
       loginHistory: Array.isArray(user.loginHistory) ? user.loginHistory : []
@@ -375,8 +377,49 @@ function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
       return { ok: false, code: 'PASSWORD_REQUIRED', message: 'Password is required for local users' };
     }
 
+    if (payload.departmentPermissions && typeof payload.departmentPermissions === 'object') {
+      user.departmentPermissions = payload.departmentPermissions;
+    }
+
     writeUserFile(normalized, user);
     return { ok: true, user, created: !existing };
+  };
+
+  const setUserDepartmentPermissions = (userId, permissions = {}) => {
+    ensureStore();
+    const normalized = normalizeUserId(userId);
+    if (!normalized) {
+      return { ok: false, code: 'INVALID_USER', message: 'Invalid user id' };
+    }
+
+    let user = readUserFile(normalized);
+    if (!user) {
+      const now = new Date().toISOString();
+      user = {
+        userId: normalized,
+        userIdNormalized: normalized.toLowerCase(),
+        type: 'ad',
+        displayName: normalized,
+        createdAt: now,
+        lastLoginAt: null,
+        loginHistory: [],
+        departmentPermissions: {}
+      };
+    }
+
+    user.departmentPermissions = permissions && typeof permissions === 'object' ? permissions : {};
+    user.updatedAt = new Date().toISOString();
+    writeUserFile(normalized, user);
+    return { ok: true, userId: user.userId, departmentPermissions: user.departmentPermissions };
+  };
+
+  const getUserDepartmentPermissions = (userId) => {
+    const normalized = normalizeUserId(userId);
+    if (!normalized) return {};
+    const user = readUserFile(normalized);
+    return (user && user.departmentPermissions && typeof user.departmentPermissions === 'object')
+      ? user.departmentPermissions
+      : {};
   };
 
   const deleteLocalUser = (userId) => {
@@ -410,6 +453,8 @@ function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
     upsertLdapUser,
     upsertLocalUser,
     deleteLocalUser,
+    setUserDepartmentPermissions,
+    getUserDepartmentPermissions,
     getAuthSnapshot,
     listLocalUsers,
     listUsers,

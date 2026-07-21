@@ -21,6 +21,8 @@ export function LoginScreen({
   adminToken,
   onAdminLogin,
   onAdminLogout,
+  userToken,
+  userPermissions,
   onUserTokenChange,
   loginError,
   setLoginError,
@@ -328,42 +330,108 @@ export function LoginScreen({
 
         <div className="login-body">
           {activeTab === 'user' ? (
-            <form onSubmit={handleUserLogin} className="login-form">
-              <div className="form-group">
-                <label htmlFor="login-username">Nome Utente</label>
-                <input
-                  id="login-username"
-                  type="text"
-                  value={userIdInput}
-                  onChange={(e) => setUserIdInput(e.target.value)}
-                  placeholder="es. mario.rossi o mrossi"
-                  disabled={isLoading}
-                  autoFocus
-                  autoComplete="username"
-                />
-              </div>
+            userToken ? (
+              <div className="user-authenticated-area" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                <div className="banner-info" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                  <span className="banner-icon" style={{ fontSize: '1.75rem' }}>👤</span>
+                  <div style={{ textAlign: 'left' }}>
+                    <strong style={{ fontSize: '1rem', display: 'block', color: 'var(--text-primary)' }}>Sessione Utente Attiva</strong>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{userName || storage.getCurrentUser()}</span>
+                  </div>
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="login-password">Password</label>
-                <input
-                  id="login-password"
-                  type="password"
-                  value={userPasswordInput}
-                  onChange={(e) => setUserPasswordInput(e.target.value)}
-                  placeholder="Password account"
-                  disabled={isLoading}
-                  autoComplete="current-password"
-                />
-              </div>
+                <div className="form-group" style={{ marginBottom: '1.25rem', textAlign: 'left' }}>
+                  <label htmlFor="login-dept-select">Seleziona Reparto per Accedere</label>
+                  <select
+                    id="login-dept-select"
+                    className="form-control"
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        onDepartmentChange(e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="" disabled>-- Seleziona un reparto --</option>
+                    {departments.map((d) => {
+                      const deptName = typeof d === 'string' ? d : d.name;
+                      const isProt = typeof d === 'object' && d.protected;
+                      const userRole = (userPermissions && userPermissions[deptName]) ? userPermissions[deptName] : 'none';
+                      const hasSpecificPerms = userPermissions && Object.keys(userPermissions).length > 0;
+                      if (hasSpecificPerms && userRole === 'none') {
+                        return null;
+                      }
+                      const roleLabel = userRole === 'supervisor' ? '👑 Supervisor'
+                        : userRole === 'editor' ? '✏️ Modifica'
+                        : userRole === 'viewer' ? '👁️ Sola Lettura'
+                        : '';
+                      return (
+                        <option key={deptName} value={deptName}>
+                          {deptName} {roleLabel ? `[${roleLabel}]` : ''} {isProt ? '🔒' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
 
-              <button
-                type="submit"
-                className="login-submit btn-success"
-                disabled={isLoading || !userIdInput.trim()}
-              >
-                {isLoading ? 'Accesso in corso...' : 'Accedi'}
-              </button>
-            </form>
+                <button
+                  type="button"
+                  className="btn-danger btn-small"
+                  onClick={onAdminLogout}
+                  style={{ width: '100%' }}
+                >
+                  Esci / Cambia utente
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleUserLogin} className="login-form">
+                <div className="form-group">
+                  <label htmlFor="login-username">Nome Utente</label>
+                  <input
+                    id="login-username"
+                    type="text"
+                    value={userIdInput}
+                    onChange={(e) => setUserIdInput(e.target.value)}
+                    placeholder="es. mario.rossi o mrossi"
+                    disabled={isLoading}
+                    autoFocus
+                    autoComplete="username"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="login-password">Password</label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    value={userPasswordInput}
+                    onChange={(e) => setUserPasswordInput(e.target.value)}
+                    placeholder="Password account"
+                    disabled={isLoading}
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="login-submit btn-success"
+                  disabled={isLoading || !userIdInput.trim()}
+                >
+                  {isLoading ? 'Accesso in corso...' : 'Accedi'}
+                </button>
+              </form>
+            )
           ) : (
             <div className="admin-login-area">
               {adminToken ? (

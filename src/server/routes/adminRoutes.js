@@ -430,6 +430,20 @@ function createAdminRouter(ctx) {
     }
   });
 
+  router.post('/api/admin/users/:userId/permissions', requireAdmin, (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { departmentPermissions } = req.body || {};
+      const result = userStore.setUserDepartmentPermissions(userId, departmentPermissions || {});
+      if (!result.ok) {
+        return errorResponse(res, 400, result.code || 'INVALID_REQUEST', result.message || 'Failed to update permissions');
+      }
+      res.json({ ok: true, userId: result.userId, departmentPermissions: result.departmentPermissions });
+    } catch (err) {
+      errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+    }
+  });
+
   router.get('/api/admin/departments', requireAdmin, (req, res) => {
     try {
       const names = departmentStore.list();

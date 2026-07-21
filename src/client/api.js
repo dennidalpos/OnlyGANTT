@@ -472,6 +472,17 @@ export async function setupAdminPassword(password, signal) {
   });
 }
 
+export async function saveUserDepartmentPermissions(userId, departmentPermissions, token, signal) {
+  return fetchJSON(`/api/admin/users/${encodeURIComponent(userId)}/permissions`, {
+    method: 'POST',
+    body: JSON.stringify({ departmentPermissions }),
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    signal
+  });
+}
+
 const api = {
   setUserToken,
   getUserToken,
@@ -507,6 +518,7 @@ const api = {
   getAdminUsers,
   saveLocalUser,
   deleteLocalUser,
+  saveUserDepartmentPermissions,
   adminResetPassword,
   adminChangePassword,
   adminServerRestart,

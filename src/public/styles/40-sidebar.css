@@ -17,6 +17,7 @@
   min-height: 0;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
 }
 
 
@@ -354,24 +355,63 @@
 }
 
 
+
 .gantt-with-sidebar.sidebar-collapsed .gantt-canvas-wrapper {
   
 }
 
 
-@media (max-width: 768px) {
+@media (max-width: 1366px), (max-height: 800px) {
+  .gantt-with-sidebar {
+    height: clamp(280px, calc(100vh - 220px), 720px);
+  }
+
   .project-sidebar.expanded {
-    width: 240px;
+    width: 250px;
   }
 
   .sidebar-project-name {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+  }
+
+  .sidebar-project-percent {
+    font-size: 0.62rem;
+    padding: 1px 4px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .gantt-with-sidebar {
+    height: clamp(260px, calc(100vh - 240px), 640px);
+  }
+
+  .project-sidebar.expanded {
+    width: 220px;
+  }
+
+  .sidebar-project-expanded {
+    padding: 0 6px;
+    gap: 4px;
+  }
+
+  .sidebar-project-name {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-sidebar.expanded {
+    width: 210px;
+  }
+
+  .sidebar-project-name {
+    font-size: 0.7rem;
   }
 }
 
 @media (max-width: 480px) {
   .project-sidebar.expanded {
-    width: min(220px, calc(100% - 48px));
+    width: min(200px, calc(100% - 48px));
     position: absolute;
     left: 0;
     top: 0;

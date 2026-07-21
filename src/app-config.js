@@ -101,5 +101,6 @@ if (typeof window !== 'undefined') {
   window.AppConfig = AppConfig;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { AppConfig, default: AppConfig };
+  Object.assign(AppConfig, { AppConfig, default: AppConfig });
+  module.exports = AppConfig;
 }

@@ -128,7 +128,7 @@ function createProjectRouter(ctx) {
       }
       const existingData = getDepartmentDataOrRespond(res, name);
       if (!existingData) return;
-      if (!requireDepartmentAccess(req, res, name, existingData)) return;
+      if (!requireDepartmentAccess(req, res, name, existingData, 'editor')) return;
       cleanExpiredLocks();
       if (!isLockOwner(name, userName)) {
         const lockInfo = getLockInfo(name);
@@ -169,7 +169,7 @@ function createProjectRouter(ctx) {
       }
       const data = getDepartmentDataOrRespond(res, department);
       if (!data) return;
-      if (!requireDepartmentAccess(req, res, department, data)) return;
+      if (!requireDepartmentAccess(req, res, department, data, 'editor')) return;
       cleanExpiredLocks();
       if (!isLockOwner(department, userName)) {
         const lockInfo = getLockInfo(department);
@@ -219,7 +219,7 @@ function createProjectRouter(ctx) {
       }
       const data = getDepartmentDataOrRespond(res, department);
       if (!data) return;
-      if (!requireDepartmentAccess(req, res, department, data)) return;
+      if (!requireDepartmentAccess(req, res, department, data, 'editor')) return;
       if (!isLockOwner(department, userName)) {
         const lockInfo = getLockInfo(department);
         if (lockInfo.locked) {

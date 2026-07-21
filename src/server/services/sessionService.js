@@ -1,9 +1,30 @@
 const crypto = require('crypto');
 
-function createSessionService({ configService, lockStore, errorResponse, normalizeDepartmentName, hasDepartmentPassword }) {
+function createSessionService({ configService, userStore, lockStore, errorResponse, normalizeDepartmentName, hasDepartmentPassword }) {
   const adminTokens = new Map();
   const userSessions = new Map();
   const CONFIG = configService.CONFIG;
+
+  const ROLE_LEVELS = {
+    supervisor: 3,
+    editor: 2,
+    viewer: 1,
+    none: 0
+  };
+
+  function getUserDepartmentRole(userName, department) {
+    if (!userName || !department || !userStore) return 'none';
+    const permissions = userStore.getUserDepartmentPermissions(userName);
+    const normalizedDept = normalizeDepartmentName(department);
+    if (!normalizedDept) return 'none';
+    for (const key of Object.keys(permissions || {})) {
+      if (key.toLowerCase() === normalizedDept.toLowerCase()) {
+        const role = permissions[key];
+        return ['supervisor', 'editor', 'viewer'].includes(role) ? role : 'none';
+      }
+    }
+    return 'none';
+  }
 
   function isValidAdminToken(token) {
     if (!token) return false;
@@ -204,9 +225,13 @@ function createSessionService({ configService, lockStore, errorResponse, normali
     if (!session?.department) return true;
     const scopedDepartment = normalizeDepartmentName(session.department);
     const requestedDepartment = normalizeDepartmentName(department);
-    return !!scopedDepartment &&
-      !!requestedDepartment &&
-      scopedDepartment.toLowerCase() === requestedDepartment.toLowerCase();
+    if (!scopedDepartment || !requestedDepartment) return false;
+    if (scopedDepartment.toLowerCase() === requestedDepartment.toLowerCase()) return true;
+    return Array.isArray(session?.departmentGrants) &&
+      session.departmentGrants.some((item) => (
+        typeof item === 'string' &&
+        item.toLowerCase() === requestedDepartment.toLowerCase()
+      ));
   }
 
   function sessionHasDepartmentGrant(session, department, data) {
@@ -235,7 +260,7 @@ function createSessionService({ configService, lockStore, errorResponse, normali
     }
   }
 
-  function requireDepartmentAccess(req, res, department, data) {
+  function requireDepartmentAccess(req, res, department, data, requiredRole = 'viewer') {
     const normalizedDepartment = normalizeDepartmentName(department);
     if (!normalizedDepartment) {
       errorResponse(res, 400, 'INVALID_NAME', 'Invalid department name');
@@ -250,12 +275,8 @@ function createSessionService({ configService, lockStore, errorResponse, normali
 
     if (principal.type === 'admin') {
       req.userSession = principal.session;
+      req.userRole = 'supervisor';
       return principal.session;
-    }
-
-    if (!sessionHasDepartmentScope(principal.session, normalizedDepartment)) {
-      errorResponse(res, 403, 'DEPARTMENT_FORBIDDEN', 'User is not authorized for this department');
-      return null;
     }
 
     if (hasDepartmentPassword(data) && !sessionHasDepartmentGrant(principal.session, normalizedDepartment, data)) {
@@ -263,7 +284,28 @@ function createSessionService({ configService, lockStore, errorResponse, normali
       return null;
     }
 
+    let role = getUserDepartmentRole(principal.session.userName, normalizedDepartment);
+    if (role === 'none') {
+      if (!hasDepartmentPassword(data) || sessionHasDepartmentGrant(principal.session, normalizedDepartment, data)) {
+        role = 'editor';
+      }
+    }
+
+    const currentLevel = ROLE_LEVELS[role] || 0;
+    const requiredLevel = ROLE_LEVELS[requiredRole] || 1;
+
+    if (currentLevel === 0) {
+      errorResponse(res, 403, 'DEPARTMENT_FORBIDDEN', 'Access to department is not authorized for this user');
+      return null;
+    }
+
+    if (currentLevel < requiredLevel) {
+      errorResponse(res, 403, 'INSUFFICIENT_PERMISSIONS', `Operation requires ${requiredRole} role in department`);
+      return null;
+    }
+
     req.userSession = principal.session;
+    req.userRole = role;
     return principal.session;
   }
 

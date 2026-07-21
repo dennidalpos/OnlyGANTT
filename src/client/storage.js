@@ -39,7 +39,8 @@
         userName: typeof session.userName === 'string' ? session.userName : '',
         department: typeof session.department === 'string' ? session.department : null,
         userToken: typeof session.userToken === 'string' ? session.userToken : null,
-        adminToken: typeof session.adminToken === 'string' ? session.adminToken : null
+        adminToken: typeof session.adminToken === 'string' ? session.adminToken : null,
+        userPermissions: session.userPermissions && typeof session.userPermissions === 'object' ? session.userPermissions : {}
       };
     } catch {
       return {};
@@ -53,7 +54,8 @@
         userName: session?.userName || '',
         department: session?.department || null,
         userToken: session?.userToken || null,
-        adminToken: session?.adminToken || null
+        adminToken: session?.adminToken || null,
+        userPermissions: session?.userPermissions || {}
       };
 
       if (!nextSession.userToken && !nextSession.adminToken && !nextSession.department) {
