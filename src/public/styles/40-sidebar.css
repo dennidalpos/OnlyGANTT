@@ -83,6 +83,24 @@
   color: white;
 }
 
+.sidebar-edit-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+  color: #60a5fa !important;
+  border-color: rgba(96, 165, 250, 0.4) !important;
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.sidebar-edit-btn:hover {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+  transform: scale(1.05);
+}
+
 .sidebar-icon {
   font-size: 1rem;
   line-height: 1;

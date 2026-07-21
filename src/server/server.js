@@ -106,7 +106,7 @@ function getDepartmentDataOrRespond(res, department) {
   return data;
 }
 
-function writeDepartmentData(department, data) {
+function writeDepartmentData(department, data, changes = [], updatedBy = null) {
   normalizeDepartmentDataForWrite(data);
   const errors = validateDepartmentData(data);
   if (errors.length > 0) {
@@ -114,7 +114,7 @@ function writeDepartmentData(department, data) {
   }
   ensureIDs(data);
   departmentStore.set(department, data);
-  sseService.broadcastDepartmentUpdate(department, data);
+  sseService.broadcastDepartmentUpdate(department, data, changes, updatedBy);
 }
 
 const backupService = createBackupService({

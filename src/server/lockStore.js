@@ -64,33 +64,7 @@ function createLockStore({ dataDir, dbName = 'locks.db', logger = console }) {
     let expired = 0;
     const now = new Date();
 
-    // 1. Migrate legacy locks.json if it exists
-    const legacyPath = path.join(dataDir, 'locks.json');
-    if (fs.existsSync(legacyPath)) {
-      try {
-        const content = fs.readFileSync(legacyPath, 'utf8');
-        const payload = JSON.parse(content);
-        const list = Array.isArray(payload) ? payload : payload?.locks;
-        if (Array.isArray(list)) {
-          list.forEach(lock => {
-            if (lock && typeof lock.department === 'string') {
-              if (isExpired(lock, now)) {
-                expired += 1;
-              } else {
-                locks.set(lock.department, lock);
-                persistLock(lock.department, lock);
-                loaded += 1;
-              }
-            }
-          });
-        }
-        fs.unlinkSync(legacyPath);
-      } catch (err) {
-        logger.warn(`[LockStore] legacy locks.json migration warning: ${err.message}`);
-      }
-    }
-
-    // 2. Load active locks from SQLite
+    // Load active locks from SQLite
     try {
       const rows = db.prepare('SELECT department, data FROM locks').all();
       rows.forEach(row => {

@@ -78,8 +78,9 @@ Assert-True -Condition ($bundleElement.Name -eq 'OnlyGANTT') -Message 'Bundle Na
 
 $onlyGanttMsiPackage = $bundleDoc.SelectSingleNode('//wix:MsiPackage[@Id="OnlyGanttMsi"]', $bundleNsManager)
 Assert-True -Condition ($null -ne $onlyGanttMsiPackage) -Message 'OnlyGanttMsi MsiPackage is missing from Bundle.wxs.'
-Assert-True -Condition ($onlyGanttMsiPackage.Visible -eq 'no') -Message 'OnlyGanttMsi should set Visible="no" to hide the MSI package from ARP and prevent duplicate entries.'
+Assert-True -Condition ($onlyGanttMsiPackage.Visible -eq 'yes') -Message 'OnlyGanttMsi should set Visible="yes" to delegate ARP entry management to the MSI package and prevent duplicate entries.'
 
-Assert-True -Condition ($bundleElement.GetAttribute('DisableRemove') -ne 'yes') -Message 'Bundle should not set DisableRemove="yes" so the setup bootstrapper is the sole active ARP entry.'
+$relatedBundle = $bundleDoc.SelectSingleNode('//wix:RelatedBundle', $bundleNsManager)
+Assert-True -Condition ($null -ne $relatedBundle) -Message 'Bundle.wxs should include RelatedBundle for upgrade tracking.'
 
 Write-Host 'Installer source regression check passed'

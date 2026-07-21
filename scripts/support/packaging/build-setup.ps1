@@ -61,11 +61,28 @@ foreach ($toolName in 'candle.exe', 'light.exe') {
   Assert-PathExists -Path $toolPath -Label $toolName
 }
 
+function Test-FileLocked {
+  param([string]$FilePath)
+  if (-not (Test-Path $FilePath)) { return $false }
+  try {
+    $stream = [System.IO.File]::Open($FilePath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    $stream.Close()
+    return $false
+  } catch {
+    return $true
+  }
+}
+
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
 $packageVersion = if ($Version) { $Version } else { [string]$packageJson.version }
 $productVersion = Get-SemVerCore -InputVersion $packageVersion
 
-$msiPath = Join-Path $repoRoot "artifacts\packages\msi\OnlyGantt-$productVersion-x64.msi"
+$msiPackagesRoot = Join-Path $repoRoot 'artifacts\packages\msi'
+$msiCandidate = Get-ChildItem -Path $msiPackagesRoot -Filter "OnlyGantt-$productVersion*-x64.msi" -File -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1
+
+$msiPath = if ($msiCandidate) { $msiCandidate.FullName } else { Join-Path $msiPackagesRoot "OnlyGantt-$productVersion-x64.msi" }
 Assert-PathExists -Path $msiPath -Label 'OnlyGANTT MSI package'
 
 $nodeMsiPath = Join-Path $repoRoot 'artifacts\build\prerequisites\node-v24.15.0-x64.msi'
@@ -75,10 +92,20 @@ $buildRoot = Join-Path $repoRoot 'artifacts\build\setup'
 $objRoot = Join-Path $buildRoot 'obj'
 $distRoot = Join-Path $repoRoot 'artifacts\packages\setup'
 $licenseRtfPath = Join-Path $buildRoot 'LICENSE.rtf'
-$setupOutputPath = Join-Path $distRoot "OnlyGantt-Setup-$productVersion-x64.exe"
+$setupName = "OnlyGantt-Setup-$productVersion-x64.exe"
+$setupOutputPath = Join-Path $distRoot $setupName
+if (Test-FileLocked -FilePath $setupOutputPath) {
+  $timestamp = Get-Date -Format 'yyyyMMddHHmmss'
+  $setupName = "OnlyGantt-Setup-$productVersion-$timestamp-x64.exe"
+  $setupOutputPath = Join-Path $distRoot $setupName
+}
 
 if (Test-Path $buildRoot) {
   Remove-Item -Path $buildRoot -Recurse -Force
+}
+
+if (Test-Path $setupOutputPath) {
+  Remove-Item -Path $setupOutputPath -Force -ErrorAction SilentlyContinue
 }
 
 New-Item -ItemType Directory -Force -Path $objRoot, $distRoot | Out-Null
@@ -107,9 +134,11 @@ if ($LASTEXITCODE -ne 0) {
   throw "candle.exe failed with exit code $LASTEXITCODE"
 }
 
+$tempSetupPath = Join-Path $objRoot 'built_setup.exe'
+
 $lightArguments = @(
   '-nologo'
-  '-out', $setupOutputPath
+  '-out', $tempSetupPath
   '-ext', 'WixBalExtension'
   '-ext', 'WixUtilExtension'
   $bundleObject
@@ -120,4 +149,12 @@ if ($LASTEXITCODE -ne 0) {
   throw "light.exe failed with exit code $LASTEXITCODE"
 }
 
+if (Test-Path $setupOutputPath) {
+  $staleBackup = "$setupOutputPath.stale.$([System.Guid]::NewGuid().ToString('N'))"
+  try { Move-Item -Path $setupOutputPath -Destination $staleBackup -Force -ErrorAction SilentlyContinue } catch {}
+  try { Remove-Item -Path $staleBackup -Force -ErrorAction SilentlyContinue } catch {}
+}
+
+Copy-Item -Path $tempSetupPath -Destination $setupOutputPath -Force
+Remove-Item -Path $tempSetupPath -Force -ErrorAction SilentlyContinue
 Write-Host "Setup bootstrapper created: $setupOutputPath"

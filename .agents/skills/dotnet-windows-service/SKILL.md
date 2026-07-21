@@ -35,7 +35,7 @@ The service host is configured with the following properties:
     <RootNamespace>OnlyGantt.Service</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.10" />
   </ItemGroup>
 </Project>
 ```

@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const { computeDepartmentChanges } = require('../../domain/changeTracker');
 
 function createProjectRouter(ctx) {
   const router = express.Router();
@@ -196,14 +197,15 @@ function createProjectRouter(ctx) {
       if (errors.length > 0) {
         return errorResponse(res, 400, 'VALIDATION_ERROR', 'Invalid project data', { errors });
       }
+      const diffResult = computeDepartmentChanges(data, validationData, userName || 'Un utente');
       data.projects = projects;
       data.meta = {
         updatedAt: new Date().toISOString(),
         updatedBy: userName || 'unknown',
         revision: currentRevision + 1
       };
-      writeDepartmentData(department, data);
-      res.json({ ok: true, meta: data.meta });
+      writeDepartmentData(department, data, diffResult.changes, userName || 'unknown');
+      res.json({ ok: true, meta: data.meta, changes: diffResult.changes });
     } catch (err) {
       errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
     }

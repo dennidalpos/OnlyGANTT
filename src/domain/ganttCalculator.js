@@ -733,6 +733,10 @@ export function render(ctx, layout, options = {}) {
 
 export function hitTest(mouseX, mouseY, layout) {
   for (const row of layout.rows) {
+    if (mouseY < row.y || mouseY > row.y + row.height) {
+      continue;
+    }
+
     if (Array.isArray(row.project.fasi)) {
       for (const fase of row.project.fasi) {
         if (fase.milestone && fase.dataFine) {

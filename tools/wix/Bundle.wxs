@@ -9,6 +9,8 @@
     Manufacturer="Danny Perondi"
     UpgradeCode="B08F4DE5-BB9E-4263-8EE4-92F4D3940A59"
     IconSourceFile="$(var.BrandIcon)">
+    <RelatedBundle Id="B08F4DE5-BB9E-4263-8EE4-92F4D3940A59" Action="Upgrade" />
+
     <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
       <bal:WixStandardBootstrapperApplication LicenseFile="$(var.LicenseRtf)" SuppressOptionsUI="yes" />
     </BootstrapperApplicationRef>
@@ -33,7 +35,7 @@
         Id="OnlyGanttMsi"
         SourceFile="$(var.ProductMsiSource)"
         DisplayInternalUI="yes"
-        Visible="no"
+        Visible="yes"
         Vital="yes" />
     </Chain>
   </Bundle>

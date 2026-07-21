@@ -33,7 +33,7 @@ This skill provides developer guidelines and official documentation standards fo
 - `ProjectForm`: Project creation and editing dialogs.
 - `LoginScreen`: Authentication interface supporting local and LDAP authentication.
 - `UserManagement` & `SystemSettings`: Administrative configuration tools.
-- `AlertsPanel` & `DialogHost`: Toast alerts, notifications, and modal dialog hosting.
+- `AlertsDrawer` & `DialogHost`: Toast alerts, notifications, and modal dialog hosting.
 
 ### Key Custom Hooks
 - `useAuth`: Encapsulates authentication, user/admin tokens, department selection, and read-only state.

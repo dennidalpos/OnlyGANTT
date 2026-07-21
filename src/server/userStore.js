@@ -104,31 +104,7 @@ function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
   `);
 
   const ensureStore = () => {
-    // Migration helper for legacy json user files into SQLite
-    try {
-      const files = fs.readdirSync(dataDir);
-      for (const file of files) {
-        if (file.endsWith('.json') && !file.endsWith('.tmp') && !file.endsWith('.bak')) {
-          const filePath = path.join(dataDir, file);
-          try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            const data = JSON.parse(content);
-            if (isValidUserRecord(data)) {
-              const normId = data.userIdNormalized.toLowerCase();
-              const existing = db.prepare('SELECT 1 FROM users WHERE user_id_normalized = ?').get(normId);
-              if (!existing) {
-                db.prepare('INSERT INTO users (user_id_normalized, user_id, data) VALUES (?, ?, ?)').run(
-                  normId,
-                  data.userId,
-                  JSON.stringify(data)
-                );
-              }
-            }
-            fs.unlinkSync(filePath);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
+    // SQLite user store ready
   };
 
   const readUserFile = (userId) => {

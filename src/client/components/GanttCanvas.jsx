@@ -16,7 +16,8 @@ export function GanttCanvas({
   verticalScrollTop,
   onVerticalScrollChange,
   sidebarCollapsed,
-  onIsScrollableChange
+  onIsScrollableChange,
+  onEditProject
 }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
@@ -55,8 +56,15 @@ export function GanttCanvas({
 
   const handleVerticalScroll = useCallback((e) => {
     if (isSyncingVerticalScrollRef.current) return;
+    const currentTop = e.target.scrollTop;
+
+    const sidebarContainer = document.querySelector('.sidebar-scroll-container');
+    if (sidebarContainer && Math.abs(sidebarContainer.scrollTop - currentTop) > 0.5) {
+      sidebarContainer.scrollTop = currentTop;
+    }
+
     if (onVerticalScrollChange) {
-      onVerticalScrollChange(e.target.scrollTop);
+      onVerticalScrollChange(currentTop);
     }
   }, [onVerticalScrollChange]);
 
@@ -77,6 +85,12 @@ export function GanttCanvas({
     e.preventDefault();
     syncedVerticalScrollTopRef.current = nextScrollTop;
     container.scrollTop = nextScrollTop;
+
+    const sidebarContainer = document.querySelector('.sidebar-scroll-container');
+    if (sidebarContainer && Math.abs(sidebarContainer.scrollTop - nextScrollTop) > 0.5) {
+      sidebarContainer.scrollTop = nextScrollTop;
+    }
+
     onVerticalScrollChange(nextScrollTop);
   }, [onVerticalScrollChange]);
 
@@ -534,28 +548,76 @@ export function GanttCanvas({
         )
       )}
 
-      {contextMenu && (
-        <div
-          className="gantt-context-menu"
-          style={{
-            left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`
-          }}
-          role="menu"
-        >
-          <button type="button" onClick={handleMenuAction} role="menuitem">
-            Vai su Progetto: {contextMenu.project?.nome || 'Senza nome'}
-          </button>
-        </div>
+      {contextMenu && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal ? (
+        ReactDOM.createPortal(
+          <div
+            className="gantt-context-menu"
+            style={{
+              position: 'fixed',
+              left: `${Math.min(contextMenu.x, window.innerWidth - 260)}px`,
+              top: `${Math.min(contextMenu.y, window.innerHeight - 180)}px`,
+              zIndex: 9999
+            }}
+            role="menu"
+          >
+            {onEditProject && contextMenu.project && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEditProject(contextMenu.project, {
+                    tab: contextMenu.phase ? 'phases' : 'general',
+                    phaseId: contextMenu.phase?.id
+                  });
+                  setContextMenu(null);
+                }}
+                role="menuitem"
+                style={{ fontWeight: '600', color: '#3b82f6', marginBottom: '2px' }}
+              >
+                ✏ Modifica {contextMenu.phase ? `Fase (${contextMenu.phase.nome})` : 'Progetto'}
+              </button>
+            )}
+            <button type="button" onClick={handleMenuAction} role="menuitem">
+              🎯 Centra su Progetto: {contextMenu.project?.nome || 'Senza nome'}
+            </button>
+          </div>,
+          document.body
+        )
+      ) : (
+        contextMenu && (
+          <div
+            className="gantt-context-menu"
+            style={{
+              position: 'fixed',
+              left: `${Math.min(contextMenu.x, window.innerWidth - 260)}px`,
+              top: `${Math.min(contextMenu.y, window.innerHeight - 180)}px`,
+              zIndex: 9999
+            }}
+            role="menu"
+          >
+            {onEditProject && contextMenu.project && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEditProject(contextMenu.project, {
+                    tab: contextMenu.phase ? 'phases' : 'general',
+                    phaseId: contextMenu.phase?.id
+                  });
+                  setContextMenu(null);
+                }}
+                role="menuitem"
+                style={{ fontWeight: '600', color: '#3b82f6', marginBottom: '2px' }}
+              >
+                ✏ Modifica {contextMenu.phase ? `Fase (${contextMenu.phase.nome})` : 'Progetto'}
+              </button>
+            )}
+            <button type="button" onClick={handleMenuAction} role="menuitem">
+              🎯 Centra su Progetto: {contextMenu.project?.nome || 'Senza nome'}
+            </button>
+          </div>
+        )
       )}
     </div>
   );
-}
-
-if (typeof window !== 'undefined') {
-  window.OnlyGantt = window.OnlyGantt || {};
-  window.OnlyGantt.components = window.OnlyGantt.components || {};
-  window.OnlyGantt.components.GanttCanvas = GanttCanvas;
 }
 
 export default GanttCanvas;

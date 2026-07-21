@@ -42,6 +42,15 @@ function Get-AvailableTcpPort {
   throw 'No free TCP port found in validation range 3324-3399.'
 }
 
+$changeTrackerLogPath = Join-Path $repoRoot 'artifacts\test-results\change-tracker-check.log'
+$changeTrackerScript = Join-Path $repoRoot 'tests\change-tracker-check.js'
+
+& node $changeTrackerScript 2>&1 | Tee-Object -FilePath $changeTrackerLogPath
+$exitCode = $LASTEXITCODE
+if ($exitCode -ne 0) {
+  throw "Change tracker check failed with exit code $exitCode"
+}
+
 & node $smokeScript 2>&1 | Tee-Object -FilePath $logPath
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {

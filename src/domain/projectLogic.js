@@ -190,6 +190,12 @@ export function getProjectAlertSeverity(alerts) {
 }
 
 export function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -430,10 +436,5 @@ const projectLogic = {
   getPhaseColor,
   getAllPhaseNames
 };
-
-if (typeof window !== 'undefined') {
-  window.OnlyGantt = window.OnlyGantt || {};
-  window.OnlyGantt.logic = projectLogic;
-}
 
 export default projectLogic;

@@ -15,14 +15,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const { DatabaseSync } = require('node:sqlite');
+
 function createTempDataDir() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'onlygantt-smoke-'));
   ['reparti', 'config', 'utenti', 'log'].forEach((segment) => {
     fs.mkdirSync(path.join(root, segment), { recursive: true });
   });
 
-  const demoDepartmentPath = path.join(root, 'reparti', 'Demo.json');
-  fs.writeFileSync(demoDepartmentPath, JSON.stringify({
+  const deptDb = new DatabaseSync(path.join(root, 'reparti.db'));
+  deptDb.exec('CREATE TABLE IF NOT EXISTS departments (name TEXT PRIMARY KEY, data TEXT NOT NULL)');
+  deptDb.prepare('INSERT INTO departments (name, data) VALUES (?, ?)').run('Demo', JSON.stringify({
     password: null,
     projects: [],
     meta: {
@@ -30,7 +33,8 @@ function createTempDataDir() {
       updatedBy: 'smoke-seed',
       revision: 1
     }
-  }, null, 2), 'utf8');
+  }));
+  deptDb.close();
 
   return root;
 }

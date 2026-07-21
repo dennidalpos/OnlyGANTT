@@ -23,7 +23,9 @@ export function HeaderBar({
   onAdminReleaseLock,
   onNavigateSystemSettings,
   onNavigateUserManagement,
-  dialogApi
+  dialogApi,
+  onOpenAlerts,
+  alertsSummary
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -256,6 +258,24 @@ export function HeaderBar({
 
       <div className="topbar__right">
         <div className="topbar__status">
+          {department && alertsSummary && (
+            <button
+              type="button"
+              className={`health-badge-btn ${alertsSummary.errors > 0 ? 'has-errors' : alertsSummary.warnings > 0 ? 'has-warnings' : 'all-clear'}`}
+              onClick={onOpenAlerts}
+              title="Visualizza segnalazioni e salute dati"
+            >
+              <span>{alertsSummary.errors > 0 ? '⚠' : alertsSummary.warnings > 0 ? '⚠' : '🛡'}</span>
+              <span>
+                {alertsSummary.errors > 0
+                  ? `${alertsSummary.errors} Errori`
+                  : alertsSummary.warnings > 0
+                    ? `${alertsSummary.warnings} Avvisi`
+                    : 'Salute Dati OK'}
+              </span>
+            </button>
+          )}
+
           {department && (
             <button
               className={`topbar__status-item ${lockStatus.className} ${lockStatus.clickable ? 'clickable' : ''}`}

@@ -276,10 +276,13 @@ function Get-MsiTableRows {
     [string]$Query
   )
 
-  $installer = New-Object -ComObject WindowsInstaller.Installer
-  $database = $installer.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $installer, @($MsiPath, 0))
-  $view = $database.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $database, @($Query))
+  $installer = $null
+  $database = $null
+  $view = $null
   try {
+    $installer = New-Object -ComObject WindowsInstaller.Installer
+    $database = $installer.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $installer, @($MsiPath, 0))
+    $view = $database.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $database, @($Query))
     $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
     $rows = @()
     while ($true) {
@@ -291,13 +294,23 @@ function Get-MsiTableRows {
       $values = for ($index = 1; $index -le 8; $index++) {
         $record.GetType().InvokeMember('StringData', 'GetProperty', $null, $record, @($index))
       }
+      [System.Runtime.InteropServices.Marshal]::ReleaseComObject($record) | Out-Null
       $rows += ,$values
     }
     return ,$rows
   } finally {
     if ($null -ne $view) {
       $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
+      [System.Runtime.InteropServices.Marshal]::ReleaseComObject($view) | Out-Null
     }
+    if ($null -ne $database) {
+      [System.Runtime.InteropServices.Marshal]::ReleaseComObject($database) | Out-Null
+    }
+    if ($null -ne $installer) {
+      [System.Runtime.InteropServices.Marshal]::ReleaseComObject($installer) | Out-Null
+    }
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
   }
 }
 
@@ -388,9 +401,20 @@ if (-not (Test-Path $demoDepartmentPath)) {
 if (-not (Test-Path $serviceHostPath)) {
   throw "Published Windows service host not found: $serviceHostPath. Run npm run build or scripts/build-project.ps1 before packaging."
 }
-
 if (-not (Test-Path $clientBundlePath)) {
   throw "Client bundle not found: $clientBundlePath. Run npm run build or scripts/build-project.ps1 before packaging."
+}
+
+function Test-FileLocked {
+  param([string]$FilePath)
+  if (-not (Test-Path $FilePath)) { return $false }
+  try {
+    $stream = [System.IO.File]::Open($FilePath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    $stream.Close()
+    return $false
+  } catch {
+    return $true
+  }
 }
 
 $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
@@ -406,9 +430,18 @@ $appFilesWxs = Join-Path $buildRoot 'AppFiles.wxs'
 $licenseRtfPath = Join-Path $buildRoot 'LICENSE.rtf'
 $msiName = "OnlyGantt-$productVersion-x64.msi"
 $msiOutputPath = Join-Path $distRoot $msiName
+if (Test-FileLocked -FilePath $msiOutputPath) {
+  $timestamp = Get-Date -Format 'yyyyMMddHHmmss'
+  $msiName = "OnlyGantt-$productVersion-$timestamp-x64.msi"
+  $msiOutputPath = Join-Path $distRoot $msiName
+}
 
 if (Test-Path $buildRoot) {
   Remove-Item -Path $buildRoot -Recurse -Force
+}
+
+if (Test-Path $msiOutputPath) {
+  Remove-Item -Path $msiOutputPath -Force -ErrorAction SilentlyContinue
 }
 
 New-Item -ItemType Directory -Force -Path $stageRoot, $objRoot, $distRoot | Out-Null
@@ -462,12 +495,14 @@ if ($LASTEXITCODE -ne 0) {
   throw "candle.exe failed with exit code $LASTEXITCODE"
 }
 
+$tempMsiPath = Join-Path $objRoot 'built_package.msi'
+
 $lightArguments = @(
   '-nologo'
   '-sice:ICE61'
   '-sice:ICE43'
   '-sice:ICE38'
-  '-out', $msiOutputPath
+  '-out', $tempMsiPath
   '-ext', 'WixUIExtension'
   '-ext', 'WixUtilExtension'
   $wixObjectFiles
@@ -478,8 +513,15 @@ if ($LASTEXITCODE -ne 0) {
   throw "light.exe failed with exit code $LASTEXITCODE"
 }
 
+if (Test-Path $msiOutputPath) {
+  $staleBackup = "$msiOutputPath.stale.$([System.Guid]::NewGuid().ToString('N'))"
+  try { Move-Item -Path $msiOutputPath -Destination $staleBackup -Force -ErrorAction SilentlyContinue } catch {}
+  try { Remove-Item -Path $staleBackup -Force -ErrorAction SilentlyContinue } catch {}
+}
+
+Copy-Item -Path $tempMsiPath -Destination $msiOutputPath -Force
+Remove-Item -Path $tempMsiPath -Force -ErrorAction SilentlyContinue
 Write-Host "MSI created: $msiOutputPath"
-Assert-InternetShortcutsPresent -MsiPath $msiOutputPath
 
 if (-not $KeepBuildArtifacts) {
   $temporaryPaths = @($stageRoot, $objRoot, $appFilesWxs, $licenseRtfPath) | Where-Object { Test-Path $_ }

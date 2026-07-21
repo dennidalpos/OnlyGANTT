@@ -43,12 +43,15 @@ function Resolve-MsiPath {
   }
 
   if ($Version) {
-    $candidate = Join-Path $PackagesRoot "OnlyGantt-$Version-x64.msi"
-    if (-not (Test-Path $candidate)) {
-      throw "MSI not found for version ${Version}: $candidate"
+    $msiCandidate = Get-ChildItem -Path $PackagesRoot -Filter "OnlyGantt-$Version*-x64.msi" -File -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+
+    if ($null -eq $msiCandidate) {
+      throw "MSI not found for version ${Version} under $PackagesRoot"
     }
 
-    return (Resolve-Path $candidate).Path
+    return $msiCandidate.FullName
   }
 
   $msi = Get-ChildItem -Path $PackagesRoot -Filter 'OnlyGantt-*-x64.msi' -File -ErrorAction SilentlyContinue |
@@ -221,6 +224,11 @@ function Assert-OnlyGanttInstalled {
     throw 'OnlyGANTT uninstall entry not found after installation.'
   }
 
+  $allEntries = Get-OnlyGanttUninstallEntries
+  if ($allEntries.Count -gt 1) {
+    throw "Found $($allEntries.Count) duplicate uninstall entries for OnlyGANTT in Windows Uninstall registry. Expected exactly 1 entry."
+  }
+
   if ($entry.DisplayVersion -ne $ExpectedVersion) {
     throw "Expected installed version $ExpectedVersion, found $($entry.DisplayVersion)."
   }
@@ -366,6 +374,7 @@ function Remove-OnlyGanttMachineState {
   }
 
   if ($installRoot -and (Test-Path $installRoot)) {
+    Stop-Process -Name OnlyGantt.Service, node -Force -ErrorAction SilentlyContinue
     $lastRemovalError = $null
 
     foreach ($attempt in 1..10) {

@@ -97,9 +97,6 @@ const AppConfig = {
   ]
 };
 
-if (typeof window !== 'undefined') {
-  window.AppConfig = AppConfig;
-}
 if (typeof module !== 'undefined' && module.exports) {
   Object.assign(AppConfig, { AppConfig, default: AppConfig });
   module.exports = AppConfig;

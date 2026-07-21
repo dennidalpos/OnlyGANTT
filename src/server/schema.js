@@ -151,11 +151,10 @@ function validateDepartmentData(data) {
 
   const hasValidPassword = data.password === null ||
     data.password === undefined ||
-    typeof data.password === 'string' ||
     isValidHashedSecret(data.password);
 
   if (!hasValidPassword) {
-    errors.push('password must be null, a string, or a supported hashed secret object');
+    errors.push('password must be null or a supported hashed secret object');
   }
 
   if (!Array.isArray(data.projects)) {

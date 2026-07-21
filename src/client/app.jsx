@@ -16,9 +16,8 @@ import HeaderBar from './components/HeaderBar.jsx';
 import GanttControls from './components/GanttControls.jsx';
 import GanttCanvas from './components/GanttCanvas.jsx';
 import ProjectForm from './components/ProjectForm.jsx';
-import ProjectList from './components/ProjectList.jsx';
 import ProjectSidebar from './components/ProjectSidebar.jsx';
-import AlertsPanel from './components/AlertsPanel.jsx';
+import AlertsDrawer from './components/AlertsDrawer.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import SystemSettings from './components/SystemSettings.jsx';
 import UserManagement from './components/UserManagement.jsx';
@@ -129,6 +128,8 @@ export function App() {
     isLoading,
     validationErrors,
     error: projectsError,
+    remoteNotice,
+    clearRemoteNotice,
     loadProjects,
     saveProjects,
     updateProjects,
@@ -136,6 +137,28 @@ export function App() {
   } = useProjects(auth.department, auth.readOnlyDepartment, {
     requestProjectFixConfirmation
   });
+
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+
+  const alertsSummary = useMemo(() => {
+    if (!projects || projects.length === 0) return { errors: 0, warnings: 0, infos: 0 };
+    let errors = 0;
+    let warnings = 0;
+    let infos = 0;
+    projects.forEach(p => {
+      const alerts = logic.getProjectAlerts(p);
+      if (alerts.projectDelayed) errors++;
+      if (alerts.phasesDelayed.length > 0) errors++;
+      if (alerts.phasesOutsideRange.length > 0) errors++;
+      if (alerts.milestonesOutsideRange.length > 0) errors++;
+      if (alerts.percentage100NotCompleted) errors++;
+      if (alerts.projectMissingDates) warnings++;
+      if (alerts.noPhases) warnings++;
+      if (alerts.phasesMissingDates.length > 0) warnings++;
+      if (alerts.phasesOnHoliday.length > 0) infos++;
+    });
+    return { errors, warnings, infos };
+  }, [projects]);
 
   useEffect(() => {
     api.setUserToken(auth.userToken);
@@ -591,7 +614,7 @@ export function App() {
     draftState.openNewProjectForm();
   };
 
-  const handleEditProject = async (project) => {
+  const handleEditProject = async (project, options = {}) => {
     if (!project) {
       handleNewProject();
       return;
@@ -600,7 +623,7 @@ export function App() {
     const canProceed = await confirmPendingChanges('modificare un altro progetto');
     if (!canProceed) return;
 
-    draftState.openEditProjectForm(project);
+    draftState.openEditProjectForm(project, options);
   };
 
   const handleCancelProjectForm = async () => {
@@ -769,6 +792,33 @@ export function App() {
     notify.pushNotification({ type: 'success', message: 'Export progetti completato' });
   };
 
+  const handleFixAlerts = async () => {
+    if (auth.readOnlyDepartment) {
+      notify.pushNotification({ type: 'warning', message: 'Impossibile applicare i fix in modalità sola lettura' });
+      return;
+    }
+    const { errors, projects: fixedProjects } = logic.validateAndFixProjects(projects);
+    let autoFixedCount = 0;
+    const resolvedProjects = fixedProjects.map(p => {
+      const updated = { ...p };
+      if (logic.autoFixPercentage100(updated)) {
+        autoFixedCount++;
+      }
+      return updated;
+    });
+
+    try {
+      await saveProjects(auth.effectiveUserName, resolvedProjects);
+      refreshGantt();
+      notify.pushNotification({
+        type: 'success',
+        message: `Fix automatici applicati con successo (${errors.length + autoFixedCount} correzioni)`
+      });
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: `Errore durante l'applicazione dei fix: ${err.message}` });
+    }
+  };
+
   const visibleProjects = useMemo(
     () => projects.filter(p => filtersState.selectedProjectIds.has(p.id)),
     [projects, filtersState.selectedProjectIds]
@@ -826,6 +876,31 @@ export function App() {
         {lockError && !lockError.lockedBy && lockError.message && (
           <div className="lock-banner">
             {lockError.message}
+          </div>
+        )}
+
+        {remoteNotice && (
+          <div className="lock-banner remote-changes-banner" style={{ backgroundColor: 'rgba(30, 58, 138, 0.9)', borderColor: 'rgba(59, 130, 246, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <strong>🔄 Modifiche da {remoteNotice.updatedBy}:</strong>
+              {remoteNotice.changes && remoteNotice.changes.length > 0 ? (
+                <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: '0.85rem' }}>
+                  {remoteNotice.changes.map((change, i) => (
+                    <li key={i}>{change}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span style={{ marginLeft: '8px' }}>Reparto aggiornato alla revisione #{remoteNotice.revision}.</span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer' }}
+              onClick={clearRemoteNotice}
+            >
+              Chiudi
+            </button>
           </div>
         )}
 
@@ -904,6 +979,9 @@ export function App() {
                           onSelectedProjectIdsChange={filtersState.setSelectedProjectIds}
                           onEditProject={handleEditProject}
                           onDeleteProject={handleDeleteProject}
+                          onNewProject={handleNewProject}
+                          onImportJSON={handleImportJSON}
+                          onExportJSON={handleExportProjects}
                           readOnly={auth.readOnlyDepartment}
                           isSaving={draftState.isSavingProject}
                           hoveredProjectId={hoveredProjectId}
@@ -929,6 +1007,7 @@ export function App() {
                             onVerticalScrollChange={setVerticalScrollTop}
                             sidebarCollapsed={sidebarCollapsed}
                             onIsScrollableChange={setIsGanttScrollable}
+                            onEditProject={handleEditProject}
                           />
                         </div>
                       </div>
@@ -937,98 +1016,30 @@ export function App() {
                 </div>
               </div>
 
-              <div className="bottom-layout">
-                <div>
-                  <div className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h2 className="card-title">Gestione Progetto</h2>
-                      {draftState.showProjectForm && (
-                        <div>
-                          {showProjectUnsavedBadge ? (
-                            <span className="badge badge-warning">Modifiche non salvate</span>
-                          ) : (
-                            <span className="badge badge-success">Salvato</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+              {draftState.showProjectForm && (
+                <ProjectForm
+                  isOpen={draftState.showProjectForm}
+                  project={draftState.editingProject}
+                  initialTab={draftState.initialFormTab}
+                  initialPhaseId={draftState.initialPhaseId}
+                  onSave={handleSaveProject}
+                  onDelete={handleDeleteProject}
+                  onCancel={handleCancelProjectForm}
+                  readOnly={auth.readOnlyDepartment}
+                  isSaving={draftState.isSavingProject}
+                  onDraftChange={draftState.setProjectDraft}
+                  dialogApi={notify.dialogApi}
+                  pushNotification={notify.pushNotification}
+                />
+              )}
 
-                    <div className="button-group">
-                      <button
-                        onClick={handleNewProject}
-                        className="btn-success"
-                        disabled={auth.readOnlyDepartment || draftState.isSavingProject}
-                      >
-                        Nuovo Progetto
-                      </button>
-                      {draftState.showProjectForm && (
-                        <button
-                          onClick={() => draftState.projectDraft && handleSaveProject(draftState.projectDraft)}
-                          className="btn-success"
-                          disabled={auth.readOnlyDepartment || draftState.isSavingProject || !draftState.projectDraft}
-                        >
-                          {draftState.isSavingProject ? 'Salvataggio...' : 'Salva progetto e chiudi'}
-                        </button>
-                      )}
-                      {draftState.showProjectForm && (
-                        <button
-                          onClick={() => draftState.projectDraft?.id && handleDeleteProject(draftState.projectDraft.id)}
-                          className="btn-danger"
-                          disabled={auth.readOnlyDepartment || draftState.isSavingProject || !draftState.projectDraft?.id}
-                        >
-                          Elimina progetto
-                        </button>
-                      )}
-                      {draftState.showProjectForm && draftState.hasDraftChanges && (
-                        <button
-                          onClick={handleCancelProjectForm}
-                          className="btn-secondary"
-                          disabled={draftState.isSavingProject}
-                        >
-                          Annulla modifiche
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {draftState.showProjectForm && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <ProjectForm
-                        project={draftState.editingProject}
-                        onSave={handleSaveProject}
-                        onDelete={handleDeleteProject}
-                        onCancel={handleCancelProjectForm}
-                        readOnly={auth.readOnlyDepartment}
-                        isSaving={draftState.isSavingProject}
-                        onDraftChange={draftState.setProjectDraft}
-                        dialogApi={notify.dialogApi}
-                        pushNotification={notify.pushNotification}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <ProjectList
-                    projects={projects}
-                    selectedProjectIds={filtersState.selectedProjectIds}
-                    onSelectedProjectIdsChange={filtersState.setSelectedProjectIds}
-                    onEditProject={handleEditProject}
-                    onDeleteProject={handleDeleteProject}
-                    onExportJSON={handleExportProjects}
-                    onImportJSON={handleImportJSON}
-                    validationErrors={validationErrors}
-                    readOnly={auth.readOnlyDepartment}
-                    isSaving={draftState.isSavingProject}
-                    focusedProjectId={draftState.focusedProjectId}
-                    onFocusHandled={handleProjectFocusHandled}
-                  />
-                </div>
-
-                <div>
-                  <AlertsPanel projects={projects} />
-                </div>
-              </div>
+              <AlertsDrawer
+                isOpen={isAlertsOpen}
+                onClose={() => setIsAlertsOpen(false)}
+                projects={projects}
+                onEditProject={handleEditProject}
+                onFixErrors={handleFixAlerts}
+              />
             </>
           )}
         </main>

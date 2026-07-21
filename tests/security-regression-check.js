@@ -26,13 +26,17 @@ function hashPassword(password) {
   };
 }
 
+const { DatabaseSync } = require('node:sqlite');
+
 function createTempDataDir() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'onlygantt-security-'));
   ['reparti', 'config', 'utenti', 'log'].forEach((segment) => {
     fs.mkdirSync(path.join(root, segment), { recursive: true });
   });
 
-  fs.writeFileSync(path.join(root, 'reparti', 'Demo.json'), JSON.stringify({
+  const deptDb = new DatabaseSync(path.join(root, 'reparti.db'));
+  deptDb.exec('CREATE TABLE IF NOT EXISTS departments (name TEXT PRIMARY KEY, data TEXT NOT NULL)');
+  deptDb.prepare('INSERT INTO departments (name, data) VALUES (?, ?)').run('Demo', JSON.stringify({
     password: null,
     projects: [],
     meta: {
@@ -40,9 +44,12 @@ function createTempDataDir() {
       updatedBy: 'security-seed',
       revision: 1
     }
-  }, null, 2), 'utf8');
+  }));
+  deptDb.close();
 
-  fs.writeFileSync(path.join(root, 'utenti', 'local.user.json'), JSON.stringify({
+  const userDb = new DatabaseSync(path.join(root, 'utenti', 'users.db'));
+  userDb.exec('CREATE TABLE IF NOT EXISTS users (user_id_normalized TEXT PRIMARY KEY, user_id TEXT NOT NULL, data TEXT NOT NULL)');
+  userDb.prepare('INSERT INTO users (user_id_normalized, user_id, data) VALUES (?, ?, ?)').run('local.user', 'local.user', JSON.stringify({
     userId: 'local.user',
     userIdNormalized: 'local.user',
     type: 'local',
@@ -52,7 +59,8 @@ function createTempDataDir() {
     createdAt: '2026-01-01T00:00:00.000Z',
     lastLoginAt: null,
     loginHistory: []
-  }, null, 2), 'utf8');
+  }));
+  userDb.close();
 
   return root;
 }

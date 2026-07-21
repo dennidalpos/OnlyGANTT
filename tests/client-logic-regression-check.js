@@ -8,9 +8,10 @@ function loadBrowserScript(context, relativePath) {
   let source = fs.readFileSync(filePath, 'utf8');
   source = source
     .replace(/^import\s+.*?;?\s*$/gm, '')
-    .replace(/^export\s+default\s+.*?;?\s*$/gm, '')
+    .replace(/^export\s+default\s+([a-zA-Z0-9_$]+);?\s*$/gm, 'if (typeof window !== "undefined") { window.$1 = $1; window.OnlyGantt = window.OnlyGantt || {}; window.OnlyGantt.$1 = $1; }')
     .replace(/^export\s+(function|const|let|var)\s+/gm, '$1 ');
   vm.runInContext(source, context, { filename: filePath });
+  vm.runInContext('if (typeof AppConfig !== "undefined" && typeof window !== "undefined") { window.AppConfig = AppConfig; }', context);
 }
 
 function listClientSourceFiles(rootDir) {
@@ -82,20 +83,20 @@ function createClientContext() {
 
   const context = vm.createContext(sandbox);
   loadBrowserScript(context, 'src/app-config.js');
-  sandbox.AppConfig = sandbox.window.AppConfig;
+  sandbox.window.AppConfig = context.AppConfig;
 
   loadBrowserScript(context, 'src/domain/holidayCalendar.js');
   loadBrowserScript(context, 'src/utils/dateUtils.js');
-  sandbox.dateUtils = sandbox.window.OnlyGantt.dateUtils;
+  sandbox.dateUtils = sandbox.dateUtils || sandbox.window.dateUtils || sandbox.window.OnlyGantt?.dateUtils;
 
   loadBrowserScript(context, 'src/domain/projectLogic.js');
-  sandbox.logic = sandbox.window.OnlyGantt.logic;
+  sandbox.logic = sandbox.projectLogic || sandbox.window.projectLogic || sandbox.window.OnlyGantt?.logic;
 
   loadBrowserScript(context, 'src/domain/ganttCalculator.js');
-  sandbox.gantt = sandbox.window.OnlyGantt.gantt;
+  sandbox.gantt = sandbox.ganttCalculator || sandbox.window.ganttCalculator || sandbox.window.OnlyGantt?.gantt;
 
   loadBrowserScript(context, 'src/client/storage.js');
-  sandbox.storage = sandbox.window.OnlyGantt.storage;
+  sandbox.storage = sandbox.storage || sandbox.window.storage || sandbox.window.OnlyGantt?.storage;
 
   return context;
 }
@@ -201,11 +202,11 @@ function main() {
   assertNoNativeDialogs(repoRoot);
 
   const context = createClientContext();
-  const easter = context.window.OnlyGantt.holidayCalendar;
-  const dateUtils = context.window.OnlyGantt.dateUtils;
-  const logic = context.window.OnlyGantt.logic;
-  const gantt = context.window.OnlyGantt.gantt;
-  const storage = context.window.OnlyGantt.storage;
+  const easter = context.holidayCalendar || context.window.holidayCalendar || context.window.OnlyGantt?.holidayCalendar;
+  const dateUtils = context.dateUtils || context.window.dateUtils || context.window.OnlyGantt?.dateUtils;
+  const logic = context.logic || context.projectLogic || context.window.projectLogic || context.window.OnlyGantt?.logic;
+  const gantt = context.gantt || context.ganttCalculator || context.window.ganttCalculator || context.window.OnlyGantt?.gantt;
+  const storage = context.storage || context.window.storage || context.window.OnlyGantt?.storage;
 
   assert.strictEqual(dateUtils.formatDate(easter.calculateEaster(2026)), '2026-04-05');
   assert.strictEqual(dateUtils.formatDate(easter.calculateEasterMonday(2026)), '2026-04-06');

@@ -145,6 +145,12 @@ export function useProjects(department, readOnly, options = {}) {
     loadProjects();
   }, [loadProjects]);
 
+  const [remoteNotice, setRemoteNotice] = useState(null);
+
+  const clearRemoteNotice = useCallback(() => {
+    setRemoteNotice(null);
+  }, []);
+
   useEffect(() => {
     if (!department) return;
 
@@ -154,11 +160,15 @@ export function useProjects(department, readOnly, options = {}) {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'update') {
-          if (readOnly) {
-            setProjects(ensureIds(message.projects || []));
-            setMeta(message.meta || null);
-            setValidationErrors(message.validationErrors || []);
-            setIsDirty(false);
+          setRemoteNotice({
+            updatedBy: message.updatedBy || 'Un utente',
+            changes: Array.isArray(message.changes) ? message.changes : [],
+            revision: message.revision,
+            updatedAt: message.updatedAt || new Date().toISOString()
+          });
+
+          if (readOnly || !isDirty) {
+            loadProjects();
           }
         }
       } catch (err) {
@@ -169,7 +179,7 @@ export function useProjects(department, readOnly, options = {}) {
     return () => {
       eventSource.close();
     };
-  }, [department, readOnly]);
+  }, [department, readOnly, isDirty, loadProjects]);
 
   return {
     projects,
@@ -178,6 +188,8 @@ export function useProjects(department, readOnly, options = {}) {
     isLoading,
     validationErrors,
     error,
+    remoteNotice,
+    clearRemoteNotice,
     loadProjects,
     saveProjects,
     updateProjects,
