@@ -1,238 +1,226 @@
-(function() {
-  'use strict';
+import logic from '../../domain/projectLogic.js';
+import AppConfig from '../../app-config.js';
 
-  const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef } = React;
 
-  window.OnlyGantt = window.OnlyGantt || {};
-  window.OnlyGantt.components = window.OnlyGantt.components || {};
+export function ProjectList({
+  projects,
+  selectedProjectIds,
+  onSelectedProjectIdsChange,
+  onEditProject,
+  onDeleteProject,
+  onImportJSON,
+  onExportJSON,
+  validationErrors = [],
+  readOnly,
+  isSaving,
+  focusedProjectId,
+  onFocusHandled
+}) {
+  const [expandedProjects, setExpandedProjects] = useState(new Set());
+  const [highlightedProjectId, setHighlightedProjectId] = useState(null);
+  const projectRefs = useRef({});
+  const importFileInputRef = useRef(null);
+  const highlightTimerRef = useRef(null);
 
-  const logic = window.OnlyGantt.logic;
-  const config = window.AppConfig;
-
-  function ProjectList({
-    projects,
-    selectedProjectIds,
-    onSelectedProjectIdsChange,
-    onEditProject,
-    onDeleteProject,
-    onImportJSON,
-    onExportJSON,
-    validationErrors = [],
-    readOnly,
-    isSaving,
-    focusedProjectId,
-    onFocusHandled
-  }) {
-    const [expandedProjects, setExpandedProjects] = useState(new Set());
-    const [highlightedProjectId, setHighlightedProjectId] = useState(null);
-    const projectRefs = useRef({});
-    const importFileInputRef = useRef(null);
-    const highlightTimerRef = useRef(null);
-
-    useEffect(() => {
-      if (!focusedProjectId) return;
-      const target = projectRefs.current[focusedProjectId];
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setHighlightedProjectId(null);
-        window.requestAnimationFrame(() => {
-          setHighlightedProjectId(focusedProjectId);
-        });
-        if (highlightTimerRef.current) {
-          clearTimeout(highlightTimerRef.current);
-        }
-        highlightTimerRef.current = setTimeout(() => {
-          setHighlightedProjectId(null);
-        }, 5000);
-      }
-      if (onFocusHandled) {
-        onFocusHandled();
-      }
-    }, [focusedProjectId, onFocusHandled]);
-
-    useEffect(() => () => {
+  useEffect(() => {
+    if (!focusedProjectId) return;
+    const target = projectRefs.current[focusedProjectId];
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedProjectId(null);
+      window.requestAnimationFrame(() => {
+        setHighlightedProjectId(focusedProjectId);
+      });
       if (highlightTimerRef.current) {
         clearTimeout(highlightTimerRef.current);
       }
-    }, []);
-
-    const toggleExpand = (projectId) => {
-      const newExpanded = new Set(expandedProjects);
-      if (newExpanded.has(projectId)) {
-        newExpanded.delete(projectId);
-      } else {
-        newExpanded.add(projectId);
+      highlightTimerRef.current = setTimeout(() => {
+        setHighlightedProjectId(null);
+      }, 1600);
+      if (onFocusHandled) {
+        onFocusHandled(focusedProjectId);
       }
-      setExpandedProjects(newExpanded);
-    };
+    }
+  }, [focusedProjectId, onFocusHandled]);
 
-    const toggleProjectInGantt = (projectId) => {
-      const newSelected = new Set(selectedProjectIds);
-      if (newSelected.has(projectId)) {
-        newSelected.delete(projectId);
-      } else {
-        newSelected.add(projectId);
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
       }
-      onSelectedProjectIdsChange(newSelected);
     };
+  }, []);
 
-    const selectAllInGantt = () => {
-      const allIds = new Set(projects.map(p => p.id));
-      onSelectedProjectIdsChange(allIds);
-    };
-
-    const deselectAllInGantt = () => {
+  const toggleSelectAll = () => {
+    if (selectedProjectIds.size === projects.length) {
       onSelectedProjectIdsChange(new Set());
-    };
+    } else {
+      onSelectedProjectIdsChange(new Set(projects.map(p => p.id)));
+    }
+  };
 
-    const openImportFilePicker = () => {
-      if (readOnly || !importFileInputRef.current) return;
-      importFileInputRef.current.click();
-    };
+  const toggleSelectProject = (id) => {
+    const next = new Set(selectedProjectIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    onSelectedProjectIdsChange(next);
+  };
 
-    const handleImportFileChange = (e) => {
-      if (readOnly) return;
-      const file = e.target.files[0];
-      if (file) {
-        onImportJSON(file);
-        e.target.value = '';
-      }
-    };
+  const toggleExpand = (id) => {
+    const next = new Set(expandedProjects);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setExpandedProjects(next);
+  };
 
-    const allSelected = projects.length > 0 && selectedProjectIds.size === projects.length;
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      onImportJSON(file);
+      e.target.value = '';
+    }
+  };
 
-    return (
-      <div className="card">
-        <h2 className="card-title">Elenco Progetti</h2>
-
-        {validationErrors.length > 0 && (
-          <div className="card-section">
-            <div className="alert-item warning">
-              Sono stati rilevati errori nei dati dei progetti:
-              <ul style={{ marginTop: '0.5rem', paddingLeft: '1rem' }}>
-                {validationErrors.map((err, index) => (
-                  <li key={index}>{err}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        <div className="card-section">
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#cbd5e1' }}>Strumenti</h3>
-          <div className="text-muted text-small" style={{ marginBottom: '0.5rem' }}>
-            Import/Export progetti per trasferirli su un altro reparto.
-          </div>
-
-          <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            <label className="checkbox-label compact">
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 className="card-title" style={{ margin: 0 }}>
+          Elenco Progetti ({projects.length})
+        </h2>
+        <div className="button-group">
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                onClick={() => onEditProject(null)}
+                className="btn-success btn-small"
+                disabled={isSaving}
+              >
+                + Nuovo Progetto
+              </button>
+              <button
+                type="button"
+                onClick={() => importFileInputRef.current?.click()}
+                className="btn-secondary btn-small"
+                disabled={isSaving}
+              >
+                Importa JSON
+              </button>
               <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={(e) => (e.target.checked ? selectAllInGantt() : deselectAllInGantt())}
-                disabled={projects.length === 0}
+                ref={importFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
               />
-              Visualizza tutti i progetti su diagramma
+            </>
+          )}
+          <button
+            type="button"
+            onClick={onExportJSON}
+            className="btn-secondary btn-small"
+            disabled={projects.length === 0}
+          >
+            Esporta JSON
+          </button>
+        </div>
+      </div>
+
+      {validationErrors.length > 0 && (
+        <div className="alert-item warning" style={{ marginBottom: '1rem' }}>
+          <strong>Segnalazioni validazione:</strong>
+          <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+            {validationErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {projects.length === 0 ? (
+        <p className="text-muted">Nessun progetto disponibile in questo reparto.</p>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+            <label className="checkbox-label" htmlFor="project-list-select-all">
+              <input
+                id="project-list-select-all"
+                type="checkbox"
+                checked={selectedProjectIds.size === projects.length && projects.length > 0}
+                onChange={toggleSelectAll}
+              />
+              Seleziona tutti ({selectedProjectIds.size}/{projects.length})
             </label>
           </div>
 
-          <div className="button-group" style={{ marginBottom: '0.5rem' }}>
-            <button
-              type="button"
-              onClick={openImportFilePicker}
-              className="btn-secondary btn-small"
-              disabled={readOnly}
-            >
-              Importa progetti
-            </button>
-            <input
-              ref={importFileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImportFileChange}
-              style={{ display: 'none' }}
-              disabled={readOnly}
-            />
-            <button onClick={onExportJSON} className="btn-secondary btn-small">
-              Export Progetti
-            </button>
-          </div>
-        </div>
+          {projects.map((project) => {
+            const isSelected = selectedProjectIds.has(project.id);
+            const isExpanded = expandedProjects.has(project.id);
+            const isHighlighted = highlightedProjectId === project.id;
+            const percentage = logic.calculateProjectPercentage(project);
+            const alerts = logic.getProjectAlerts(project);
+            const severity = logic.getProjectAlertSeverity(alerts);
+            const summary = logic.getPhasesSummary(project);
 
-        {projects.length === 0 ? (
-          <p className="text-muted text-center">Nessun progetto</p>
-        ) : (
-          <div>
-            {projects.map(project => {
-              const percentage = logic.calculateProjectPercentage(project);
-              const summary = logic.getPhasesSummary(project);
-              const alerts = logic.getProjectAlerts(project);
-              const severity = logic.getProjectAlertSeverity(alerts);
-              const severityClass = ` project-item-alert-${severity || 'success'}`;
-              const isExpanded = expandedProjects.has(project.id);
-              const isSelected = selectedProjectIds.has(project.id);
+            return (
+              <div
+                key={project.id}
+                ref={(el) => {
+                  if (el) projectRefs.current[project.id] = el;
+                }}
+                className={`project-item ${isHighlighted ? 'project-item--highlighted' : ''}`}
+                style={{
+                  borderLeft: `4px solid ${project.colore || '#3b82f6'}`,
+                  marginBottom: '0.5rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectProject(project.id)}
+                      aria-label={`Seleziona ${project.nome}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(project.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '0 4px' }}
+                    >
+                      {isExpanded ? '▼' : '►'}
+                    </button>
+                    <strong>{project.nome}</strong>
 
-              return (
-                <div
-                  key={project.id}
-                  ref={(el) => {
-                    if (el) {
-                      projectRefs.current[project.id] = el;
-                    }
-                  }}
-                  className={`project-item${severityClass}${highlightedProjectId === project.id ? ' project-item-highlight' : ''}`}
-                >
-                  <div className="project-header">
-                    <div>
-                      <h3 className="project-name">
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: project.colore,
-                            marginRight: '0.5rem',
-                            borderRadius: '2px'
-                          }}
-                        />
-                        {project.nome}
-                      </h3>
-                    </div>
-                    <span className={`badge badge-${project.stato === 'completato' ? 'success' : project.stato === 'in_ritardo' ? 'error' : 'info'}`}>
-                      {config.stateLabels[project.stato]}
+                    <span className={`badge badge--${project.stato}`}>
+                      {AppConfig.stateLabels[project.stato] || project.stato}
+                    </span>
+
+                    {severity && (
+                      <span className={`alert-badge alert-badge--${severity}`} title="Segnalazioni nel progetto">
+                        ⚠
+                      </span>
+                    )}
+
+                    <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
+                      {percentage}%
                     </span>
                   </div>
 
-                  <div className="project-info">
-                    <div>
-                      {project.dataInizio || '?'} — {project.dataFine || '?'}
-                    </div>
-                    <div>
-                      Completamento: {percentage}%
-                    </div>
-                    <div>
-                      Fasi: {summary.completed}/{summary.total} completate
-                      {summary.delayed > 0 && (
-                        <span style={{ color: 'var(--error)', marginLeft: '0.5rem' }}>
-                          ({summary.delayed} in ritardo)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="project-actions">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleProjectInGantt(project.id)}
-                      />
-                      In Gantt
-                    </label>
-
+                  <div className="button-group">
                     {!readOnly && (
                       <>
                         <button
+                          type="button"
                           onClick={() => onEditProject(project)}
                           className="btn-secondary btn-small"
                           disabled={isSaving}
@@ -240,6 +228,7 @@
                           Modifica
                         </button>
                         <button
+                          type="button"
                           onClick={() => onDeleteProject(project.id)}
                           className="btn-danger btn-small"
                           disabled={isSaving}
@@ -248,60 +237,65 @@
                         </button>
                       </>
                     )}
-
-                    <button
-                      onClick={() => toggleExpand(project.id)}
-                      className="btn-secondary btn-small"
-                    >
-                      {isExpanded ? 'Nascondi' : 'Dettagli'}
-                    </button>
                   </div>
-
-                  {isExpanded && (
-                    <div className="phase-list">
-                      {project.fasi && project.fasi.length > 0 ? (
-                        project.fasi.map((fase) => (
-                          <div key={fase.id} className={`phase-item state-${fase.stato} ${fase.milestone ? 'milestone' : ''}`}>
-                            <div className="phase-name">
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  width: '10px',
-                                  height: '10px',
-                                  backgroundColor: fase.colore || project.colore || '#64748b',
-                                  marginRight: '0.4rem',
-                                  borderRadius: '2px'
-                                }}
-                              />
-                              {fase.milestone && '💎 '}
-                              {fase.nome}
-                            </div>
-                            <div className="phase-info">
-                              {fase.dataInizio || '?'} — {fase.dataFine || '?'} | {config.stateLabels[fase.stato]} | {(fase.percentualeCompletamento ?? 0)}%
-                              {logic.isDelayed(fase) && (
-                                <span style={{ color: 'var(--error)', marginLeft: '0.5rem' }}>IN RITARDO</span>
-                              )}
-                            </div>
-                            {fase.note && (
-                              <div className="phase-info" style={{ fontStyle: 'italic', marginTop: '0.25rem' }}>
-                                Note: {fase.note}
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-muted text-small">Nessuna fase</p>
-                      )}
-                    </div>
-                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
 
+                <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.25rem', marginLeft: '2rem' }}>
+                  {project.dataInizio || '—'} a {project.dataFine || '—'}
+                  {' • '}Fasi: {summary.completed}/{summary.total} completate
+                  {summary.delayed > 0 && ` • ${summary.delayed} in ritardo`}
+                </div>
+
+                {isExpanded && Array.isArray(project.fasi) && project.fasi.length > 0 && (
+                  <div style={{ marginTop: '0.5rem', marginLeft: '2rem', borderTop: '1px solid #334155', paddingTop: '0.5rem' }}>
+                    {project.fasi.map((fase) => (
+                      <div
+                        key={fase.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'space-between',
+                          padding: '0.25rem 0',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span
+                            style={{
+                              width: '10px',
+                              height: '10px',
+                              backgroundColor: fase.colore || project.colore || '#3b82f6',
+                              borderRadius: '2px',
+                              display: 'inline-block'
+                            }}
+                          />
+                          <span>{fase.nome}</span>
+                          {fase.milestone && <span title="Milestone">◆</span>}
+                          <span className={`badge badge--${fase.stato}`} style={{ fontSize: '0.7rem' }}>
+                            {AppConfig.stateLabels[fase.stato] || fase.stato}
+                          </span>
+                        </div>
+                        <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>
+                          {fase.dataInizio || '—'} - {fase.dataFine || '—'}
+                          {fase.percentualeCompletamento !== null && ` (${fase.percentualeCompletamento}%)`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+if (typeof window !== 'undefined') {
+  window.OnlyGantt = window.OnlyGantt || {};
+  window.OnlyGantt.components = window.OnlyGantt.components || {};
   window.OnlyGantt.components.ProjectList = ProjectList;
-})();
+}
+
+export default ProjectList;

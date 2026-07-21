@@ -1,32 +1,39 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 bin/
 obj/
-tools/wix314-binaries/
-.playwright-cli/
-artifacts/**
-!artifacts/
-!artifacts/**/
-!artifacts/**/.gitkeep
 build/
 dist/
 out/
 output/
 publish/
 tmp/
+tools/wix314-binaries/
+.playwright-cli/
 playwright-report/
-Data/config/locks.json
-Data/config/admin-auth.json
+
+# Artifacts
+artifacts/**
+!artifacts/
+!artifacts/**/
+!artifacts/**/.gitkeep
+
+# Runtime Data & Database Files
+Data/**/*.db
+Data/**/*.db-journal
+Data/**/*.db-wal
+Data/**/*.db-shm
+Data/**/*.bak
+Data/**/*.tmp
+Data/**/*.log
 Data/config/system-config.local.json
-Data/config/*.bak
-Data/config/*.tmp
-Data/reparti/*.bak
-Data/reparti/*.tmp
-Data/reparti/*.migrated
-Data/*.db
-Data/utenti/*.json
-Data/utenti/*.bak
-Data/utenti/*.tmp
-Data/log/*.log
+Data/config/locks.json
+Data/config/locks.db
+Data/utenti/users.db
+
+# Environment & IDE
 .vscode/
 .idea/
 .DS_Store

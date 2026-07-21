@@ -62,18 +62,19 @@ function Resolve-MsiPath {
   return $msi.FullName
 }
 
-function Get-OnlyGanttUninstallEntry {
+function Get-OnlyGanttUninstallEntries {
   $registryRoots = @(
     'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
   )
 
+  $entries = @()
   foreach ($root in $registryRoots) {
     if (-not (Test-Path $root)) {
       continue
     }
 
-    $entry = Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
+    $found = Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
       try {
         $properties = Get-ItemProperty -Path $_.PSPath -ErrorAction Stop
         if ($properties.DisplayName -eq 'OnlyGANTT') {
@@ -86,11 +87,20 @@ function Get-OnlyGanttUninstallEntry {
         }
       } catch {
       }
-    } | Select-Object -First 1
-
-    if ($null -ne $entry) {
-      return $entry
     }
+
+    if ($found) {
+      $entries += $found
+    }
+  }
+
+  return $entries
+}
+
+function Get-OnlyGanttUninstallEntry {
+  $entries = Get-OnlyGanttUninstallEntries
+  if ($entries -and $entries.Count -gt 0) {
+    return $entries[0]
   }
 
   return $null
@@ -321,10 +331,18 @@ function Remove-OnlyGanttMachineState {
     [string]$FallbackInstallRoot
   )
 
-  $entry = Get-OnlyGanttUninstallEntry
-  if ($null -ne $entry) {
-    $cleanupLog = Join-Path $LogsRoot 'msi-cleanup.log'
-    Invoke-MsiExec -Arguments @('/x', $entry.ProductCode) -LogPath $cleanupLog
+  $entries = Get-OnlyGanttUninstallEntries
+  foreach ($entry in $entries) {
+    if ($entry.ProductCode -and $entry.ProductCode.StartsWith('{')) {
+      $cleanupLog = Join-Path $LogsRoot "msi-cleanup-$($entry.ProductCode.Trim('{}')).log"
+      try {
+        Invoke-MsiExec -Arguments @('/x', $entry.ProductCode) -LogPath $cleanupLog
+      } catch {
+      }
+    }
+    if (Test-Path $entry.KeyPath) {
+      Remove-Item -Path $entry.KeyPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
   }
 
   $service = Get-ServiceSnapshot -ServiceName $ServiceName

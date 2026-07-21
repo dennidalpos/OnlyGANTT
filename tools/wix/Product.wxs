@@ -18,6 +18,7 @@
       Description="OnlyGANTT server installer" />
 
     <MajorUpgrade
+      Schedule="afterInstallInitialize"
       AllowSameVersionUpgrades="yes"
       DowngradeErrorMessage="A newer version of OnlyGANTT is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />

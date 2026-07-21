@@ -1,855 +1,532 @@
+import api from '../api.js';
+import storage from '../storage.js';
 
+const { useState, useEffect, useCallback, useRef } = React;
 
-
-
-(function() {
-  'use strict';
-
-  const { useState, useEffect, useCallback, useRef } = React;
-
-  window.OnlyGantt = window.OnlyGantt || {};
-  window.OnlyGantt.components = window.OnlyGantt.components || {};
-
-  const api = window.OnlyGantt.api;
-  const storage = window.OnlyGantt.storage;
-
-  function getRequestedLoginTab() {
-    try {
-      const hash = window.location.hash.toLowerCase();
-      const searchParams = new URLSearchParams(window.location.search);
-      const requestedLogin = (searchParams.get('login') || searchParams.get('view') || '').toLowerCase();
-      return hash === '#admin' || requestedLogin === 'admin' ? 'admin' : null;
-    } catch {
-      return null;
-    }
+function getRequestedLoginTab() {
+  try {
+    const hash = window.location.hash.toLowerCase();
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedLogin = (searchParams.get('login') || searchParams.get('view') || '').toLowerCase();
+    return hash === '#admin' || requestedLogin === 'admin' ? 'admin' : null;
+  } catch {
+    return null;
   }
+}
 
-  function LoginScreen({
-    userName,
-    onUserNameChange,
-    onDepartmentChange,
-    adminToken,
-    onAdminLogin,
-    onAdminLogout,
-    onUserTokenChange,
-    loginError,
-    setLoginError,
-    pushNotification
-  }) {
-    
-    const [activeTab, setActiveTab] = useState(() => adminToken ? 'admin' : getRequestedLoginTab() || 'user');
-    const [departments, setDepartments] = useState([]);
-    const [selectedDept, setSelectedDept] = useState('');
-    const [deptPassword, setDeptPassword] = useState('');
-    const [pendingUserName, setPendingUserName] = useState(userName || '');
-    const [userPassword, setUserPassword] = useState('');
-    const [authConfig, setAuthConfig] = useState({
-      ldapEnabled: false,
-      localFallback: false,
-      localUsers: 0,
-      adminConfigured: true,
-      adminManagedByEnv: false,
-      adminResetEnabled: false
-    });
-    const [authLoading, setAuthLoading] = useState(true);
-    const [adminId, setAdminId] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [loadingDepts, setLoadingDepts] = useState(true);
-    const [initialAdminPassword, setInitialAdminPassword] = useState('');
-    const [initialAdminConfirmPassword, setInitialAdminConfirmPassword] = useState('');
-    const [setupError, setSetupError] = useState('');
-    const [isSettingUp, setIsSettingUp] = useState(false);
-    const [showAdminPasswordReset, setShowAdminPasswordReset] = useState(false);
-    const [adminResetCode, setAdminResetCode] = useState('');
-    const [newAdminPassword, setNewAdminPassword] = useState('');
+export function LoginScreen({
+  userName,
+  onUserNameChange,
+  onDepartmentChange,
+  adminToken,
+  onAdminLogin,
+  onAdminLogout,
+  onUserTokenChange,
+  loginError,
+  setLoginError,
+  pushNotification,
+  onNavigateSystemSettings,
+  onNavigateUserManagement
+}) {
+  const [activeTab, setActiveTab] = useState(() => adminToken ? 'admin' : getRequestedLoginTab() || 'user');
+  const [userIdInput, setUserIdInput] = useState(() => storage.getCurrentUser() || userName || '');
+  const [userPasswordInput, setUserPasswordInput] = useState('');
 
-    const userNameRef = useRef(null);
-    const deptSelectRef = useRef(null);
-    const deptPasswordRef = useRef(null);
-    const userPasswordRef = useRef(null);
-    const adminIdRef = useRef(null);
-    const adminPasswordRef = useRef(null);
+  const [adminUserIdInput, setAdminUserIdInput] = useState('admin');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [setupPasswordInput, setSetupPasswordInput] = useState('');
+  const [setupConfirmInput, setSetupConfirmInput] = useState('');
 
-    const loadDepartments = useCallback(async (signal) => {
-      setLoadingDepts(true);
-      try {
-        const data = await api.getDepartments(signal);
-        setDepartments(data.departments || []);
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        setError('Impossibile caricare i reparti');
-      } finally {
-        setLoadingDepts(false);
+  const [adminResetCode, setAdminResetCode] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [showAdminReset, setShowAdminReset] = useState(false);
+
+  const [departments, setDepartments] = useState([]);
+
+  const [authConfig, setAuthConfig] = useState({
+    ldapEnabled: false,
+    localFallback: false,
+    localUsers: 0,
+    adminConfigured: false,
+    adminManagedByEnv: false,
+    adminResetEnabled: false
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const isUnmountingRef = useRef(false);
+
+  const fetchAuthConfig = useCallback(async (signal) => {
+    try {
+      const config = await api.getAuthConfig(signal);
+      if (!isUnmountingRef.current) {
+        setAuthConfig(config);
       }
-    }, []);
-
-    useEffect(() => {
-      const controller = new AbortController();
-      loadDepartments(controller.signal);
-      return () => controller.abort();
-    }, [loadDepartments]);
-
-    useEffect(() => {
-      const handleLocationChange = () => {
-        if (!adminToken && getRequestedLoginTab() === 'admin') {
-          setActiveTab('admin');
-        }
-      };
-
-      handleLocationChange();
-      window.addEventListener('hashchange', handleLocationChange);
-      return () => window.removeEventListener('hashchange', handleLocationChange);
-    }, [adminToken]);
-
-    useEffect(() => {
-      const controller = new AbortController();
-      const loadAuthConfig = async () => {
-        setAuthLoading(true);
-        try {
-          const data = await api.getAuthConfig(controller.signal);
-          setAuthConfig({
-            ldapEnabled: !!data.ldapEnabled,
-            localFallback: !!data.localFallback,
-            localUsers: data.localUsers || 0,
-            adminConfigured: data.adminConfigured !== false,
-            adminManagedByEnv: !!data.adminManagedByEnv,
-            adminResetEnabled: !!data.adminResetEnabled
-          });
-        } catch (err) {
-          if (err.name === 'AbortError') return;
-          setAuthConfig({
-            ldapEnabled: false,
-            localFallback: false,
-            localUsers: 0,
-            adminConfigured: true,
-            adminManagedByEnv: false,
-            adminResetEnabled: false
-          });
-        } finally {
-          setAuthLoading(false);
-        }
-      };
-      loadAuthConfig();
-      return () => controller.abort();
-    }, []);
-
-    
-    useEffect(() => {
-      setPendingUserName(userName || '');
-      setUserPassword('');
-    }, [userName]);
-
-    
-    useEffect(() => {
-      if (selectedDept && userName) {
-        const saved = storage.getPassword(userName, selectedDept);
-        setDeptPassword(saved || '');
-      } else {
-        setDeptPassword('');
+    } catch (err) {
+      if (!isUnmountingRef.current && err.name !== 'AbortError') {
+        console.warn('Failed to load auth config:', err.message);
       }
-    }, [selectedDept, userName]);
+    }
+  }, []);
 
-    
-    useEffect(() => {
-      setError('');
-      if (activeTab === 'user') {
-        if (!userName || userName.length < 2) {
-          userNameRef.current?.focus();
-        } else {
-          deptSelectRef.current?.focus();
-        }
-      } else if (activeTab === 'admin' && !adminToken) {
-        adminIdRef.current?.focus();
+  const fetchDepartments = useCallback(async (signal) => {
+    try {
+      const list = await api.getDepartments(signal);
+      if (!isUnmountingRef.current) {
+        setDepartments(list?.departments || []);
       }
-    }, [activeTab, adminToken, userName]);
-
-    useEffect(() => {
-      if (!authConfig.adminResetEnabled || authConfig.adminManagedByEnv) {
-        setShowAdminPasswordReset(false);
+    } catch (err) {
+      if (!isUnmountingRef.current && err.name !== 'AbortError') {
+        console.warn('Failed to load departments:', err.message);
       }
-    }, [authConfig.adminManagedByEnv, authConfig.adminResetEnabled]);
+    }
+  }, []);
 
-    
-    const selectedDeptObj = departments.find(d => d.name === selectedDept);
-    const effectiveError = error || loginError;
-    const isUserNameValid = pendingUserName.trim().length >= 2;
-    const hasDepartments = departments.length > 0;
-    const needsPassword = selectedDeptObj?.protected && !adminToken;
-    const requiresUserPassword = !adminToken;
-    const canShowAdminPasswordReset = authConfig.adminResetEnabled && !authConfig.adminManagedByEnv;
+  useEffect(() => {
+    isUnmountingRef.current = false;
+    const controller = new AbortController();
 
-    
-    const canSubmitDept = Boolean(
-      selectedDeptObj &&
-      (adminToken || isUserNameValid) &&
-      (!needsPassword || deptPassword) &&
-      (!requiresUserPassword || userPassword) &&
-      !authLoading &&
-      !isLoading
-    );
+    fetchAuthConfig(controller.signal);
+    fetchDepartments(controller.signal);
 
-    
-    const canSubmitAdmin = Boolean(
-      adminId.trim() &&
-      adminPassword &&
-      !isLoading
-    );
-
-    
-    const handleUserNameBlur = () => {
-      if (pendingUserName !== userName) {
-        onUserNameChange(pendingUserName.trim());
-      }
+    return () => {
+      isUnmountingRef.current = true;
+      controller.abort();
     };
+  }, [fetchAuthConfig, fetchDepartments]);
 
-    const handleUserNameKeyDown = (e) => {
-      if (e.key === 'Tab' && !e.shiftKey && requiresUserPassword) {
-        e.preventDefault();
-        userPasswordRef.current?.focus();
-        return;
-      }
-      if (e.key === 'Enter') {
-        handleUserNameBlur();
-        if (isUserNameValid) {
-          deptSelectRef.current?.focus();
-        }
-      }
-    };
+  const handleUserLogin = async (e) => {
+    if (e) e.preventDefault();
 
-    const handleDeptSelectKeyDown = (e) => {
-      if (e.key === 'Enter' && selectedDept) {
-        if (needsPassword) {
-          deptPasswordRef.current?.focus();
-        } else {
-          handleDeptLogin();
-        }
-      }
-    };
+    const trimmedUserId = userIdInput.trim();
+    if (!trimmedUserId) {
+      setLoginError('Inserisci un nome utente');
+      return;
+    }
 
-    const handleDeptPasswordKeyDown = (e) => {
-      if (e.key === 'Enter' && canSubmitDept) {
-        handleDeptLogin();
-      }
-    };
+    setIsLoading(true);
+    setLoginError(null);
 
-    const handleUserPasswordKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        if (selectedDept) {
-          handleDeptLogin();
-        } else {
-          deptSelectRef.current?.focus();
-        }
-      }
-    };
+    try {
+      const result = await api.authLogin(trimmedUserId, userPasswordInput);
 
-    const handleAdminIdKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        adminPasswordRef.current?.focus();
-      }
-    };
+      if (result.ok && result.token) {
+        storage.setCurrentUser(trimmedUserId);
+        onUserNameChange(trimmedUserId);
 
-    const handleAdminPasswordKeyDown = (e) => {
-      if (e.key === 'Enter' && canSubmitAdmin) {
-        handleAdminLogin();
-      }
-    };
-
-    const handleDeptLogin = async () => {
-      if (!selectedDept) {
-        setLoginError('');
-        setError('Seleziona un reparto');
-        deptSelectRef.current?.focus();
-        return;
-      }
-
-      if (!adminToken && !isUserNameValid) {
-        setLoginError('');
-        setError('Inserisci un nome utente valido (min. 2 caratteri)');
-        userNameRef.current?.focus();
-        return;
-      }
-
-      if (requiresUserPassword && !userPassword) {
-        setLoginError('');
-        setError('Inserisci la password utente');
-        userPasswordRef.current?.focus();
-        return;
-      }
-
-      if (authLoading) {
-        setLoginError('');
-        setError('Configurazione autenticazione in caricamento');
-        return;
-      }
-
-      setError('');
-      setLoginError('');
-      setIsLoading(true);
-
-      try {
-        const normalizedUserName = pendingUserName.trim();
-        if (normalizedUserName !== userName) {
-          const userChanged = await onUserNameChange(normalizedUserName);
-          if (!userChanged) {
-            setIsLoading(false);
-            return;
-          }
+        if (onUserTokenChange) {
+          onUserTokenChange(result.token);
         }
 
-        let authResult = null;
-        if (!adminToken) {
-          authResult = await api.authLogin(normalizedUserName, userPassword, selectedDept);
+        if (result.user?.department) {
+          const dept = typeof result.user.department === 'string' ? result.user.department : result.user.department?.name;
+          if (dept) onDepartmentChange(dept);
+        } else if (departments.length === 1) {
+          const dept = typeof departments[0] === 'string' ? departments[0] : departments[0]?.name;
+          if (dept) onDepartmentChange(dept);
         }
-
-        if (authResult?.token) {
-          onUserTokenChange(authResult.token);
-        } else if (!adminToken) {
-          throw new Error('Sessione utente non inizializzata');
-        }
-
-        if (needsPassword) {
-          const result = await api.verifyPassword(selectedDept, deptPassword);
-          if (!result.ok) {
-            setError('Password reparto errata');
-            setDeptPassword('');
-            deptPasswordRef.current?.focus();
-            setIsLoading(false);
-            return;
-          }
-          
-          storage.setPassword(normalizedUserName, selectedDept, deptPassword);
-        }
-
-        setUserPassword('');
-        onDepartmentChange(selectedDept);
-      } catch (err) {
-        if (err.code === 'LDAP_DOWN') {
-          setError('Server LDAP non disponibile');
+      }
+    } catch (err) {
+      if (!isUnmountingRef.current) {
+        if (err.code === 'ADMIN_LOCAL_ONLY') {
+          setLoginError('L\'account admin deve effettuare l\'accesso dalla scheda Amministrazione.');
         } else if (err.code === 'INVALID_CREDENTIALS') {
-          setError('Credenziali non valide');
+          setLoginError('Credenziali non valide. Verificare nome utente e password.');
         } else if (err.code === 'GROUP_REQUIRED') {
-          setError('Utente non presente nel gruppo richiesto');
-        } else if (err.code === 'ADMIN_LOCAL_ONLY') {
-          setError('Accesso admin consentito solo localmente');
+          setLoginError(err.message || 'Accesso non consentito: utente non appartiene al gruppo richiesto.');
         } else if (err.code === 'USER_LOGIN_NOT_CONFIGURED') {
-          setError('Accesso utenti non configurato');
+          setLoginError('L\'accesso utente richiede un server LDAP o un utente locale configurato dall\'amministratore.');
+        } else if (err.code === 'LDAP_DOWN') {
+          setLoginError('Server Active Directory non raggiungibile. Riprovare piu\' tardi.');
         } else {
-          setError(err.message || 'Errore durante l\'accesso');
+          setLoginError(err.message || 'Errore durante l\'accesso');
         }
-      } finally {
+      }
+    } finally {
+      if (!isUnmountingRef.current) {
         setIsLoading(false);
       }
-    };
+    }
+  };
 
-    const handleAdminLogin = async () => {
-      if (!adminId.trim()) {
-        setLoginError('');
-        setError('Inserisci l\'ID admin');
-        adminIdRef.current?.focus();
-        return;
-      }
+  const handleAdminSetup = async (e) => {
+    if (e) e.preventDefault();
 
-      if (!adminPassword) {
-        setLoginError('');
-        setError('Inserisci la password admin');
-        adminPasswordRef.current?.focus();
-        return;
-      }
+    if (!setupPasswordInput) {
+      setLoginError('Inserisci una password per l\'amministratore');
+      return;
+    }
 
-      setError('');
-      setLoginError('');
-      setIsLoading(true);
+    if (setupPasswordInput.length < 6) {
+      setLoginError('La password deve contenere almeno 6 caratteri');
+      return;
+    }
 
-      try {
-        await onAdminLogin(adminId.trim(), adminPassword);
-        
-        setAdminId('');
-        setAdminPassword('');
-      } catch (err) {
-        if (err.code === 'ADMIN_PASSWORD_NOT_CONFIGURED') {
-          setError('Password admin non configurata. Imposta ONLYGANTT_ADMIN_PASSWORD oppure usa il codice reset.');
-        } else if (err.code === 'ADMIN_PASSWORD_MANAGED_BY_ENV') {
-          setError('Password admin gestita da variabili ambiente e non modificabile dalla UI.');
-        } else {
-          setError(err.message || 'Credenziali admin non valide');
+    if (setupPasswordInput !== setupConfirmInput) {
+      setLoginError('Le password non coincidono');
+      return;
+    }
+
+    setIsLoading(true);
+    setLoginError(null);
+
+    try {
+      const result = await api.setupAdminPassword(setupPasswordInput.trim());
+
+      if (result.ok) {
+        if (pushNotification) {
+          pushNotification({ type: 'success', message: 'Password amministratore configurata con successo' });
         }
-        setAdminPassword('');
-        adminPasswordRef.current?.focus();
-      } finally {
+
+        setAuthConfig(prev => ({ ...prev, adminConfigured: true }));
+        setAdminPasswordInput(setupPasswordInput.trim());
+
+        const loginResult = await api.adminLogin('admin', setupPasswordInput.trim());
+        if (loginResult.ok && loginResult.token) {
+          onAdminLogin(loginResult.token);
+        }
+      }
+    } catch (err) {
+      if (!isUnmountingRef.current) {
+        setLoginError(err.message || 'Errore durante la configurazione della password');
+      }
+    } finally {
+      if (!isUnmountingRef.current) {
         setIsLoading(false);
       }
-    };
+    }
+  };
 
-    const handleAdminLogout = () => {
-      onAdminLogout();
-      setActiveTab('user');
-    };
+  const handleAdminLoginSubmit = async (e) => {
+    if (e) e.preventDefault();
 
-    const handleTabChange = (tab) => {
-      setActiveTab(tab);
-      setError('');
-      setLoginError('');
-    };
+    const trimmedAdminUser = adminUserIdInput.trim();
+    if (!trimmedAdminUser) {
+      setLoginError('Inserisci il nome utente amministratore');
+      return;
+    }
 
-    const handleAdminPasswordReset = async () => {
-      if (!adminResetCode || !newAdminPassword) return;
-      setIsLoading(true);
-      setError('');
-      setLoginError('');
-      try {
-        await api.adminResetPassword(adminResetCode, newAdminPassword);
+    if (!adminPasswordInput) {
+      setLoginError('Inserisci la password amministratore');
+      return;
+    }
+
+    setIsLoading(true);
+    setLoginError(null);
+
+    try {
+      const result = await api.adminLogin(trimmedAdminUser, adminPasswordInput);
+
+      if (result && result.token) {
+        onAdminLogin(result.token);
+        if (pushNotification) {
+          pushNotification({ type: 'success', message: 'Accesso amministratore effettuato' });
+        }
+      }
+    } catch (err) {
+      if (!isUnmountingRef.current) {
+        if (err.code === 'INVALID_CREDENTIALS') {
+          setLoginError('Credenziali amministratore non valide.');
+        } else {
+          setLoginError(err.message || 'Errore durante l\'accesso amministratore');
+        }
+      }
+    } finally {
+      if (!isUnmountingRef.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleAdminPasswordReset = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!adminResetCode.trim()) {
+      setLoginError('Inserisci il codice di reset');
+      return;
+    }
+
+    if (!newAdminPassword) {
+      setLoginError('Inserisci la nuova password');
+      return;
+    }
+
+    if (newAdminPassword.length < 6) {
+      setLoginError('La nuova password deve contenere almeno 6 caratteri');
+      return;
+    }
+
+    setIsLoading(true);
+    setLoginError(null);
+
+    try {
+      const resetPasswordValue = newAdminPassword.trim();
+      const result = await api.adminResetPassword(adminResetCode.trim(), resetPasswordValue);
+
+      if (result.ok) {
         setAdminResetCode('');
         setNewAdminPassword('');
-        setShowAdminPasswordReset(false);
-        if (pushNotification) {
-          pushNotification({
-            type: 'success',
-            message: 'Password admin reimpostata con successo. Usa le nuove credenziali per accedere.'
-          });
+        setShowAdminReset(false);
+        setAdminPasswordInput(resetPasswordValue);
+
+        const loginResult = await api.adminLogin(adminUserIdInput.trim() || 'admin', resetPasswordValue);
+        if (loginResult.ok && loginResult.token) {
+          onAdminLogin(loginResult.token);
+          if (pushNotification) {
+            pushNotification({ type: 'success', message: 'Password amministratore reimpostata e accesso effettuato' });
+          }
+        } else if (pushNotification) {
+          pushNotification({ type: 'success', message: 'Password amministratore reimpostata con successo' });
         }
-      } catch (err) {
-        setError(err.message || 'Codice reset non valido');
-      } finally {
+      }
+    } catch (err) {
+      if (!isUnmountingRef.current) {
+        setLoginError(err.message || 'Codice di reset non valido o errore durante il ripristino');
+      }
+    } finally {
+      if (!isUnmountingRef.current) {
         setIsLoading(false);
       }
-    };
-
-    const handleInitialAdminSetup = async (e) => {
-      e?.preventDefault();
-      if (!initialAdminPassword || initialAdminPassword.length < 6) {
-        setSetupError('La password deve contenere almeno 6 caratteri.');
-        return;
-      }
-      if (initialAdminPassword !== initialAdminConfirmPassword) {
-        setSetupError('Le password inserite non coincidono.');
-        return;
-      }
-      setIsSettingUp(true);
-      setSetupError('');
-      try {
-        await api.setupAdminPassword(initialAdminPassword);
-        if (pushNotification) {
-          pushNotification({
-            type: 'success',
-            message: 'Password amministratore configurata con successo!'
-          });
-        }
-        const data = await api.getAuthConfig();
-        setAuthConfig((prev) => ({
-          ...prev,
-          adminConfigured: data.adminConfigured !== false
-        }));
-      } catch (err) {
-        setSetupError(err.message || 'Errore durante la configurazione della password admin');
-      } finally {
-        setIsSettingUp(false);
-      }
-    };
-
-    if (!authLoading && !authConfig.adminConfigured) {
-      return (
-        <div className="login-screen">
-          <div className="login-card">
-            <div className="login-header">
-              <h1 className="login-title">OnlyGANTT</h1>
-              <p className="login-subtitle">Configurazione Iniziale Password Amministratore</p>
-            </div>
-
-            <div className="login-form">
-              {setupError && (
-                <div className="login-error" role="alert" style={{ marginBottom: '1rem' }}>
-                  <span className="login-error-icon">!</span>
-                  <span className="login-error-text">{setupError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleInitialAdminSetup}>
-                <div className="form-group">
-                  <label htmlFor="setup-admin-password">Nuova Password Admin</label>
-                  <input
-                    id="setup-admin-password"
-                    type="password"
-                    value={initialAdminPassword}
-                    onChange={(e) => { setSetupError(''); setInitialAdminPassword(e.target.value); }}
-                    placeholder="Inserisci password admin (min 6 caratteri)"
-                    disabled={isSettingUp}
-                    autoFocus
-                  />
-                </div>
-
-                <div className="form-group" style={{ marginTop: '1rem' }}>
-                  <label htmlFor="setup-admin-confirm">Conferma Password</label>
-                  <input
-                    id="setup-admin-confirm"
-                    type="password"
-                    value={initialAdminConfirmPassword}
-                    onChange={(e) => { setSetupError(''); setInitialAdminConfirmPassword(e.target.value); }}
-                    placeholder="Conferma password admin"
-                    disabled={isSettingUp}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="login-submit btn-success"
-                  style={{ marginTop: '1.5rem', width: '100%' }}
-                  disabled={isSettingUp || !initialAdminPassword || !initialAdminConfirmPassword}
-                >
-                  {isSettingUp ? 'Configurazione in corso...' : 'Imposta Password Admin e Salva'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      );
     }
+  };
 
-    return (
-      <div className="login-screen">
-        <div className="login-card">
-          <div className="login-header">
-            <h1 className="login-title">OnlyGANTT</h1>
-            <p className="login-subtitle">Accedi per gestire i progetti</p>
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setLoginError(null);
+  };
+
+  return (
+    <div className="login-container">
+      <div className="login-card">
+        <div className="login-header">
+          <h1 className="login-title">OnlyGANTT</h1>
+          <p className="login-subtitle">Gestione Timeline e Progetti Multi-Reparto</p>
+        </div>
+
+        <div className="login-tabs">
+          <button
+            type="button"
+            className={`login-tab ${activeTab === 'user' ? 'active' : ''}`}
+            onClick={() => handleTabChange('user')}
+          >
+            Accesso Utente
+          </button>
+          <button
+            type="button"
+            className={`login-tab ${activeTab === 'admin' ? 'active' : ''}`}
+            onClick={() => handleTabChange('admin')}
+          >
+            Amministrazione
+          </button>
+        </div>
+
+        {loginError && (
+          <div className="login-error" role="alert">
+            <span className="login-error-icon">⚠️</span>
+            <span className="login-error-message">{loginError}</span>
           </div>
+        )}
 
-          {}
-          <div className="login-tabs" role="tablist" aria-label="Tipo di accesso">
-            <button
-              type="button"
-              id="login-tab-user"
-              role="tab"
-              aria-selected={activeTab === 'user'}
-              aria-controls="login-panel-user"
-              className={`login-tab ${activeTab === 'user' ? 'active' : ''}`}
-              onClick={() => handleTabChange('user')}
-              disabled={isLoading}
-            >
-              <span className="login-tab-icon">&#128100;</span>
-              <span className="login-tab-label">Reparto</span>
-            </button>
-            <button
-              type="button"
-              id="login-tab-admin"
-              role="tab"
-              aria-selected={activeTab === 'admin'}
-              aria-controls="login-panel-admin"
-              className={`login-tab ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => handleTabChange('admin')}
-              disabled={isLoading}
-            >
-              <span className="login-tab-icon">&#128274;</span>
-              <span className="login-tab-label">Admin</span>
-            </button>
-          </div>
-
-          {}
-          {effectiveError && (
-            <div className="login-error" role="alert">
-              <span className="login-error-icon">!</span>
-              <span className="login-error-text">{effectiveError}</span>
-            </div>
-          )}
-
-          {}
-          {activeTab === 'user' && (
-            <div id="login-panel-user" className="login-form" role="tabpanel" aria-labelledby="login-tab-user">
-              <div className="login-section">
-                <div className="login-section-header">
-                  <span className="login-section-number">1</span>
-                  <span className="login-section-title">Identificati</span>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="login-username">Nome utente</label>
-                  <input
-                    ref={userNameRef}
-                    id="login-username"
-                    type="text"
-                    value={pendingUserName}
-                    onChange={(e) => {
-                      setLoginError('');
-                      setPendingUserName(e.target.value);
-                    }}
-                    onBlur={handleUserNameBlur}
-                    onKeyDown={handleUserNameKeyDown}
-                    placeholder="Il tuo nome (min. 2 caratteri)"
-                    disabled={isLoading}
-                    autoComplete="username"
-                    className={!isUserNameValid && pendingUserName ? 'input-warning' : ''}
-                  />
-                  {!isUserNameValid && pendingUserName && (
-                    <span className="input-hint warning">Inserisci almeno 2 caratteri</span>
-                  )}
-                  {isUserNameValid && (
-                    <span className="input-hint success">Nome valido</span>
-                  )}
-                </div>
-                {requiresUserPassword && (
-                  <div className="form-group">
-                    <label htmlFor="login-user-password">Password utente</label>
-                    <input
-                      ref={userPasswordRef}
-                      id="login-user-password"
-                      type="password"
-                      value={userPassword}
-                      onChange={(e) => {
-                        setLoginError('');
-                        setUserPassword(e.target.value);
-                      }}
-                      onKeyDown={handleUserPasswordKeyDown}
-                      placeholder="Inserisci password utente"
-                      disabled={isLoading}
-                      autoComplete="current-password"
-                    />
-                    <span className="input-hint">
-                      {authConfig.ldapEnabled ? 'Autenticazione LDAP attiva' : 'Autenticazione locale attiva'}
-                    </span>
-                  </div>
-                )}
+        <div className="login-body">
+          {activeTab === 'user' ? (
+            <form onSubmit={handleUserLogin} className="login-form">
+              <div className="form-group">
+                <label htmlFor="login-username">Nome Utente</label>
+                <input
+                  id="login-username"
+                  type="text"
+                  value={userIdInput}
+                  onChange={(e) => setUserIdInput(e.target.value)}
+                  placeholder="es. mario.rossi o mrossi"
+                  disabled={isLoading}
+                  autoFocus
+                  autoComplete="username"
+                />
               </div>
 
-              <div className="login-section">
-                <div className="login-section-header">
-                  <span className="login-section-number">2</span>
-                  <span className="login-section-title">Seleziona reparto</span>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="login-department">Reparto</label>
-                  {loadingDepts ? (
-                    <div className="login-loading-inline">Caricamento reparti...</div>
-                  ) : (
-                    <select
-                      ref={deptSelectRef}
-                      id="login-department"
-                      value={selectedDept}
-                      onChange={(e) => {
-                        setLoginError('');
-                        setSelectedDept(e.target.value);
-                      }}
-                      onKeyDown={handleDeptSelectKeyDown}
-                      disabled={isLoading || !hasDepartments}
-                    >
-                      <option value="">-- Seleziona reparto --</option>
-                      {departments.map(d => (
-                        <option key={d.name} value={d.name}>
-                          {d.name}
-                          {d.protected ? ' (protetto)' : ''}
-                          {d.readOnly ? ' [sola lettura]' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {!hasDepartments && !loadingDepts && (
-                    <span className="input-hint warning">
-                      Nessun reparto disponibile. Contatta un admin.
-                    </span>
-                  )}
-                </div>
-
-                {needsPassword && (
-                  <div className="form-group">
-                    <label htmlFor="login-dept-password">Password reparto</label>
-                    <input
-                      ref={deptPasswordRef}
-                      id="login-dept-password"
-                      type="password"
-                      value={deptPassword}
-                      onChange={(e) => {
-                        setLoginError('');
-                        setDeptPassword(e.target.value);
-                      }}
-                      onKeyDown={handleDeptPasswordKeyDown}
-                      placeholder="Inserisci password"
-                      disabled={isLoading}
-                      autoComplete="current-password"
-                    />
-                  </div>
-                )}
+              <div className="form-group">
+                <label htmlFor="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  value={userPasswordInput}
+                  onChange={(e) => setUserPasswordInput(e.target.value)}
+                  placeholder="Password account"
+                  disabled={isLoading}
+                  autoComplete="current-password"
+                />
               </div>
 
               <button
-                type="button"
+                type="submit"
                 className="login-submit btn-success"
-                onClick={handleDeptLogin}
-                disabled={!canSubmitDept}
+                disabled={isLoading || !userIdInput.trim()}
               >
-                {isLoading ? 'Accesso in corso...' : 'Accedi al reparto'}
+                {isLoading ? 'Accesso in corso...' : 'Accedi'}
               </button>
-            </div>
-          )}
-
-          {}
-          {activeTab === 'admin' && (
-            <div id="login-panel-admin" className="login-form" role="tabpanel" aria-labelledby="login-tab-admin">
+            </form>
+          ) : (
+            <div className="admin-login-area">
               {adminToken ? (
-                <div className="login-admin-active">
-                  <div className="login-admin-status">
-                    <span className="login-admin-badge">Admin attivo</span>
-                    <p className="login-admin-info">
-                      Hai accesso amministrativo. Seleziona un reparto per gestirlo.
-                    </p>
+                <div className="admin-authenticated-banner" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                  <div className="banner-info" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <span className="banner-icon" style={{ fontSize: '1.5rem' }}>⚙️</span>
+                    <strong style={{ fontSize: '1rem' }}>Sessione amministratore attiva</strong>
                   </div>
-
-                  <div className="login-section">
-                    <div className="login-section-header">
-                      <span className="login-section-number">1</span>
-                      <span className="login-section-title">Seleziona reparto</span>
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="login-admin-department">Reparto</label>
-                      {loadingDepts ? (
-                        <div className="login-loading-inline">Caricamento reparti...</div>
-                      ) : (
-                        <select
-                          ref={deptSelectRef}
-                          id="login-admin-department"
-                        value={selectedDept}
-                          onChange={(e) => {
-                            setLoginError('');
-                            setSelectedDept(e.target.value);
-                          }}
-                          onKeyDown={handleDeptSelectKeyDown}
-                          disabled={isLoading || !hasDepartments}
-                        >
-                          <option value="">-- Seleziona reparto --</option>
-                          {departments.map(d => (
-                            <option key={d.name} value={d.name}>
-                              {d.name}
-                              {d.readOnly ? ' [sola lettura]' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                    {onNavigateSystemSettings && (
+                      <button
+                        type="button"
+                        className="btn-success"
+                        onClick={onNavigateSystemSettings}
+                      >
+                        ⚙️ Impostazioni di Sistema
+                      </button>
+                    )}
+                    {onNavigateUserManagement && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={onNavigateUserManagement}
+                      >
+                        👥 Gestione Utenti
+                      </button>
+                    )}
                   </div>
-
-                  <div className="login-actions-row">
-                    <button
-                      type="button"
-                      className="login-submit btn-success"
-                      onClick={handleDeptLogin}
-                      disabled={!selectedDept || isLoading}
-                    >
-                      {isLoading ? 'Accesso...' : 'Apri reparto'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={handleAdminLogout}
-                      disabled={isLoading}
-                    >
-                      Esci da admin
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="btn-danger btn-small"
+                    onClick={onAdminLogout}
+                    style={{ width: '100%' }}
+                  >
+                    Chiudi sessione admin
+                  </button>
                 </div>
+              ) : !authConfig.adminConfigured && !authConfig.adminManagedByEnv ? (
+                <form onSubmit={handleAdminSetup} className="login-form">
+                  <div className="login-info-box">
+                    <strong>Configurazione Iniziale Amministratore</strong>
+                    <p>Imposta la password per l'account amministrativo "admin".</p>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="setup-password">Nuova Password Admin</label>
+                    <input
+                      id="setup-password"
+                      type="password"
+                      value={setupPasswordInput}
+                      onChange={(e) => setSetupPasswordInput(e.target.value)}
+                      placeholder="Minimo 6 caratteri"
+                      disabled={isLoading}
+                      autoFocus
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="setup-confirm">Conferma Password</label>
+                    <input
+                      id="setup-confirm"
+                      type="password"
+                      value={setupConfirmInput}
+                      onChange={(e) => setSetupConfirmInput(e.target.value)}
+                      placeholder="Ripeti la password"
+                      disabled={isLoading}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="login-submit btn-success"
+                    disabled={isLoading || !setupPasswordInput || setupPasswordInput.length < 6}
+                  >
+                    {isLoading ? 'Salvataggio...' : 'Configura e Accedi'}
+                  </button>
+                </form>
               ) : (
                 <>
-                  <div className="login-section">
-                    <div className="login-section-header">
-                      <span className="login-section-number">1</span>
-                      <span className="login-section-title">Credenziali admin</span>
-                    </div>
+                  <form onSubmit={handleAdminLoginSubmit} className="login-form">
                     <div className="form-group">
-                      <label htmlFor="login-admin-id">ID Admin</label>
+                      <label htmlFor="admin-username">Utente Amministratore</label>
                       <input
-                        ref={adminIdRef}
-                        id="login-admin-id"
+                        id="admin-username"
                         type="text"
-                        value={adminId}
-                        onChange={(e) => {
-                          setLoginError('');
-                          setAdminId(e.target.value);
-                        }}
-                        onKeyDown={handleAdminIdKeyDown}
-                        placeholder="Inserisci ID admin"
+                        value={adminUserIdInput}
+                        onChange={(e) => setAdminUserIdInput(e.target.value)}
                         disabled={isLoading}
                         autoComplete="username"
                       />
                     </div>
+
                     <div className="form-group">
-                      <label htmlFor="login-admin-password">Password Admin</label>
+                      <label htmlFor="admin-password">Password Admin</label>
                       <input
-                        ref={adminPasswordRef}
-                        id="login-admin-password"
+                        id="admin-password"
                         type="password"
-                        value={adminPassword}
-                        onChange={(e) => {
-                          setLoginError('');
-                          setAdminPassword(e.target.value);
-                        }}
-                        onKeyDown={handleAdminPasswordKeyDown}
-                        placeholder="Inserisci password admin"
+                        value={adminPasswordInput}
+                        onChange={(e) => setAdminPasswordInput(e.target.value)}
+                        placeholder="Password amministratore"
                         disabled={isLoading}
+                        autoFocus
                         autoComplete="current-password"
                       />
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    className="login-submit btn-success"
-                    onClick={handleAdminLogin}
-                    disabled={!canSubmitAdmin}
-                  >
-                    {isLoading ? 'Autenticazione...' : 'Accedi come admin'}
-                  </button>
+                    <button
+                      type="submit"
+                      className="login-submit btn-success"
+                      disabled={isLoading || !adminPasswordInput}
+                    >
+                      {isLoading ? 'Accesso in corso...' : 'Accedi come Admin'}
+                    </button>
+                  </form>
 
-                  <div style={{ marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--border-color)' }}>
-                    {canShowAdminPasswordReset ? (
+                  <div className="admin-reset-area">
+                    {authConfig.adminResetEnabled && !authConfig.adminManagedByEnv ? (
                       <>
                         <button
                           type="button"
-                          className="btn-secondary"
-                          style={{ width: '100%', fontSize: '0.85rem' }}
-                          onClick={() => setShowAdminPasswordReset(!showAdminPasswordReset)}
-                          disabled={isLoading}
+                          className="btn-link-subtle"
+                          onClick={() => setShowAdminReset(!showAdminReset)}
                         >
-                          {showAdminPasswordReset ? 'Nascondi reset password' : 'Password dimenticata?'}
+                          {showAdminReset ? 'Nascondi reset password' : 'Password admin dimenticata?'}
                         </button>
 
-                        {showAdminPasswordReset && (
-                          <div style={{ marginTop: 'var(--spacing-md)' }}>
-                            <div className="login-section">
-                              <div className="login-section-header">
-                                <span className="login-section-title" style={{ fontSize: '0.8rem' }}>Reset password admin</span>
-                              </div>
-                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-sm)' }}>
-                                Usa il codice di reset fornito dall'amministratore di sistema (variabile ambiente ONLYGANTT_ADMIN_RESET_CODE).
-                              </p>
-                              <div className="form-group">
-                                <label htmlFor="admin-reset-code">Codice Reset</label>
-                                <input
-                                  id="admin-reset-code"
-                                  type="text"
-                                  value={adminResetCode}
-                                  onChange={(e) => setAdminResetCode(e.target.value)}
-                                  placeholder="Inserisci codice reset"
-                                  disabled={isLoading}
-                                  autoComplete="off"
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label htmlFor="new-admin-password">Nuova Password Admin</label>
-                                <input
-                                  id="new-admin-password"
-                                  type="password"
-                                  value={newAdminPassword}
-                                  onChange={(e) => setNewAdminPassword(e.target.value)}
-                                  placeholder="Inserisci nuova password"
-                                  disabled={isLoading}
-                                  autoComplete="new-password"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                className="login-submit btn-success"
-                                onClick={handleAdminPasswordReset}
-                                disabled={!adminResetCode || !newAdminPassword || isLoading}
-                              >
-                                {isLoading ? 'Reset in corso...' : 'Reimposta password'}
-                              </button>
+                        {showAdminReset && (
+                          <div className="admin-reset-box">
+                            <div className="form-group">
+                              <label htmlFor="reset-code">Codice Reset Ambienza (ONLYGANTT_ADMIN_RESET_CODE)</label>
+                              <input
+                                id="reset-code"
+                                type="text"
+                                value={adminResetCode}
+                                onChange={(e) => setAdminResetCode(e.target.value)}
+                                placeholder="Codice di ripristino"
+                                disabled={isLoading}
+                              />
                             </div>
+
+                            <div className="form-group">
+                              <label htmlFor="reset-new-password">Nuova Password Admin</label>
+                              <input
+                                id="reset-new-password"
+                                type="password"
+                                value={newAdminPassword}
+                                onChange={(e) => setNewAdminPassword(e.target.value)}
+                                placeholder="Minimo 6 caratteri"
+                                disabled={isLoading}
+                                autoComplete="new-password"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              className="login-submit btn-success"
+                              onClick={handleAdminPasswordReset}
+                              disabled={!adminResetCode || !newAdminPassword || isLoading}
+                            >
+                              {isLoading ? 'Reset in corso...' : 'Reimposta password'}
+                            </button>
                           </div>
                         )}
                       </>
@@ -861,8 +538,6 @@
                       </p>
                     )}
                   </div>
-
-
                 </>
               )}
             </div>
@@ -873,8 +548,14 @@
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+if (typeof window !== 'undefined') {
+  window.OnlyGantt = window.OnlyGantt || {};
+  window.OnlyGantt.components = window.OnlyGantt.components || {};
   window.OnlyGantt.components.LoginScreen = LoginScreen;
-})();
+}
+
+export default LoginScreen;

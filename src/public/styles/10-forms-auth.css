@@ -198,17 +198,21 @@ textarea:focus-visible {
 }
 
 
-.login-screen {
+.login-screen,
+.login-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 80px);
-  padding: var(--spacing-xl);
+  min-height: calc(100vh - 120px);
+  width: 100%;
+  padding: var(--spacing-md);
+  margin: 0 auto;
 }
 
 .login-card {
   width: 100%;
   max-width: 440px;
+  margin: 0 auto;
   background-color: var(--surface-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

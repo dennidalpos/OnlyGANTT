@@ -61,4 +61,25 @@ $adminRemoveFile = $adminShortcutComponent.SelectSingleNode('wix:RemoveFile[@Id=
 Assert-True -Condition ($null -ne $adminRemoveFile) -Message 'Admin desktop shortcut should be removed on uninstall.'
 Assert-True -Condition ($adminRemoveFile.Name -eq 'OnlyGANTT Admin.url') -Message 'Admin shortcut remove entry should target OnlyGANTT Admin.url.'
 
+$majorUpgrade = $document.SelectSingleNode('//wix:MajorUpgrade', $namespaceManager)
+Assert-True -Condition ($null -ne $majorUpgrade) -Message 'MajorUpgrade element is missing.'
+Assert-True -Condition ($majorUpgrade.Schedule -eq 'afterInstallInitialize') -Message 'MajorUpgrade should set Schedule="afterInstallInitialize".'
+
+$wixBundlePath = Join-Path $repoRoot 'tools\wix\Bundle.wxs'
+Assert-True -Condition (Test-Path $wixBundlePath) -Message "WiX bundle source not found: $wixBundlePath"
+
+[xml]$bundleDoc = Get-Content $wixBundlePath -Raw
+$bundleNsManager = [System.Xml.XmlNamespaceManager]::new($bundleDoc.NameTable)
+$bundleNsManager.AddNamespace('wix', 'http://schemas.microsoft.com/wix/2006/wi')
+
+$bundleElement = $bundleDoc.SelectSingleNode('//wix:Bundle', $bundleNsManager)
+Assert-True -Condition ($null -ne $bundleElement) -Message 'Bundle element is missing.'
+Assert-True -Condition ($bundleElement.Name -eq 'OnlyGANTT') -Message 'Bundle Name should be OnlyGANTT.'
+
+$onlyGanttMsiPackage = $bundleDoc.SelectSingleNode('//wix:MsiPackage[@Id="OnlyGanttMsi"]', $bundleNsManager)
+Assert-True -Condition ($null -ne $onlyGanttMsiPackage) -Message 'OnlyGanttMsi MsiPackage is missing from Bundle.wxs.'
+Assert-True -Condition ($onlyGanttMsiPackage.Visible -eq 'yes') -Message 'OnlyGanttMsi should set Visible="yes" so the MSI is the sole ARP entry.'
+
+Assert-True -Condition ($bundleElement.DisableRemove -eq 'yes') -Message 'Bundle should set DisableRemove="yes" to hide itself from ARP.'
+
 Write-Host 'Installer source regression check passed'

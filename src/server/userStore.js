@@ -1,3 +1,4 @@
+const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -86,88 +87,90 @@ function isValidUserRecord(data) {
   return true;
 }
 
-function createUserStore({ dataDir, enableBak }) {
-  const ensureStore = () => {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-  };
+function createUserStore({ dataDir, dbName = 'users.db', logger = console }) {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
 
-  const getUserFilePath = (userId) => {
-    const normalized = normalizeUserId(userId);
-    if (!normalized) return null;
-    return path.join(dataDir, `${normalized.toLowerCase()}.json`);
+  const dbPath = path.join(dataDir, dbName);
+  const db = new DatabaseSync(dbPath);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      user_id_normalized TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      data TEXT NOT NULL
+    )
+  `);
+
+  const ensureStore = () => {
+    // Migration helper for legacy json user files into SQLite
+    try {
+      const files = fs.readdirSync(dataDir);
+      for (const file of files) {
+        if (file.endsWith('.json') && !file.endsWith('.tmp') && !file.endsWith('.bak')) {
+          const filePath = path.join(dataDir, file);
+          try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const data = JSON.parse(content);
+            if (isValidUserRecord(data)) {
+              const normId = data.userIdNormalized.toLowerCase();
+              const existing = db.prepare('SELECT 1 FROM users WHERE user_id_normalized = ?').get(normId);
+              if (!existing) {
+                db.prepare('INSERT INTO users (user_id_normalized, user_id, data) VALUES (?, ?, ?)').run(
+                  normId,
+                  data.userId,
+                  JSON.stringify(data)
+                );
+              }
+            }
+            fs.unlinkSync(filePath);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   };
 
   const readUserFile = (userId) => {
-    const filePath = getUserFilePath(userId);
-    if (!filePath || !fs.existsSync(filePath)) return null;
+    const normalized = normalizeUserId(userId);
+    if (!normalized) return null;
     try {
-      const content = fs.readFileSync(filePath, 'utf8');
-      const data = JSON.parse(content);
-      if (!isValidUserRecord(data)) {
-        console.warn(`[userStore] Invalid user file structure: ${path.basename(filePath)}`);
-        return null;
-      }
-      return data;
+      const row = db.prepare('SELECT data FROM users WHERE user_id_normalized = ?').get(normalized.toLowerCase());
+      if (!row) return null;
+      const data = JSON.parse(row.data);
+      return isValidUserRecord(data) ? data : null;
     } catch (err) {
-      console.warn(`[userStore] Unable to read user file ${path.basename(filePath)}: ${err.message}`);
+      logger.error(`[UserStore] Error reading user ${userId}:`, err.message);
       return null;
     }
   };
 
-  const writeUserFileAtPath = (filePath, data) => {
-    const tmpPath = `${filePath}.tmp`;
-    const bakPath = `${filePath}.bak`;
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    try {
-      const fd = fs.openSync(tmpPath, 'r+');
-      fs.fsyncSync(fd);
-      fs.closeSync(fd);
-    } catch (err) {
-      console.warn(`[userStore] Unable to fsync temp file ${tmpPath}:`, err.message);
-    }
-    if (enableBak && fs.existsSync(filePath)) {
-      try {
-        fs.copyFileSync(filePath, bakPath);
-      } catch (err) {
-        console.warn(`[userStore] Unable to write backup file ${bakPath}:`, err.message);
-      }
-    }
-    fs.renameSync(tmpPath, filePath);
-  };
-
   const writeUserFile = (userId, data) => {
-    ensureStore();
-    const filePath = getUserFilePath(userId);
-    if (!filePath) {
-      throw new Error('Invalid user id');
-    }
-    writeUserFileAtPath(filePath, data);
-  };
-
-  const listUserFiles = () => {
-    ensureStore();
-    return fs.readdirSync(dataDir)
-      .filter((file) => file.endsWith('.json') && !file.endsWith('.tmp') && !file.endsWith('.bak'))
-      .map((file) => path.join(dataDir, file));
+    const normalized = normalizeUserId(userId);
+    if (!normalized) throw new Error('Invalid user id');
+    const normId = normalized.toLowerCase();
+    db.prepare('INSERT OR REPLACE INTO users (user_id_normalized, user_id, data) VALUES (?, ?, ?)').run(
+      normId,
+      data.userId,
+      JSON.stringify(data)
+    );
   };
 
   const readAllUsers = () => {
-    const files = listUserFiles();
-    const users = [];
-    for (const filePath of files) {
-      try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const data = JSON.parse(content);
-        if (isValidUserRecord(data)) {
-          users.push(data);
-        }
-      } catch (err) {
-        continue;
+    try {
+      const rows = db.prepare('SELECT data FROM users').all();
+      const users = [];
+      for (const row of rows) {
+        try {
+          const data = JSON.parse(row.data);
+          if (isValidUserRecord(data)) users.push(data);
+        } catch (_) {}
       }
+      return users;
+    } catch (err) {
+      logger.error('[UserStore] Error reading all users:', err.message);
+      return [];
     }
-    return users;
   };
 
   const verifyLocalUser = (userId, password) => {
@@ -327,9 +330,13 @@ function createUserStore({ dataDir, enableBak }) {
       return { ok: false, code: 'INVALID_USER', message: 'Invalid user id' };
     }
 
-    const nextPassword = typeof payload.password === 'string' ? payload.password : null;
-    if (nextPassword !== null && nextPassword.length < 6) {
-      return { ok: false, code: 'INVALID_PASSWORD', message: 'Password must be at least 6 characters' };
+    const rawPassword = typeof payload.password === 'string' ? payload.password : null;
+    let nextPassword = null;
+    if (rawPassword !== null && rawPassword.trim() !== '') {
+      if (rawPassword.trim().length < 6) {
+        return { ok: false, code: 'INVALID_PASSWORD', message: 'Password must be at least 6 characters' };
+      }
+      nextPassword = rawPassword.trim();
     }
 
     const existing = readUserFile(normalized);
@@ -374,12 +381,12 @@ function createUserStore({ dataDir, enableBak }) {
 
   const deleteLocalUser = (userId) => {
     ensureStore();
-    const filePath = getUserFilePath(userId);
-    if (!filePath || !fs.existsSync(filePath)) {
+    const normalized = normalizeUserId(userId);
+    if (!normalized) {
       return { ok: false, code: 'NOT_FOUND', message: 'User not found' };
     }
 
-    const user = readUserFile(userId);
+    const user = readUserFile(normalized);
     if (!user) {
       return { ok: false, code: 'NOT_FOUND', message: 'User not found' };
     }
@@ -387,12 +394,14 @@ function createUserStore({ dataDir, enableBak }) {
       return { ok: false, code: 'USER_TYPE_CONFLICT', message: 'Only local users can be deleted here' };
     }
 
-    fs.unlinkSync(filePath);
-    const bakPath = `${filePath}.bak`;
-    if (fs.existsSync(bakPath)) {
-      fs.unlinkSync(bakPath);
-    }
+    db.prepare('DELETE FROM users WHERE user_id_normalized = ?').run(normalized.toLowerCase());
     return { ok: true, userId: user.userId };
+  };
+
+  const close = () => {
+    try {
+      db.close();
+    } catch (_) {}
   };
 
   return {
@@ -405,7 +414,8 @@ function createUserStore({ dataDir, enableBak }) {
     listLocalUsers,
     listUsers,
     exportUsers,
-    importUsers
+    importUsers,
+    close
   };
 }
 

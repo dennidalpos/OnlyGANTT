@@ -9,9 +9,9 @@ It is not a standalone desktop app. The supported product surface is a web UI ho
 ## Features
 
 - Interactive Gantt chart with projects, phases, milestones, percentages, alerts and Italian holidays.
-- Department-based project files under `Data/reparti/`.
-- Multi-user editing locks with persisted lock state under `Data/config/locks.json`.
-- Local users, admin login, department password protection and password reset flows.
+- 100% SQLite backend persistence (`node:sqlite`) for departments (`reparti.db`), users (`users.db`), and lock management (`locks.db`).
+- Multi-user editing locks with persisted lock state in SQLite.
+- Local users, admin login, department password protection and administrative department management.
 - Server-side authorization for department project read, export, save, import and upload APIs.
 - Optional LDAP authentication with local fallback support.
 - Admin settings import/export with LDAP bind password kept out of the versioned seed config.

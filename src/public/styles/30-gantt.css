@@ -532,52 +532,6 @@ input[type="checkbox"] {
 }
 
 
-.screensaver-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(15, 23, 42, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  backdrop-filter: blur(4px);
-}
-
-.screensaver-card {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
-  border: 2px solid var(--accent-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-xl);
-  box-shadow: 0 0 40px rgba(59, 130, 246, 0.3), var(--shadow-xl);
-  text-align: center;
-  animation: glow 2s ease-in-out infinite;
-}
-
-@keyframes glow {
-  0%, 100% {
-    box-shadow: 0 0 40px rgba(59, 130, 246, 0.3), var(--shadow-xl);
-  }
-  50% {
-    box-shadow: 0 0 60px rgba(59, 130, 246, 0.5), var(--shadow-xl);
-  }
-}
-
-.screensaver-title {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--accent-light);
-  margin-bottom: var(--spacing-md);
-}
-
-.screensaver-subtitle {
-  font-size: 1rem;
-  color: var(--text-secondary);
-}
-
-
 .text-center {
   text-align: center;
 }

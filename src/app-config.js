@@ -1,4 +1,4 @@
-window.AppConfig = {
+const AppConfig = {
   server: {
     port: 3000,
     dataDir: 'Data',
@@ -34,10 +34,6 @@ window.AppConfig = {
     HEADER_FONT_SIZE: 14,
     HEADER_SMALL_FONT_SIZE: 10,
     HEADER_TINY_FONT_SIZE: 9
-  },
-
-  screensaver: {
-    idleMs: 15000
   },
 
   lock: {
@@ -100,3 +96,10 @@ window.AppConfig = {
     '#facc15', '#fb923c', '#f87171', '#c084fc', '#60a5fa'
   ]
 };
+
+if (typeof window !== 'undefined') {
+  window.AppConfig = AppConfig;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AppConfig, default: AppConfig };
+}

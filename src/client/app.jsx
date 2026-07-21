@@ -1,1237 +1,801 @@
-(function() {
-  'use strict';
+import AppConfig from '../app-config.js';
+import dateUtils from '../utils/dateUtils.js';
+import logic from '../domain/projectLogic.js';
+import gantt from '../domain/ganttCalculator.js';
+import api from './api.js';
+import storage from './storage.js';
 
-  const { useState, useEffect, useRef, useMemo, useCallback } = React;
+import useAuth from './hooks/useAuth.js';
+import useGanttFilters from './hooks/useGanttFilters.js';
+import useProjectDraft from './hooks/useProjectDraft.js';
+import useNotifications from './hooks/useNotifications.js';
+import useDepartmentLock from './hooks/useDepartmentLock.js';
+import useProjects from './hooks/useProjects.js';
 
-  const config = window.AppConfig;
-  const storage = window.OnlyGantt.storage;
-  const gantt = window.OnlyGantt.gantt;
-  const api = window.OnlyGantt.api;
-  const logic = window.OnlyGantt.logic;
+import HeaderBar from './components/HeaderBar.jsx';
+import GanttControls from './components/GanttControls.jsx';
+import GanttCanvas from './components/GanttCanvas.jsx';
+import ProjectForm from './components/ProjectForm.jsx';
+import ProjectList from './components/ProjectList.jsx';
+import ProjectSidebar from './components/ProjectSidebar.jsx';
+import AlertsPanel from './components/AlertsPanel.jsx';
+import LoginScreen from './components/LoginScreen.jsx';
+import SystemSettings from './components/SystemSettings.jsx';
+import UserManagement from './components/UserManagement.jsx';
+import DialogHost from './components/DialogHost.jsx';
 
-  const HeaderBar = window.OnlyGantt.components.HeaderBar;
-  const GanttControls = window.OnlyGantt.components.GanttControls;
-  const GanttCanvas = window.OnlyGantt.components.GanttCanvas;
-  const ProjectForm = window.OnlyGantt.components.ProjectForm;
-  const ProjectList = window.OnlyGantt.components.ProjectList;
-  const ProjectSidebar = window.OnlyGantt.components.ProjectSidebar;
-  const AlertsPanel = window.OnlyGantt.components.AlertsPanel;
-  const LoginScreen = window.OnlyGantt.components.LoginScreen;
-  const SystemSettings = window.OnlyGantt.components.SystemSettings;
-  const UserManagement = window.OnlyGantt.components.UserManagement;
-  const DialogHost = window.OnlyGantt.components.DialogHost;
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-  const useDepartmentLock = window.OnlyGantt.hooks.useDepartmentLock;
-  const useProjects = window.OnlyGantt.hooks.useProjects;
-
-  class ErrorBoundary extends React.Component {
-    constructor(props) {
-      super(props);
-      this.state = { hasError: false, error: null };
-    }
-
-    static getDerivedStateFromError(error) {
-      return { hasError: true, error };
-    }
-
-    componentDidCatch(error, info) {
-      console.error('OnlyGANTT error:', error, info);
-    }
-
-    render() {
-      if (this.state.hasError) {
-        return (
-          <main className="main-container">
-            <div className="card">
-              <h2 className="card-title">Si è verificato un errore</h2>
-              <p className="text-muted">Ricarica la pagina per riprovare.</p>
-              {this.state.error?.message && (
-                <div className="alert-item">Dettagli: {this.state.error.message}</div>
-              )}
-            </div>
-          </main>
-        );
-      }
-
-      return this.props.children;
-    }
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
 
-  function App() {
-    const restoredSessionRef = useRef(storage.getActiveSession());
-    const restoredSession = restoredSessionRef.current || {};
-    const [userName, setUserName] = useState(restoredSession.userName || storage.getCurrentUser() || '');
-    const [userToken, setUserToken] = useState(restoredSession.userToken || null);
-    const [notifications, setNotifications] = useState([]);
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
 
-    const [department, setDepartment] = useState(restoredSession.department || null);
-    const [readOnlyDepartment, setReadOnlyDepartment] = useState(false);
-    const [lockEnabled, setLockEnabled] = useState(false);
-    const [isDepartmentProtected, setIsDepartmentProtected] = useState(false);
+  componentDidCatch(error, info) {
+    console.error('OnlyGANTT error:', error, info);
+  }
 
-    const [screensaverEnabled, setScreensaverEnabled] = useState(false);
-    const [showScreensaver, setShowScreensaver] = useState(false);
-    const [screensaverPassword, setScreensaverPassword] = useState('');
-    const [screensaverError, setScreensaverError] = useState('');
-    const [screensaverUnlocking, setScreensaverUnlocking] = useState(false);
-    const lastActivityRef = useRef(Date.now());
-    const isVerifyingPasswordRef = useRef(false);
-    const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
-    const [dialogState, setDialogState] = useState(null);
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="main-container">
+          <div className="card">
+            <h2 className="card-title">Si è verificato un errore</h2>
+            <p className="text-muted">Ricarica la pagina per riprovare.</p>
+            {this.state.error?.message && (
+              <div className="alert-item">Dettagli: {this.state.error.message}</div>
+            )}
+          </div>
+        </main>
+      );
+    }
 
-    const [viewMode, setViewMode] = useState('4months');
-    const [activeView, setActiveView] = useState('gantt');
-    const [selectedProjectIds, setSelectedProjectIds] = useState(new Set());
-    const [scrollToTodayTrigger, setScrollToTodayTrigger] = useState(0);
-    const [filters, setFilters] = useState({
-      showDaySeparators: true,
-      showWeekSeparators: true,
-      showMonthSeparators: true,
-      showYearSeparators: true,
-      showDayLetters: true,
-      showDayNumbers: true,
-      showWeekNumbers: true,
-      showMonthYearLabels: true,
-      showYearLabels: true,
-      showWeekends: false,
-      showHolidays: true,
-      showOnlyMilestones: false,
-      highlightDelays: true,
-      showPhaseLabels: true,
-      showPhasePercentages: true
-    });
+    return this.props.children;
+  }
+}
 
-    const [editingProject, setEditingProject] = useState(null);
-    const [showProjectForm, setShowProjectForm] = useState(false);
-    const [projectDraft, setProjectDraft] = useState(null);
-    const [isSavingProject, setIsSavingProject] = useState(false);
-    const [hasDraftChanges, setHasDraftChanges] = useState(false);
-    const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
-    const [focusedProjectId, setFocusedProjectId] = useState(null);
+export function App() {
+  const auth = useAuth();
+  const filtersState = useGanttFilters();
+  const draftState = useProjectDraft();
+  const notify = useNotifications();
 
-    const [hoveredProjectId, setHoveredProjectId] = useState(null);
-    const [verticalScrollTop, setVerticalScrollTop] = useState(0);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-      try {
-        return localStorage.getItem('onlygantt_sidebar_collapsed') === 'true';
-      } catch {
-        return false;
-      }
-    });
+  const [departmentValidationErrors, setDepartmentValidationErrors] = useState([]);
+  const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
+  const [hoveredProjectId, setHoveredProjectId] = useState(null);
+  const [verticalScrollTop, setVerticalScrollTop] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('onlygantt_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
-    const [adminToken, setAdminToken] = useState(restoredSession.adminToken || null);
-    const [loginError, setLoginError] = useState('');
+  const [departmentsList, setDepartmentsList] = useState([]);
 
-    const effectiveUserName = adminToken ? (userName || 'admin') : userName;
-    const shouldUseLock = !!department && lockEnabled;
-    const { lockInfo, isLocked, error: lockError, releaseLock, refreshLock } = useDepartmentLock(
-      department,
-      effectiveUserName,
-      shouldUseLock
-    );
+  const fetchDepartmentsList = useCallback(async (signal) => {
+    try {
+      const list = await api.getDepartments(signal);
+      setDepartmentsList(list?.departments || []);
+    } catch (err) {}
+  }, []);
 
-    useEffect(() => {
-      if (department) {
-        const isReadOnly = !lockEnabled || (shouldUseLock && !isLocked);
-        setReadOnlyDepartment(isReadOnly);
+  useEffect(() => {
+    fetchDepartmentsList();
+  }, [fetchDepartmentsList, auth.department, auth.adminToken]);
+
+  const shouldUseLock = !!auth.department && auth.lockEnabled;
+  const { lockInfo, isLocked, error: lockError, releaseLock, refreshLock } = useDepartmentLock(
+    auth.department,
+    auth.effectiveUserName,
+    shouldUseLock
+  );
+
+  useEffect(() => {
+    if (auth.department) {
+      if (auth.adminToken) {
+        const isLockedByOther = shouldUseLock && !isLocked && lockInfo?.locked && lockInfo?.lockedBy && lockInfo.lockedBy !== auth.effectiveUserName;
+        auth.setReadOnlyDepartment(!!isLockedByOther);
       } else {
-        setReadOnlyDepartment(false);
+        const isReadOnly = !auth.lockEnabled || (shouldUseLock && !isLocked);
+        auth.setReadOnlyDepartment(isReadOnly);
       }
-    }, [department, shouldUseLock, isLocked, lockEnabled]);
+    } else {
+      auth.setReadOnlyDepartment(false);
+    }
+  }, [auth.department, shouldUseLock, isLocked, auth.lockEnabled, auth.adminToken, lockInfo, auth.effectiveUserName]);
 
-    const stripProjectIds = (project) => {
-      if (!project) return null;
-      return {
-        ...project,
-        id: undefined,
-        fasi: Array.isArray(project.fasi)
-          ? project.fasi.map(fase => ({
-              ...fase,
-              id: undefined
-            }))
-          : []
-      };
-    };
-
-    const emptyProjectTemplateRef = useRef(stripProjectIds(logic.createNewProject()));
-
-    const pushNotification = ({ type = 'info', message, title }) => {
-      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      setNotifications(prev => [...prev, { id, type, message, title }]);
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(item => item.id !== id));
-      }, 5000);
-    };
-
-    const resolveDialog = useCallback((result) => {
-      setDialogState((currentDialog) => {
-        if (currentDialog?.resolve) {
-          currentDialog.resolve(result);
-        }
-        return null;
-      });
-    }, []);
-
-    const openDialog = useCallback((config) => new Promise((resolve) => {
-      setDialogState((currentDialog) => {
-        if (currentDialog?.resolve) {
-          currentDialog.resolve({ action: 'cancel', values: {} });
-        }
-        return {
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          ...config,
-          resolve
-        };
-      });
-    }), []);
-
-    const showConfirmDialog = useCallback(async ({
-      title = 'Conferma operazione',
-      message,
-      confirmLabel = 'Conferma',
-      cancelLabel = 'Annulla',
-      confirmTone = 'danger'
-    }) => {
-      const result = await openDialog({
-        title,
-        message,
-        actions: [
-          { key: 'cancel', label: cancelLabel, className: 'btn-secondary' },
-          { key: 'confirm', label: confirmLabel, className: confirmTone === 'danger' ? 'btn-danger' : 'btn-success' }
-        ]
-      });
-      return result?.action === 'confirm';
-    }, [openDialog]);
-
-    const showDetailsDialog = useCallback(async ({
-      title = 'Dettagli',
-      message,
-      details,
-      closeLabel = 'Chiudi',
-      badge
-    }) => {
-      await openDialog({
-        title,
-        message,
-        details,
-        badge,
-        actions: [
-          { key: 'close', label: closeLabel, className: 'btn-secondary' }
-        ]
-      });
-    }, [openDialog]);
-
-    const showFormDialog = useCallback(async ({
-      title,
-      message,
-      fields,
-      submitLabel = 'Conferma',
-      cancelLabel = 'Annulla',
-      submitTone = 'success',
-      badge
-    }) => {
-      const result = await openDialog({
-        title,
-        message,
-        fields,
-        badge,
-        actions: [
-          { key: 'cancel', label: cancelLabel, className: 'btn-secondary' },
-          { key: 'submit', label: submitLabel, className: submitTone === 'danger' ? 'btn-danger' : 'btn-success', submits: true }
-        ]
-      });
-      return result?.action === 'submit' ? result.values : null;
-    }, [openDialog]);
-
-    const confirmProjectFix = useCallback(async ({ contextLabel, errors }) => (
-      showConfirmDialog({
-        title: 'Correzione automatica dati',
-        message: `${contextLabel}: rilevati ${errors.length} errori nei dati.\nVuoi applicare il fix automatico per continuare?`,
-        confirmLabel: 'Applica fix',
-        cancelLabel: 'Annulla',
-        confirmTone: 'success'
-      })
-    ), [showConfirmDialog]);
-
-    const {
-      projects,
-      meta,
-      isDirty,
-      isLoading,
-      validationErrors,
-      error: projectsError,
-      loadProjects,
-      saveProjects,
-      updateProjects,
-      uploadJSON
-    } = useProjects(department, readOnlyDepartment, {
-      requestProjectFixConfirmation: confirmProjectFix
+  const requestProjectFixConfirmation = useCallback(async ({ contextLabel, errors }) => {
+    return notify.dialogApi.confirm({
+      title: `Correzione automatica ${contextLabel}`,
+      message: `Rilevati ${errors.length} errori nei dati:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}\n\nVuoi applicare il fix automatico per continuare?`,
+      confirmLabel: 'Applica fix',
+      cancelLabel: 'Annulla',
+      confirmTone: 'success'
     });
+  }, [notify.dialogApi]);
 
-    const dialogApi = useMemo(() => ({
-      confirm: showConfirmDialog,
-      details: showDetailsDialog,
-      form: showFormDialog
-    }), [showConfirmDialog, showDetailsDialog, showFormDialog]);
+  const {
+    projects,
+    meta: projectsMeta,
+    isDirty: isProjectsDirty,
+    isLoading,
+    validationErrors,
+    error: projectsError,
+    loadProjects,
+    saveProjects,
+    updateProjects,
+    uploadJSON
+  } = useProjects(auth.department, auth.readOnlyDepartment, {
+    requestProjectFixConfirmation
+  });
 
-    useEffect(() => {
-      storage.setCurrentUser(userName);
-    }, [userName]);
+  useEffect(() => {
+    api.setUserToken(auth.userToken);
+  }, [auth.userToken]);
 
-    useEffect(() => {
-      api.setUserToken(userToken);
-    }, [userToken]);
+  useEffect(() => {
+    api.setAdminToken(auth.adminToken);
+  }, [auth.adminToken]);
 
-    useEffect(() => {
-      storage.setActiveSession({
-        userName,
-        department,
-        userToken,
-        adminToken
-      });
-    }, [userName, department, userToken, adminToken]);
+  const resetSessionState = useCallback(async ({ nextUserName, nextAdminToken, nextDepartment, nextUserToken } = {}) => {
+    const resolvedUserName = nextUserName !== undefined ? nextUserName : auth.userName;
+    const resolvedAdminToken = nextAdminToken !== undefined ? nextAdminToken : auth.adminToken;
+    const resolvedDepartment = nextDepartment !== undefined ? nextDepartment : auth.department;
+    const resolvedUserToken = nextUserToken !== undefined ? nextUserToken : auth.userToken;
 
-    useEffect(() => {
-      const restoredSession = restoredSessionRef.current || {};
-      if (!restoredSession.userToken) return;
-
-      const controller = new AbortController();
-      let isActive = true;
-
-      const validateRestoredSession = async () => {
-        try {
-          const session = await api.getAuthSession(controller.signal);
-          if (!isActive) return;
-          if (session.userName && session.userName !== userName) {
-            setUserName(session.userName);
-          }
-        } catch (err) {
-          if (!isActive || err.name === 'AbortError') return;
-          setLoginError('Sessione utente scaduta. Effettua nuovamente l\'accesso.');
-          storage.clearActiveSession();
-          await resetSessionState({ nextUserName: storage.getCurrentUser() || '', nextAdminToken: null });
-        }
-      };
-
-      validateRestoredSession();
-
-      return () => {
-        isActive = false;
-        controller.abort();
-      };
-    }, []);
-
-    useEffect(() => {
-      const handleUserSessionInvalid = async (event) => {
-        setLoginError(event.detail?.message || 'Sessione utente scaduta. Effettua nuovamente l\'accesso.');
-        pushNotification({
-          type: 'warning',
-          message: event.detail?.message || 'Sessione utente scaduta. Effettua nuovamente l\'accesso.'
-        });
-        await resetSessionState({ nextUserName: '', nextAdminToken: null });
-      };
-
-      window.addEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
-      return () => {
-        window.removeEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
-      };
-    }, []);
-
-    const initialScrollDoneRef = useRef(null);
-
-    useEffect(() => {
-      if (!department || projects.length === 0) return;
-      const allIds = new Set(projects.map(p => p.id));
-      setSelectedProjectIds(allIds);
-    }, [department, projects]);
-
-    useEffect(() => {
-      if (!department) {
-        initialScrollDoneRef.current = null;
-        return;
-      }
-
-      if (initialScrollDoneRef.current !== department && projects.length > 0) {
-        initialScrollDoneRef.current = department;
-        setTimeout(() => {
-          setScrollToTodayTrigger(prev => prev + 1);
-        }, 150);
-      }
-    }, [department, projects.length]);
-
-    useEffect(() => {
-      if (!projectDraft) {
-        setHasDraftChanges(false);
-        return;
-      }
-
-      const baseProject = editingProject
-        ? stripProjectIds(editingProject)
-        : emptyProjectTemplateRef.current;
-      const currentProject = stripProjectIds(projectDraft);
-      const hasChanges = JSON.stringify(baseProject) !== JSON.stringify(currentProject);
-      setHasDraftChanges(hasChanges);
-    }, [projectDraft, editingProject]);
-
-    useEffect(() => {
-      if (!showScreensaver) {
-        setScreensaverPassword('');
-        setScreensaverError('');
-        setScreensaverUnlocking(false);
-      }
-    }, [showScreensaver]);
-
-    useEffect(() => {
-      const handleActivity = (event) => {
-        lastActivityRef.current = Date.now();
-
-        if (showScreensaver && isDepartmentProtected && department && !adminToken) {
-          return;
-        }
-
-        setShowScreensaver(false);
-      };
-
-      const handleNonPasswordActivity = (event) => {
-        if (!showScreensaver) {
-          lastActivityRef.current = Date.now();
-        }
-      };
-
-      const passwordEvents = ['mousedown', 'keydown', 'touchstart'];
-      const activityOnlyEvents = ['mousemove', 'scroll'];
-
-      passwordEvents.forEach(event => {
-        document.addEventListener(event, handleActivity, true);
-      });
-
-      activityOnlyEvents.forEach(event => {
-        document.addEventListener(event, handleNonPasswordActivity, true);
-      });
-
-      return () => {
-        passwordEvents.forEach(event => {
-          document.removeEventListener(event, handleActivity, true);
-        });
-        activityOnlyEvents.forEach(event => {
-          document.removeEventListener(event, handleNonPasswordActivity, true);
-        });
-      };
-    }, [showScreensaver, isDepartmentProtected, department, adminToken, userName]);
-
-    useEffect(() => {
-      if (!screensaverEnabled) {
-        setShowScreensaver(false);
-        return;
-      }
-
-      const interval = setInterval(() => {
-        const idle = Date.now() - lastActivityRef.current;
-        if (idle > config.screensaver.idleMs) {
-          setShowScreensaver(true);
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, [screensaverEnabled]);
-
-    const handleUnlockScreensaver = async () => {
-      if (!department || !isDepartmentProtected || !screensaverPassword) {
-        setScreensaverError('Inserisci la password del reparto per continuare.');
-        return;
-      }
-
-      if (isVerifyingPasswordRef.current) {
-        return;
-      }
-
-      isVerifyingPasswordRef.current = true;
-      setScreensaverUnlocking(true);
-      setScreensaverError('');
-
-      try {
-        const result = await api.verifyPassword(department, screensaverPassword);
-        if (!result.ok) {
-          setScreensaverError('Password reparto errata.');
-          return;
-        }
-
-        storage.setPassword(userName, department, screensaverPassword);
-        setShowScreensaver(false);
-      } catch (err) {
-        setScreensaverError('Errore durante la verifica della password.');
-      } finally {
-        isVerifyingPasswordRef.current = false;
-        setScreensaverUnlocking(false);
-      }
-    };
-
-    useEffect(() => {
-      gantt.invalidateCache();
-    }, [filters, viewMode]);
-
-    useEffect(() => {
-      if ((activeView === 'systemSettings' || activeView === 'userManagement') && !adminToken) {
-        setActiveView('gantt');
-      }
-    }, [activeView, adminToken]);
-
-    const hasUnsavedChanges = isDirty || hasDraftChanges;
-    const showProjectUnsavedBadge = showProjectForm && hasUnsavedChanges;
-
-    useEffect(() => {
-      const handleBeforeUnload = (event) => {
-        if (!hasUnsavedChanges) return;
-        event.preventDefault();
-        event.returnValue = '';
-      };
-
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasUnsavedChanges]);
-
-    const refreshGantt = () => {
-      gantt.invalidateCache();
-      setGanttRefreshTrigger(prev => prev + 1);
-    };
-
-    useEffect(() => {
-      if (!department) return;
-      refreshGantt();
-    }, [department, projects]);
-
-    const confirmPendingChanges = async (actionLabel) => {
-      if (!hasUnsavedChanges) return true;
-
-      const result = await openDialog({
-        title: 'Modifiche non salvate',
-        message: `Hai modifiche non salvate prima di ${actionLabel}.\nScegli se salvarle, scartarle o annullare l'operazione.`,
-        badge: { type: 'warning', label: 'Attenzione' },
-        actions: [
-          { key: 'cancel', label: 'Resta qui', className: 'btn-secondary' },
-          { key: 'discard', label: 'Scarta modifiche', className: 'btn-danger' },
-          { key: 'save', label: 'Salva e continua', className: 'btn-success' }
-        ]
-      });
-
-      if (result?.action === 'save') {
-        if (!effectiveUserName) {
-          pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-          return false;
-        }
-
-        if (showProjectForm && hasDraftChanges && projectDraft) {
-          const saved = await handleSaveProject(projectDraft);
-          return saved;
-        }
-
-        try {
-          await saveProjects(effectiveUserName, projects);
-          refreshGantt();
-          return true;
-        } catch (err) {
-          pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
-          return false;
-        }
-      }
-
-      if (result?.action !== 'discard') {
-        return false;
-      }
-
-      setShowProjectForm(false);
-      setEditingProject(null);
-      setProjectDraft(null);
-      setHasDraftChanges(false);
-      return true;
-    };
-
-    const viewActionLabels = {
-      systemSettings: 'aprire le impostazioni di sistema',
-      userManagement: 'aprire la gestione utenti'
-    };
-
-    const handleViewChange = async (nextView) => {
-      if (nextView === activeView) return;
-      if (nextView !== 'gantt') {
-        const actionLabel = viewActionLabels[nextView] || 'cambiare schermata';
-        const canProceed = await confirmPendingChanges(actionLabel);
-        if (!canProceed) return;
-      }
-      setActiveView(nextView);
-    };
-
-    const handleDepartmentChange = async (newDepartment) => {
-      if (newDepartment === department) return;
-
-      const canProceed = await confirmPendingChanges('cambiare reparto');
-      if (!canProceed) return;
-
-      if (department) {
-        await releaseLock();
-      }
-
-      setDepartment(newDepartment);
-      setActiveView('gantt');
-      setLockEnabled(false);
-      setEditingProject(null);
-      setShowProjectForm(false);
-      setSelectedProjectIds(new Set());
-      setDepartmentValidationErrors([]);
-      setFocusedProjectId(null);
-
-      if (newDepartment && !adminToken) {
-        try {
-          const depts = await api.getDepartments();
-          const deptInfo = depts.departments?.find(d => d.name === newDepartment);
-          setIsDepartmentProtected(deptInfo?.protected || false);
-        } catch (err) {
-          setIsDepartmentProtected(false);
-        }
-      } else {
-        setIsDepartmentProtected(false);
-      }
-    };
-
-    const getGridFilterDefaults = (mode) => {
-      if (mode === 'full') {
-        return {
-          showDaySeparators: false,
-          showWeekSeparators: false,
-          showMonthSeparators: true,
-          showYearSeparators: true,
-          showDayLetters: false,
-          showDayNumbers: false,
-          showWeekNumbers: false,
-          showMonthYearLabels: false,
-          showYearLabels: true,
-          showWeekends: false,
-          showHolidays: false,
-          showOnlyMilestones: false,
-          highlightDelays: true,
-          showPhaseLabels: false,
-          showPhasePercentages: true
-        };
-      }
-
-      return {
-        showDaySeparators: true,
-        showWeekSeparators: true,
-        showMonthSeparators: true,
-        showYearSeparators: true,
-        showDayLetters: true,
-        showDayNumbers: true,
-        showWeekNumbers: true,
-        showMonthYearLabels: true,
-        showYearLabels: true,
-        showHolidays: true,
-        highlightDelays: true,
-        showPhaseLabels: true,
-        showPhasePercentages: true
-      };
-    };
-
-    const handleViewModeChange = (mode) => {
-      setViewMode(mode);
-      setFilters(prev => ({
-        ...prev,
-        ...getGridFilterDefaults(mode)
-      }));
-    };
-
-    const handleGoToToday = () => {
-      setScrollToTodayTrigger(prev => prev + 1);
-    };
-
-    const handleUserTokenChange = (nextUserToken) => {
-      api.setUserToken(nextUserToken || null);
-      setUserToken(nextUserToken || null);
-    };
-
-    const resetSessionState = async ({ nextUserName = '', nextAdminToken = null } = {}) => {
+    if (shouldUseLock && isLocked && auth.department && auth.effectiveUserName) {
       try {
         await releaseLock();
       } catch (err) {}
+    }
 
-      if (!nextAdminToken) {
-        storage.clearActiveSession();
-      }
+    if (nextUserName !== undefined) {
+      auth.setUserName(nextUserName);
+      storage.setCurrentUser(nextUserName);
+    }
+    if (nextAdminToken !== undefined) {
+      auth.setAdminToken(nextAdminToken);
+      api.setAdminToken(nextAdminToken);
+    }
+    if (nextUserToken !== undefined) {
+      auth.setUserToken(nextUserToken);
+      api.setUserToken(nextUserToken);
+    }
+    if (nextDepartment !== undefined) {
+      auth.setDepartment(nextDepartment);
+      auth.setLockEnabled(false);
+      auth.setReadOnlyDepartment(true);
+      auth.setIsDepartmentProtected(false);
+    }
 
-      setDepartment(null);
-      setActiveView('gantt');
-      setLockEnabled(false);
-      setEditingProject(null);
-      setShowProjectForm(false);
-      setProjectDraft(null);
-      setSelectedProjectIds(new Set());
+    draftState.closeProjectForm();
+    filtersState.setSelectedProjectIds(new Set());
+    setDepartmentValidationErrors([]);
+    setGanttRefreshTrigger(prev => prev + 1);
+
+    storage.setActiveSession({
+      userName: resolvedUserName,
+      adminToken: resolvedAdminToken,
+      department: resolvedDepartment,
+      userToken: resolvedUserToken
+    });
+  }, [auth, shouldUseLock, isLocked, releaseLock, draftState, filtersState]);
+
+  useEffect(() => {
+    const handleUserSessionInvalid = (event) => {
+      const message = event.detail?.message || 'Sessione scaduta. Effettua nuovamente l\'accesso.';
+      notify.pushNotification({ type: 'warning', message });
+      auth.setLoginError(message);
+      resetSessionState({ nextUserToken: null, nextDepartment: null });
+    };
+
+    window.addEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
+    return () => {
+      window.removeEventListener('onlygantt:user-session-invalid', handleUserSessionInvalid);
+    };
+  }, [notify, auth, resetSessionState]);
+
+  const checkDepartmentProtection = useCallback(async (deptName) => {
+    if (!deptName) return false;
+    try {
+      const result = await api.verifyPassword(deptName, '');
+      const isProtected = result && result.protected === true;
+      auth.setIsDepartmentProtected(isProtected);
+      return isProtected;
+    } catch (err) {
+      auth.setIsDepartmentProtected(false);
+      return false;
+    }
+  }, [auth]);
+
+  const confirmPendingChanges = async (actionDescription = 'procedere') => {
+    if (!draftState.hasDraftChanges) return true;
+    return notify.dialogApi.confirm({
+      title: 'Modifiche non salvate',
+      message: `Ci sono modifiche non salvate nel progetto in corso. Vuoi scartarle per ${actionDescription}?`,
+      confirmLabel: 'Scarta modifiche',
+      cancelLabel: 'Rimani qui',
+      confirmTone: 'danger'
+    });
+  };
+
+  const handleDepartmentChange = async (rawDept) => {
+    const newDept = typeof rawDept === 'string' ? rawDept : (rawDept?.name || null);
+    if (newDept === auth.department) return;
+
+    const canProceed = await confirmPendingChanges('cambiare reparto');
+    if (!canProceed) return;
+
+    if (!newDept) {
+      await resetSessionState({ nextDepartment: null });
+      return;
+    }
+
+    if (auth.adminToken) {
+      auth.setDepartment(newDept);
+      auth.setLockEnabled(true);
+      auth.setReadOnlyDepartment(false);
+      draftState.closeProjectForm();
+      filtersState.setSelectedProjectIds(new Set());
       setDepartmentValidationErrors([]);
-      setFocusedProjectId(null);
-      setShowScreensaver(false);
-      setAdminToken(nextAdminToken);
-      setUserName(nextUserName);
-      handleUserTokenChange(null);
-    };
+      storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+      return;
+    }
 
-    const handleUserNameChange = async (nextUserName) => {
-      if (nextUserName === userName) return true;
+    const isProtected = await checkDepartmentProtection(newDept);
 
-      const canProceed = await confirmPendingChanges('cambiare utente');
-      if (!canProceed) return false;
-
-      await resetSessionState({ nextUserName, nextAdminToken: null });
-      return true;
-    };
-
-    const handleAdminLogin = async (adminId, password) => {
-      const canProceed = await confirmPendingChanges('passare ad admin');
-      if (!canProceed) throw new Error('Operazione annullata');
-
-      await resetSessionState({ nextUserName: '', nextAdminToken: null });
-
-      const result = await api.adminLogin(adminId, password);
-      setAdminToken(result.token);
-      handleUserTokenChange(result.userToken || null);
-      setUserName(adminId);
-      pushNotification({ type: 'success', message: 'Accesso admin effettuato' });
-    };
-
-    const handleAdminReleaseLock = async () => {
-      if (!adminToken || !department) return;
-      try {
-        await api.adminReleaseLock(department, adminToken);
-        refreshLock();
-        pushNotification({ type: 'success', message: 'Lock rilasciato' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: `Errore durante lo sblocco: ${err.message}` });
-      }
-    };
-
-    const handleAdminCreateDepartment = async ({ name, password }) => {
-      if (!adminToken) return;
-      try {
-        await api.createDepartment(name, adminToken);
-        if (password) {
-          await api.resetPassword(name, password, adminToken);
-        }
-        pushNotification({ type: 'success', message: 'Reparto creato con successo' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Creazione reparto fallita' });
-      }
-    };
-
-    const handleAdminDeleteDepartment = async ({ department: targetDepartment }) => {
-      if (!adminToken || !targetDepartment) return;
-      try {
-        await api.deleteDepartment(targetDepartment, adminToken);
-        if (department === targetDepartment) {
-          await handleDepartmentChange(null);
-        }
-        pushNotification({ type: 'success', message: 'Reparto eliminato' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Eliminazione reparto fallita' });
-      }
-    };
-
-    const handleAdminResetPassword = async ({ department: targetDepartment, newPassword }) => {
-      if (!adminToken || !targetDepartment) return;
-      try {
-        await api.resetPassword(targetDepartment, newPassword, adminToken);
-        pushNotification({ type: 'success', message: 'Password reparto aggiornata' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Reset password fallito' });
-      }
-    };
-
-    const handleAdminChangePassword = async ({ oldPassword, newPassword }) => {
-      if (!adminToken) return;
-      try {
-        await api.adminChangePassword(oldPassword, newPassword, adminToken);
-        pushNotification({ type: 'success', message: 'Password admin aggiornata' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Reset password fallito' });
-      }
-    };
-
-    const getSelectedModuleLabels = (modules) => {
-      const labels = {
-        departments: 'Reparti',
-        users: 'Utenti',
-        settings: 'Impostazioni'
-      };
-      return Object.keys(labels).filter((key) => modules?.[key]).map((key) => labels[key]);
-    };
-
-    const formatExportTimestamp = () => {
-      const now = new Date();
-      const pad = (value) => String(value).padStart(2, '0');
-      return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}-${pad(now.getHours())}-${pad(now.getMinutes())}`;
-    };
-
-    const buildExportFileName = () => `OnlyGANTT-${formatExportTimestamp()}.json`;
-
-    const handleAdminModularExport = async (modules) => {
-      if (!adminToken) return;
-      try {
-        const backup = await api.adminExportModules(modules, adminToken);
-        const dataStr = JSON.stringify(backup, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = buildExportFileName();
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
-        pushNotification({
-          type: 'success',
-          message: `Export impostazioni completato: ${moduleSummary}`
-        });
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Export impostazioni fallito' });
-      }
-    };
-
-    const handleAdminModularImport = async ({ backup, modules, overwriteExisting }) => {
-      if (!adminToken) return;
-      try {
-        const result = await api.adminImportModules(backup, modules, overwriteExisting, adminToken);
-        const { summary } = result;
-        const moduleSummary = getSelectedModuleLabels(modules).join(', ') || 'Nessun modulo';
-
-        let details = `Import impostazioni completato\n` +
-          `Moduli: ${moduleSummary}\n` +
-          `- Importati: ${summary.imported}\n` +
-          `- Saltati: ${summary.skipped}\n` +
-          `- Errori: ${summary.errors}`;
-
-        if (summary.errors > 0 && result.results?.departments?.errors?.length > 0) {
-          details += `\n\nErrori:\n${result.results.departments.errors.map(e => `- ${e.department}: ${e.error}`).join('\n')}`;
-        }
-
-        await showDetailsDialog({
-          title: 'Esito import impostazioni',
-          message: 'Il server ha completato l\'import dei moduli richiesti.',
-          details,
-          badge: {
-            type: summary.errors > 0 ? 'warning' : 'success',
-            label: summary.errors > 0 ? 'Completato con errori' : 'Completato'
+    if (isProtected && !auth.adminToken) {
+      const storedPassword = storage.getPassword(auth.effectiveUserName, newDept);
+      if (storedPassword) {
+        try {
+          const verifyResult = await api.verifyPassword(newDept, storedPassword);
+          if (verifyResult && verifyResult.ok) {
+            auth.setDepartment(newDept);
+            auth.setLockEnabled(false);
+            auth.setReadOnlyDepartment(true);
+            draftState.closeProjectForm();
+            filtersState.setSelectedProjectIds(new Set());
+            setDepartmentValidationErrors([]);
+            storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+            return;
           }
-        });
-
-        if (summary.imported > 0) {
-          pushNotification({
-            type: 'success',
-            message: `Import impostazioni completato: ${summary.imported} reparti importati`
-          });
-
-          if (department) {
-            await handleDepartmentChange(null);
-          }
-        }
-      } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Import impostazioni fallito' });
+        } catch (err) {}
       }
-    };
 
-    const handleChangePassword = async ({ oldPassword, newPassword }) => {
-      if (!department) return false;
+      const values = await notify.dialogApi.form({
+        title: `Password reparto ${newDept}`,
+        message: 'Questo reparto è protetto da password. Inserisci la password per accedere.',
+        submitLabel: 'Accedi al reparto',
+        fields: [
+          {
+            name: 'password',
+            label: 'Password reparto',
+            type: 'password',
+            required: true,
+            autoFocus: true
+          }
+        ]
+      });
+
+      if (!values) return;
 
       try {
-        await api.changePassword(department, oldPassword, newPassword);
-        if (userName) {
-          storage.removePassword(userName, department);
+        const verifyResult = await api.verifyPassword(newDept, values.password.trim());
+        if (verifyResult && verifyResult.ok) {
+          storage.setPassword(auth.effectiveUserName, newDept, values.password.trim());
+          auth.setDepartment(newDept);
+          auth.setLockEnabled(false);
+          auth.setReadOnlyDepartment(true);
+          draftState.closeProjectForm();
+          filtersState.setSelectedProjectIds(new Set());
+          setDepartmentValidationErrors([]);
+          storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
         }
-        pushNotification({ type: 'success', message: 'Password aggiornata. Effettua nuovamente l\'accesso al reparto.' });
-        await handleDepartmentChange(null);
-        return true;
       } catch (err) {
-        pushNotification({ type: 'error', message: err.message || 'Cambio password fallito' });
-        return false;
+        notify.pushNotification({ type: 'error', message: err.message || 'Password reparto errata' });
       }
-    };
+      return;
+    }
 
-    const handleEnableLock = () => {
-      if (!department) return;
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return;
+    auth.setDepartment(newDept);
+    auth.setLockEnabled(false);
+    auth.setReadOnlyDepartment(true);
+    draftState.closeProjectForm();
+    filtersState.setSelectedProjectIds(new Set());
+    setDepartmentValidationErrors([]);
+    storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: newDept, userToken: auth.userToken });
+  };
+
+  const handleEnableLock = async () => {
+    if (!auth.department) return;
+
+    if (auth.isDepartmentProtected && !auth.adminToken) {
+      const storedPassword = storage.getPassword(auth.effectiveUserName, auth.department);
+
+      if (storedPassword) {
+        try {
+          const verifyResult = await api.verifyPassword(auth.department, storedPassword);
+          if (verifyResult && verifyResult.ok) {
+            auth.setLockEnabled(true);
+            return;
+          }
+        } catch (err) {}
       }
-      setLockEnabled(true);
-    };
 
-    const handleDisableLock = async () => {
+      const values = await notify.dialogApi.form({
+        title: `Abilita modifica reparto ${auth.department}`,
+        message: 'Questo reparto è protetto da password. Inserisci la password per abilitare la modifica.',
+        submitLabel: 'Abilita modifica',
+        fields: [
+          {
+            name: 'password',
+            label: 'Password reparto',
+            type: 'password',
+            required: true,
+            autoFocus: true
+          }
+        ]
+      });
+
+      if (!values) return;
+
+      try {
+        const verifyResult = await api.verifyPassword(auth.department, values.password.trim());
+        if (verifyResult && verifyResult.ok) {
+          storage.setPassword(auth.effectiveUserName, auth.department, values.password.trim());
+          auth.setLockEnabled(true);
+        }
+      } catch (err) {
+        notify.pushNotification({ type: 'error', message: err.message || 'Password reparto errata' });
+      }
+      return;
+    }
+
+    auth.setLockEnabled(true);
+  };
+
+  const handleDisableLock = async () => {
+    const canProceed = await confirmPendingChanges('rilasciare la modifica');
+    if (!canProceed) return;
+
+    auth.setLockEnabled(false);
+    if (isLocked) {
       try {
         await releaseLock();
-      } finally {
-        setLockEnabled(false);
-      }
-    };
+      } catch (err) {}
+    }
+  };
 
-    const handleGanttPhaseContextMenu = (project) => {
-      if (!project) return;
-      setFocusedProjectId(project.id);
-    };
+  const handleChangePassword = async ({ oldPassword, newPassword }) => {
+    if (!auth.department) return;
 
-    const handleProjectFocusHandled = () => {
-      setFocusedProjectId(null);
-    };
-
-    const handleExportPNG = () => {
-      const previousViewMode = viewMode;
-      setViewMode('full');
-
-      setTimeout(() => {
-        const canvas = document.querySelector('.gantt-canvas');
-        if (canvas) {
-          const dataURL = canvas.toDataURL('image/png');
-          const a = document.createElement('a');
-          a.href = dataURL;
-          a.download = `gantt_${department}_${new Date().toISOString().split('T')[0]}.png`;
-          a.click();
-        }
-
-        setViewMode(previousViewMode);
-      }, 100);
-    };
-
-    const handleNewProject = () => {
-      if (readOnlyDepartment) return;
-      if (projectDraft && hasDraftChanges && !showProjectForm) {
-        setEditingProject(null);
-        setProjectDraft(null);
-        setHasDraftChanges(false);
-      }
-      const draft = logic.createNewProject();
-      setEditingProject(null);
-      setProjectDraft(draft);
-      setShowProjectForm(true);
-    };
-
-    const handleEditProject = (project) => {
-      if (readOnlyDepartment) return;
-      if (projectDraft && hasDraftChanges && !showProjectForm && editingProject?.id !== project.id) {
-        setEditingProject(null);
-        setProjectDraft(null);
-        setHasDraftChanges(false);
-      }
-      setEditingProject(project);
-      setProjectDraft(project);
-      setShowProjectForm(true);
-    };
-
-    const handleSaveProject = async (projectData, { keepEditing } = {}) => {
-      if (readOnlyDepartment || isSavingProject) return false;
-
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return false;
-      }
-
-      let newProjects;
-
-      if (editingProject) {
-        newProjects = projects.map(p => p.id === projectData.id ? projectData : p);
-      } else {
-        newProjects = [...projects, projectData];
-      }
-
-      updateProjects(newProjects);
-      refreshGantt();
-
-      setIsSavingProject(true);
-
-      let saveOk = false;
-      try {
-        await saveProjects(effectiveUserName, newProjects);
-        saveOk = true;
-      } catch (err) {
-        pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
-      } finally {
-        setIsSavingProject(false);
-      }
-
-      if (saveOk) {
-        if (keepEditing) {
-          setShowProjectForm(true);
-          setEditingProject(projectData);
-          setProjectDraft(projectData);
-          setHasDraftChanges(false);
+    try {
+      const result = await api.changePassword(auth.department, oldPassword, newPassword);
+      if (result && result.ok) {
+        if (newPassword) {
+          storage.setPassword(auth.effectiveUserName, auth.department, newPassword);
+          auth.setIsDepartmentProtected(true);
         } else {
-          setShowProjectForm(false);
-          setEditingProject(null);
-          setProjectDraft(null);
-          setHasDraftChanges(false);
+          storage.removePassword(auth.effectiveUserName, auth.department);
+          auth.setIsDepartmentProtected(false);
         }
+        notify.pushNotification({ type: 'success', message: 'Password reparto aggiornata con successo' });
       }
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile aggiornare la password reparto' });
+    }
+  };
 
-      return saveOk;
-    };
-
-    const handleCancelProjectForm = async () => {
-      if (hasDraftChanges) {
-        const shouldDiscard = await showConfirmDialog({
-          title: 'Annulla modifiche',
-          message: 'Vuoi annullare le modifiche apportate al progetto corrente?',
-          confirmLabel: 'Scarta modifiche',
-          cancelLabel: 'Continua a modificare',
-          confirmTone: 'danger'
-        });
-        if (!shouldDiscard) {
-          return;
+  const handleAdminResetPassword = async ({ department: targetDept, newPassword }) => {
+    if (!auth.adminToken || !targetDept) return;
+    try {
+      const result = await api.resetPassword(targetDept, newPassword, auth.adminToken);
+      if (result && result.ok) {
+        if (targetDept === auth.department) {
+          auth.setIsDepartmentProtected(!!newPassword);
         }
+        notify.pushNotification({ type: 'success', message: `Password reparto ${targetDept} aggiornata da admin` });
       }
-      setShowProjectForm(false);
-      setEditingProject(null);
-      setProjectDraft(null);
-      setHasDraftChanges(false);
-    };
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile impostare la password reparto' });
+    }
+  };
 
-    const handleDeleteProject = async (projectId) => {
-      if (readOnlyDepartment || isSavingProject) return;
-
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return;
-      }
-
-      const shouldDelete = await showConfirmDialog({
-        title: 'Elimina progetto',
-        message: 'Eliminare questo progetto dal reparto corrente?',
-        confirmLabel: 'Elimina progetto',
-        cancelLabel: 'Mantieni progetto',
-        confirmTone: 'danger'
-      });
-      if (!shouldDelete) {
-        return;
-      }
-
-      const newProjects = projects.filter(p => p.id !== projectId);
-      updateProjects(newProjects);
-      refreshGantt();
-
-      const newSelected = new Set(selectedProjectIds);
-      newSelected.delete(projectId);
-      setSelectedProjectIds(newSelected);
-
-      if (editingProject && editingProject.id === projectId) {
-        setEditingProject(null);
-        setShowProjectForm(false);
-        setProjectDraft(null);
-      }
-
-      setIsSavingProject(true);
-      try {
-        await saveProjects(effectiveUserName, newProjects);
-      } catch (err) {
-        pushNotification({ type: 'error', message: `Errore durante l'eliminazione: ${err.message}` });
-        await loadProjects();
-      } finally {
-        setIsSavingProject(false);
-      }
-    };
-
-    const handleSaveAll = async () => {
-      if (readOnlyDepartment || isSavingProject) return;
-
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return;
-      }
-
-      try {
-        setIsSavingProject(true);
-        await saveProjects(effectiveUserName, projects);
-        refreshGantt();
-        pushNotification({ type: 'success', message: 'Progetti salvati con successo' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
-      } finally {
-        setIsSavingProject(false);
-      }
-    };
-
-    const handleUserLogout = async () => {
-      const canProceed = await confirmPendingChanges('uscire');
-      if (!canProceed) return;
-
-      if (adminToken) {
-        try {
-          await api.adminLogout(adminToken);
-        } catch (err) {}
-      } else if (userToken) {
-        try {
-          await api.authLogout();
-        } catch (err) {}
-      }
-
-      setLoginError('');
-      await resetSessionState({ nextUserName: '', nextAdminToken: null });
-    };
-
-    const handleImportJSON = async (file) => {
-      if (readOnlyDepartment) return;
-
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return;
-      }
-
-      try {
-        if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
-          pushNotification({ type: 'error', message: 'Formato file non valido. Carica un file .json' });
-          return;
+  const handleAdminCreateDepartment = async ({ name, password }) => {
+    if (!auth.adminToken || !name) return;
+    try {
+      const result = await api.createDepartment(name, auth.adminToken);
+      if (result && result.ok) {
+        if (password) {
+          await api.resetPassword(name, password, auth.adminToken);
         }
-        await uploadJSON(file, effectiveUserName);
-        setDepartmentValidationErrors([]);
-        pushNotification({ type: 'success', message: 'Import completato con successo' });
-      } catch (err) {
-        if (err.details?.errors) {
-          setDepartmentValidationErrors(err.details.errors);
-        }
-        pushNotification({ type: 'error', message: `Errore durante l'import: ${err.message}` });
+        notify.pushNotification({ type: 'success', message: `Reparto ${name} creato con successo` });
+        await handleDepartmentChange(name);
       }
-    };
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile creare il reparto' });
+    }
+  };
 
-    const handleExportProjects = () => {
-      if (!department) return;
-      const dataStr = JSON.stringify({ projects }, null, 2);
+  const handleAdminDeleteDepartment = async ({ department: targetDept }) => {
+    if (!auth.adminToken || !targetDept) return;
+    try {
+      await api.deleteDepartment(targetDept, auth.adminToken);
+      notify.pushNotification({ type: 'success', message: `Reparto ${targetDept} eliminato con successo` });
+      if (targetDept === auth.department) {
+        await resetSessionState({ nextDepartment: null });
+      }
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile eliminare il reparto' });
+    }
+  };
+
+  const handleAdminChangePassword = async ({ oldPassword, newPassword }) => {
+    if (!auth.adminToken) return;
+    try {
+      const result = await api.adminChangePassword(oldPassword, newPassword, auth.adminToken);
+      if (result && result.ok) {
+        notify.pushNotification({ type: 'success', message: 'Password amministratore aggiornata con successo' });
+      }
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile aggiornare la password amministratore' });
+    }
+  };
+
+  const handleAdminReleaseLock = async () => {
+    if (!auth.adminToken || !auth.department) return;
+    try {
+      await api.adminReleaseLock(auth.department, auth.adminToken);
+      refreshLock();
+      notify.pushNotification({ type: 'success', message: `Lock del reparto ${auth.department} sbloccato dall'amministratore` });
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile sbloccare il reparto' });
+    }
+  };
+
+  const handleAdminModularExport = async (modulesToExport) => {
+    if (!auth.adminToken) return;
+    try {
+      const payload = await api.adminExportModules(modulesToExport, auth.adminToken);
+      const dataStr = JSON.stringify(payload, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = buildExportFileName();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `OnlyGANTT-Modular-Backup-${dateStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      pushNotification({ type: 'success', message: 'Export progetti completato' });
-    };
+      notify.pushNotification({ type: 'success', message: 'Esportazione modulare completata con successo' });
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Impossibile esportare i moduli selezionati' });
+    }
+  };
 
-    const handleExportJSON = handleExportProjects;
+  const handleAdminModularImport = async (file, modulesToImport) => {
+    if (!auth.adminToken || !file) return;
 
-    const handleExportDepartment = async () => {
-      if (!department) return;
-      try {
-        const result = await api.exportDepartment(department);
-        const payload = result.data;
-        if (result.validationErrors?.length) {
-          setDepartmentValidationErrors(result.validationErrors);
-        }
-        const dataStr = JSON.stringify(payload, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = buildExportFileName();
-        a.click();
-        URL.revokeObjectURL(url);
-        pushNotification({ type: 'success', message: 'Export reparto completato' });
-      } catch (err) {
-        pushNotification({ type: 'error', message: `Errore durante l'export reparto: ${err.message}` });
-      }
-    };
+    const readFileAsText = (f) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Impossibile leggere il file'));
+      reader.readAsText(f);
+    });
 
-    const handleImportDepartment = async (file) => {
-      if (readOnlyDepartment || !department) return;
-      if (!effectiveUserName) {
-        pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
-        return;
-      }
+    try {
+      const text = await readFileAsText(file);
+      const backup = JSON.parse(text);
 
-      const readFileAsText = (f) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Impossibile leggere il file'));
-        reader.readAsText(f);
+      const overwriteExisting = await notify.dialogApi.confirm({
+        title: 'Importazione Modulare Admin',
+        message: 'Sovrascrivere i reparti o le configurazioni eventualmente già esistenti?',
+        confirmLabel: 'Sovrascrivi esistenti',
+        cancelLabel: 'Salta esistenti',
+        confirmTone: 'warning'
       });
 
-      try {
-        if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
-          pushNotification({ type: 'error', message: 'Formato file non valido. Carica un file .json' });
-          return;
-        }
-        const rawText = await readFileAsText(file);
-        const parsed = JSON.parse(rawText);
-        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
-          pushNotification({ type: 'error', message: 'Struttura file non valida: manca la lista progetti' });
-          return;
-        }
-        const { errors, projects: fixedProjects } = logic.validateAndFixProjects(parsed.projects || []);
+      await api.adminImportModules(backup, modulesToImport, overwriteExisting, auth.adminToken);
+      notify.pushNotification({ type: 'success', message: 'Importazione modulare completata con successo' });
 
-        if (errors.length > 0) {
-          const confirmFix = await showConfirmDialog({
-            title: 'Correzione automatica import reparto',
-            message: `Import reparto: rilevati ${errors.length} errori nei dati.\nVuoi applicare il fix automatico per continuare?`,
-            confirmLabel: 'Applica fix',
-            cancelLabel: 'Annulla import',
-            confirmTone: 'success'
-          });
-          if (!confirmFix) {
-            pushNotification({ type: 'warning', message: 'Import annullato: dati non corretti.' });
-            return;
-          }
-        }
-
-        const payload = {
-          ...parsed,
-          projects: fixedProjects
-        };
-
-        await api.importDepartment(department, payload, effectiveUserName);
-        setDepartmentValidationErrors([]);
+      if (auth.department) {
         await loadProjects();
-        pushNotification({ type: 'success', message: 'Import reparto completato con successo' });
-      } catch (err) {
-        if (err.details?.errors) {
-          setDepartmentValidationErrors(err.details.errors);
-        }
-        pushNotification({ type: 'error', message: `Errore durante l'import reparto: ${err.message}` });
       }
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: err.message || 'Errore durante l\'importazione modulare' });
+    }
+  };
+
+  const handleUserNameChange = (newName) => {
+    auth.setUserName(newName);
+    storage.setCurrentUser(newName);
+    storage.setActiveSession({ userName: newName, adminToken: auth.adminToken, department: auth.department, userToken: auth.userToken });
+  };
+
+  const handleUserTokenChange = (token) => {
+    auth.setUserToken(token);
+    api.setUserToken(token);
+    storage.setActiveSession({ userName: auth.userName, adminToken: auth.adminToken, department: auth.department, userToken: token });
+  };
+
+  const handleAdminLogin = (token) => {
+    auth.setAdminToken(token);
+    storage.setActiveSession({ userName: auth.userName, adminToken: token, department: auth.department, userToken: auth.userToken });
+  };
+
+  const handleExportPNG = () => {
+    const canvas = document.querySelector('.gantt-canvas');
+    if (!canvas) {
+      notify.pushNotification({ type: 'warning', message: 'Nessun grafico Gantt visibile' });
+      return;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.download = `OnlyGANTT-${auth.department || 'export'}-${new Date().toISOString().slice(0, 10)}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      notify.pushNotification({ type: 'success', message: 'Esportazione PNG completata' });
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: 'Impossibile esportare in PNG' });
+    }
+  };
+
+  const refreshGantt = () => {
+    gantt.invalidateCache();
+    setGanttRefreshTrigger(prev => prev + 1);
+  };
+
+  useEffect(() => {
+    if (filtersState.selectedProjectIds.size === 0 && projects.length > 0) {
+      filtersState.setSelectedProjectIds(new Set(projects.map(p => p.id)));
+    }
+  }, [projects, filtersState]);
+
+  const showProjectUnsavedBadge = draftState.showProjectForm && draftState.hasDraftChanges;
+
+  const buildExportFileName = () => {
+    const name = auth.department || 'OnlyGANTT';
+    const date = new Date().toISOString().slice(0, 10);
+    return `${name}-${date}.json`;
+  };
+
+  const handleNewProject = async () => {
+    if (auth.readOnlyDepartment) return;
+
+    const canProceed = await confirmPendingChanges('creare un nuovo progetto');
+    if (!canProceed) return;
+
+    draftState.openNewProjectForm();
+  };
+
+  const handleEditProject = async (project) => {
+    if (!project) {
+      handleNewProject();
+      return;
+    }
+
+    const canProceed = await confirmPendingChanges('modificare un altro progetto');
+    if (!canProceed) return;
+
+    draftState.openEditProjectForm(project);
+  };
+
+  const handleCancelProjectForm = async () => {
+    const canProceed = await confirmPendingChanges('chiudere il modulo');
+    if (!canProceed) return;
+
+    draftState.closeProjectForm();
+  };
+
+  const handleProjectFocusHandled = useCallback((projectId) => {
+    draftState.setFocusedProjectId((current) => (current === projectId ? null : current));
+  }, [draftState]);
+
+  const handleGanttPhaseContextMenu = useCallback(({ phase, project }) => {
+    if (project?.id) {
+      draftState.setFocusedProjectId(project.id);
+    }
+  }, [draftState]);
+
+  const handleSaveProject = async (projectToSave, { keepEditing = false } = {}) => {
+    if (auth.readOnlyDepartment || draftState.isSavingProject) return;
+
+    if (!auth.effectiveUserName) {
+      notify.pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
+      return;
+    }
+
+    if (!projectToSave.nome || !projectToSave.nome.trim()) {
+      notify.pushNotification({ type: 'warning', message: 'Il nome del progetto è obbligatorio' });
+      return;
+    }
+
+    const cleanProject = {
+      ...projectToSave,
+      nome: projectToSave.nome.trim(),
+      fasi: Array.isArray(projectToSave.fasi)
+        ? projectToSave.fasi.map(fase => ({
+            ...fase,
+            nome: (fase.nome || '').trim(),
+            note: (fase.note || '').trim()
+          }))
+        : []
     };
 
-    const visibleProjects = useMemo(
-      () => projects.filter(p => selectedProjectIds.has(p.id)),
-      [projects, selectedProjectIds]
-    );
+    const isExisting = projects.some(p => p.id === cleanProject.id);
+    const newProjects = isExisting
+      ? projects.map(p => p.id === cleanProject.id ? cleanProject : p)
+      : [...projects, cleanProject];
 
-    const ganttProjects = useMemo(
-      () => (filters.showOnlyMilestones
-        ? visibleProjects.map(p => ({
-            ...p,
-            fasi: p.fasi.filter(f => f.milestone)
-          }))
-        : visibleProjects),
-      [filters.showOnlyMilestones, visibleProjects]
-    );
+    draftState.setIsSavingProject(true);
+    try {
+      await saveProjects(auth.effectiveUserName, newProjects);
+      refreshGantt();
+      notify.pushNotification({ type: 'success', message: 'Progetto salvato con successo' });
 
-    return (
+      if (keepEditing) {
+        draftState.setEditingProject(cleanProject);
+        draftState.setProjectDraft(cleanProject);
+        draftState.setHasDraftChanges(false);
+      } else {
+        draftState.closeProjectForm();
+      }
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: `Errore durante il salvataggio: ${err.message}` });
+      await loadProjects();
+    } finally {
+      draftState.setIsSavingProject(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (auth.readOnlyDepartment || draftState.isSavingProject) return;
+
+    const shouldDelete = await notify.dialogApi.confirm({
+      title: 'Elimina progetto',
+      message: 'Eliminare questo progetto dal reparto corrente?',
+      confirmLabel: 'Elimina progetto',
+      cancelLabel: 'Mantieni progetto',
+      confirmTone: 'danger'
+    });
+    if (!shouldDelete) {
+      return;
+    }
+
+    const newProjects = projects.filter(p => p.id !== projectId);
+    updateProjects(newProjects);
+    refreshGantt();
+
+    const newSelected = new Set(filtersState.selectedProjectIds);
+    newSelected.delete(projectId);
+    filtersState.setSelectedProjectIds(newSelected);
+
+    if (draftState.editingProject && draftState.editingProject.id === projectId) {
+      draftState.closeProjectForm();
+    }
+
+    draftState.setIsSavingProject(true);
+    try {
+      await saveProjects(auth.effectiveUserName, newProjects);
+    } catch (err) {
+      notify.pushNotification({ type: 'error', message: `Errore durante l'eliminazione: ${err.message}` });
+      await loadProjects();
+    } finally {
+      draftState.setIsSavingProject(false);
+    }
+  };
+
+  const handleUserLogout = async () => {
+    const canProceed = await confirmPendingChanges('uscire');
+    if (!canProceed) return;
+
+    if (auth.adminToken) {
+      try {
+        await api.adminLogout(auth.adminToken);
+      } catch (err) {}
+    } else if (auth.userToken) {
+      try {
+        await api.authLogout();
+      } catch (err) {}
+    }
+
+    auth.setLoginError('');
+    await resetSessionState({
+      nextUserName: '',
+      nextAdminToken: null,
+      nextDepartment: null,
+      nextUserToken: null
+    });
+    storage.clearActiveSession();
+  };
+
+  const handleImportJSON = async (file) => {
+    if (auth.readOnlyDepartment) return;
+
+    if (!auth.effectiveUserName) {
+      notify.pushNotification({ type: 'warning', message: 'Inserisci il tuo nome' });
+      return;
+    }
+
+    try {
+      if (!file || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
+        notify.pushNotification({ type: 'error', message: 'Formato file non valido. Carica un file .json' });
+        return;
+      }
+      await uploadJSON(file, auth.effectiveUserName);
+      setDepartmentValidationErrors([]);
+      notify.pushNotification({ type: 'success', message: 'Import completato con successo' });
+    } catch (err) {
+      if (err.details?.errors) {
+        setDepartmentValidationErrors(err.details.errors);
+      }
+      notify.pushNotification({ type: 'error', message: `Errore durante l'import: ${err.message}` });
+    }
+  };
+
+  const handleExportProjects = () => {
+    if (!auth.department) return;
+    const dataStr = JSON.stringify({ projects }, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = buildExportFileName();
+    a.click();
+    URL.revokeObjectURL(url);
+    notify.pushNotification({ type: 'success', message: 'Export progetti completato' });
+  };
+
+  const visibleProjects = useMemo(
+    () => projects.filter(p => filtersState.selectedProjectIds.has(p.id)),
+    [projects, filtersState.selectedProjectIds]
+  );
+
+  const ganttProjects = useMemo(
+    () => (filtersState.filters.showOnlyMilestones
+      ? visibleProjects.map(p => ({
+          ...p,
+          fasi: p.fasi.filter(f => f.milestone)
+        }))
+      : visibleProjects),
+    [filtersState.filters.showOnlyMilestones, visibleProjects]
+  );
+
+  return (
+    <ErrorBoundary>
       <div>
         <HeaderBar
-          userName={userName}
-          department={department}
+          userName={auth.userName}
+          department={auth.department}
+          departments={departmentsList}
+          userToken={auth.userToken}
           onDepartmentChange={handleDepartmentChange}
           lockInfo={lockInfo}
           isLocked={isLocked}
-          lockEnabled={lockEnabled}
+          lockEnabled={auth.lockEnabled}
           onRefreshLock={refreshLock}
           onEnableLock={handleEnableLock}
           onReleaseLock={handleDisableLock}
           onUserLogout={handleUserLogout}
-          readOnlyDepartment={readOnlyDepartment}
-          adminToken={adminToken}
+          readOnlyDepartment={auth.readOnlyDepartment}
+          adminToken={auth.adminToken}
           onChangePassword={handleChangePassword}
           onAdminCreateDepartment={handleAdminCreateDepartment}
           onAdminDeleteDepartment={handleAdminDeleteDepartment}
           onAdminResetPassword={handleAdminResetPassword}
           onAdminChangePassword={handleAdminChangePassword}
           onAdminReleaseLock={handleAdminReleaseLock}
-          screensaverEnabled={screensaverEnabled}
-          onToggleScreensaver={() => setScreensaverEnabled(!screensaverEnabled)}
-          onNavigateSystemSettings={() => handleViewChange('systemSettings')}
-          onNavigateUserManagement={() => handleViewChange('userManagement')}
-          dialogApi={dialogApi}
-          pushNotification={pushNotification}
+          onNavigateSystemSettings={() => filtersState.setActiveView('systemSettings')}
+          onNavigateUserManagement={() => filtersState.setActiveView('userManagement')}
+          dialogApi={notify.dialogApi}
+          pushNotification={notify.pushNotification}
         />
 
         {lockError && lockError.lockedBy && (
@@ -1250,33 +814,35 @@
         )}
 
         <main className="main-container">
-          {activeView === 'systemSettings' && adminToken ? (
+          {filtersState.activeView === 'systemSettings' && auth.adminToken ? (
             <SystemSettings
-              onBack={() => handleViewChange('gantt')}
+              onBack={() => filtersState.setActiveView('gantt')}
               onAdminModularExport={handleAdminModularExport}
               onAdminModularImport={handleAdminModularImport}
-              adminToken={adminToken}
-              dialogApi={dialogApi}
-              pushNotification={pushNotification}
+              adminToken={auth.adminToken}
+              dialogApi={notify.dialogApi}
+              pushNotification={notify.pushNotification}
             />
-          ) : activeView === 'userManagement' && adminToken ? (
+          ) : filtersState.activeView === 'userManagement' && auth.adminToken ? (
             <UserManagement
-              adminToken={adminToken}
-              onBack={() => handleViewChange('gantt')}
-              dialogApi={dialogApi}
+              adminToken={auth.adminToken}
+              onBack={() => filtersState.setActiveView('gantt')}
+              dialogApi={notify.dialogApi}
             />
-          ) : !department ? (
+          ) : !auth.department ? (
             <LoginScreen
-              userName={userName}
+              userName={auth.userName}
               onUserNameChange={handleUserNameChange}
               onDepartmentChange={handleDepartmentChange}
-              adminToken={adminToken}
+              adminToken={auth.adminToken}
               onAdminLogin={handleAdminLogin}
               onAdminLogout={handleUserLogout}
               onUserTokenChange={handleUserTokenChange}
-              loginError={loginError}
-              setLoginError={setLoginError}
-              pushNotification={pushNotification}
+              loginError={auth.loginError}
+              setLoginError={auth.setLoginError}
+              pushNotification={notify.pushNotification}
+              onNavigateSystemSettings={() => filtersState.setActiveView('systemSettings')}
+              onNavigateUserManagement={() => filtersState.setActiveView('userManagement')}
             />
           ) : (
             <>
@@ -1298,12 +864,12 @@
                   <h2 className="card-title">Timeline Progetti</h2>
 
                   <GanttControls
-                    viewMode={viewMode}
-                    onViewModeChange={handleViewModeChange}
-                    onGoToToday={handleGoToToday}
+                    viewMode={filtersState.viewMode}
+                    onViewModeChange={filtersState.setViewMode}
+                    onGoToToday={filtersState.triggerScrollToToday}
                     onExportPNG={handleExportPNG}
-                    filters={filters}
-                    onFiltersChange={setFilters}
+                    filters={filtersState.filters}
+                    onFiltersChange={filtersState.setFilters}
                   />
 
                   <div className="card-section">
@@ -1317,26 +883,26 @@
                       <div className={`gantt-with-sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
                         <ProjectSidebar
                           projects={ganttProjects}
-                          selectedProjectIds={selectedProjectIds}
-                          onSelectedProjectIdsChange={setSelectedProjectIds}
+                          selectedProjectIds={filtersState.selectedProjectIds}
+                          onSelectedProjectIdsChange={filtersState.setSelectedProjectIds}
                           onEditProject={handleEditProject}
                           onDeleteProject={handleDeleteProject}
-                          readOnly={readOnlyDepartment}
-                          isSaving={isSavingProject}
+                          readOnly={auth.readOnlyDepartment}
+                          isSaving={draftState.isSavingProject}
                           hoveredProjectId={hoveredProjectId}
                           onProjectHover={setHoveredProjectId}
                           scrollTop={verticalScrollTop}
                           onScrollChange={setVerticalScrollTop}
-                          ganttHeaderHeight={config.gantt.CANVAS_TOP_MARGIN}
+                          ganttHeaderHeight={AppConfig.gantt.CANVAS_TOP_MARGIN}
                           onCollapsedChange={setSidebarCollapsed}
-                          viewMode={viewMode}
+                          viewMode={filtersState.viewMode}
                         />
                         <div className="gantt-main-area">
                           <GanttCanvas
-                            viewMode={viewMode}
+                            viewMode={filtersState.viewMode}
                             projects={ganttProjects}
-                            filters={filters}
-                            scrollToTodayTrigger={scrollToTodayTrigger}
+                            filters={filtersState.filters}
+                            scrollToTodayTrigger={filtersState.scrollToTodayTrigger}
                             refreshTrigger={ganttRefreshTrigger}
                             onPhaseContextMenu={handleGanttPhaseContextMenu}
                             hoveredProjectId={hoveredProjectId}
@@ -1357,7 +923,7 @@
                   <div className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <h2 className="card-title">Gestione Progetto</h2>
-                      {showProjectForm && (
+                      {draftState.showProjectForm && (
                         <div>
                           {showProjectUnsavedBadge ? (
                             <span className="badge badge-warning">Modifiche non salvate</span>
@@ -1372,33 +938,33 @@
                       <button
                         onClick={handleNewProject}
                         className="btn-success"
-                        disabled={readOnlyDepartment || isSavingProject}
+                        disabled={auth.readOnlyDepartment || draftState.isSavingProject}
                       >
                         Nuovo Progetto
                       </button>
-                      {showProjectForm && (
+                      {draftState.showProjectForm && (
                         <button
-                          onClick={() => projectDraft && handleSaveProject(projectDraft)}
+                          onClick={() => draftState.projectDraft && handleSaveProject(draftState.projectDraft)}
                           className="btn-success"
-                          disabled={readOnlyDepartment || isSavingProject || !projectDraft}
+                          disabled={auth.readOnlyDepartment || draftState.isSavingProject || !draftState.projectDraft}
                         >
-                          {isSavingProject ? 'Salvataggio...' : 'Salva progetto e chiudi'}
+                          {draftState.isSavingProject ? 'Salvataggio...' : 'Salva progetto e chiudi'}
                         </button>
                       )}
-                      {showProjectForm && (
+                      {draftState.showProjectForm && (
                         <button
-                          onClick={() => projectDraft?.id && handleDeleteProject(projectDraft.id)}
+                          onClick={() => draftState.projectDraft?.id && handleDeleteProject(draftState.projectDraft.id)}
                           className="btn-danger"
-                          disabled={readOnlyDepartment || isSavingProject || !projectDraft?.id}
+                          disabled={auth.readOnlyDepartment || draftState.isSavingProject || !draftState.projectDraft?.id}
                         >
                           Elimina progetto
                         </button>
                       )}
-                      {showProjectForm && hasDraftChanges && (
+                      {draftState.showProjectForm && draftState.hasDraftChanges && (
                         <button
                           onClick={handleCancelProjectForm}
                           className="btn-secondary"
-                          disabled={isSavingProject}
+                          disabled={draftState.isSavingProject}
                         >
                           Annulla modifiche
                         </button>
@@ -1406,18 +972,18 @@
                     </div>
                   </div>
 
-                  {showProjectForm && (
+                  {draftState.showProjectForm && (
                     <div style={{ marginTop: '1rem' }}>
                       <ProjectForm
-                        project={editingProject}
+                        project={draftState.editingProject}
                         onSave={handleSaveProject}
                         onDelete={handleDeleteProject}
                         onCancel={handleCancelProjectForm}
-                        readOnly={readOnlyDepartment}
-                        isSaving={isSavingProject}
-                        onDraftChange={setProjectDraft}
-                        dialogApi={dialogApi}
-                        pushNotification={pushNotification}
+                        readOnly={auth.readOnlyDepartment}
+                        isSaving={draftState.isSavingProject}
+                        onDraftChange={draftState.setProjectDraft}
+                        dialogApi={notify.dialogApi}
+                        pushNotification={notify.pushNotification}
                       />
                     </div>
                   )}
@@ -1426,16 +992,16 @@
                 <div>
                   <ProjectList
                     projects={projects}
-                    selectedProjectIds={selectedProjectIds}
-                    onSelectedProjectIdsChange={setSelectedProjectIds}
+                    selectedProjectIds={filtersState.selectedProjectIds}
+                    onSelectedProjectIdsChange={filtersState.setSelectedProjectIds}
                     onEditProject={handleEditProject}
                     onDeleteProject={handleDeleteProject}
-                    onExportJSON={handleExportJSON}
+                    onExportJSON={handleExportProjects}
                     onImportJSON={handleImportJSON}
                     validationErrors={validationErrors}
-                    readOnly={readOnlyDepartment}
-                    isSaving={isSavingProject}
-                    focusedProjectId={focusedProjectId}
+                    readOnly={auth.readOnlyDepartment}
+                    isSaving={draftState.isSavingProject}
+                    focusedProjectId={draftState.focusedProjectId}
                     onFocusHandled={handleProjectFocusHandled}
                   />
                 </div>
@@ -1447,16 +1013,17 @@
             </>
           )}
         </main>
-        {notifications.length > 0 && (
+
+        {notify.notifications.length > 0 && (
           <div className="notification-container" role="status" aria-live="polite">
-            {notifications.map(item => (
+            {notify.notifications.map(item => (
               <div key={item.id} className={`notification notification-${item.type}`}>
                 {item.title && <div className="notification-title">{item.title}</div>}
                 <div>{item.message}</div>
                 <button
                   type="button"
                   className="notification-close"
-                  onClick={() => setNotifications(prev => prev.filter(entry => entry.id !== item.id))}
+                  onClick={() => notify.removeNotification(item.id)}
                   aria-label="Chiudi notifica"
                 >
                   ✕
@@ -1466,15 +1033,15 @@
           </div>
         )}
 
-        <DialogHost dialog={dialogState} onResolve={resolveDialog} />
+        <DialogHost dialog={notify.dialogState} onResolve={notify.resolveDialog} />
       </div>
-    );
-  }
-
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(
-    <ErrorBoundary>
-      <App />
     </ErrorBoundary>
   );
-})();
+}
+
+if (typeof window !== 'undefined') {
+  window.OnlyGantt = window.OnlyGantt || {};
+  window.OnlyGantt.App = App;
+}
+
+export default App;

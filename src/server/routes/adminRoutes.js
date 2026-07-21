@@ -59,7 +59,7 @@ function createAdminRouter(ctx) {
         expiresAt: expiresAt.toISOString(),
         userToken
       });
-      res.json({ token, userToken });
+      res.json({ ok: true, token, userToken });
     } catch (err) {
       errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
     }
@@ -128,6 +128,35 @@ function createAdminRouter(ctx) {
     }
   });
 
+  router.post('/api/admin/reset-password', (req, res) => {
+    try {
+      const { resetCode, newPassword } = req.body || {};
+      if (!CONFIG.adminResetCode) {
+        return errorResponse(res, 403, 'RESET_DISABLED', 'Admin reset code is not configured on server');
+      }
+      if (ctx.isAdminManagedByEnv()) {
+        return errorResponse(res, 409, 'ADMIN_PASSWORD_MANAGED_BY_ENV', 'Admin password is managed by environment variables');
+      }
+      if (!resetCode || resetCode.trim() !== CONFIG.adminResetCode) {
+        return errorResponse(res, 401, 'INVALID_RESET_CODE', 'Invalid reset code');
+      }
+      if (!newPassword || newPassword.trim().length < 6) {
+        return errorResponse(res, 400, 'INVALID_NEW_PASSWORD', 'New password must be at least 6 characters');
+      }
+      persistAdminPassword(newPassword.trim());
+      revokeUserSessionsForUser(CONFIG.adminUser);
+      for (const [token, session] of adminTokens) {
+        if (session?.userToken) {
+          userSessions.delete(session.userToken);
+        }
+      }
+      adminTokens.clear();
+      res.json({ ok: true, message: 'Admin password reset successfully' });
+    } catch (err) {
+      errorResponse(res, 500, 'INTERNAL_ERROR', err.message);
+    }
+  });
+
   router.post('/api/admin/ldap/test', requireAdmin, async (req, res) => {
     try {
       const { config, testUserId } = req.body || {};
@@ -162,8 +191,21 @@ function createAdminRouter(ctx) {
   router.get('/api/admin/system-status', requireAdmin, (req, res) => {
     try {
       const memory = process.memoryUsage();
+      const uptimeSeconds = Math.floor(process.uptime());
+      const activeUserSessions = userSessions?.size || 0;
+      const departmentsCount = departmentStore?.list()?.length || 0;
+
       res.json({
         ok: true,
+        nodeVersion: process.version,
+        uptimeSeconds,
+        activeUserSessions,
+        departmentsCount,
+        memoryUsage: {
+          rss: memory.rss,
+          heapUsed: memory.heapUsed,
+          heapTotal: memory.heapTotal
+        },
         app: {
           name: packageInfo.name || 'OnlyGANTT',
           version: packageInfo.version || 'dev'
@@ -171,7 +213,7 @@ function createAdminRouter(ctx) {
         server: {
           status: 'online',
           startedAt: SERVER_STARTED_AT,
-          uptimeSeconds: Math.floor(process.uptime()),
+          uptimeSeconds,
           pid: process.pid,
           nodeVersion: process.version
         },

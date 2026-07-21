@@ -21,46 +21,54 @@ function createDepartmentStore({ dataDir, dbName = 'reparti.db', logger = consol
     )
   `);
 
-  function runMigrations(legacyDir) {
-    if (!fs.existsSync(legacyDir)) {
-      return;
-    }
-    try {
-      const files = fs.readdirSync(legacyDir);
-      for (const file of files) {
-        if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
-          const deptName = file.replace('.json', '');
-          const filePath = path.join(legacyDir, file);
-          try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            const data = JSON.parse(content);
-            
-            // Check if already in DB
-            const check = db.prepare('SELECT 1 FROM departments WHERE name = ?').get(deptName);
-            if (!check) {
-              const errors = validateDepartmentData(data);
-              if (errors.length === 0) {
-                ensureIDs(data);
-                db.prepare('INSERT INTO departments (name, data) VALUES (?, ?)').run(
-                  deptName,
-                  JSON.stringify(data)
-                );
-                logger.info(`[DepartmentStore] Migrated legacy file ${file} into SQLite`);
-              } else {
-                logger.warn(`[DepartmentStore] Legacy file ${file} failed validation: ${errors.join(', ')}`);
+  function ensureDefaultDepartments(departmentsDir) {
+    if (departmentsDir && fs.existsSync(departmentsDir)) {
+      try {
+        const files = fs.readdirSync(departmentsDir);
+        for (const file of files) {
+          if (file.endsWith('.json') && !file.endsWith('.bak') && !file.endsWith('.tmp')) {
+            const deptName = file.replace('.json', '');
+            const filePath = path.join(departmentsDir, file);
+            try {
+              const check = db.prepare('SELECT 1 FROM departments WHERE LOWER(name) = LOWER(?)').get(deptName);
+              if (!check) {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const data = JSON.parse(content);
+                const errors = validateDepartmentData(data);
+                if (errors.length === 0) {
+                  ensureIDs(data);
+                  db.prepare('INSERT INTO departments (name, data) VALUES (?, ?)').run(
+                    deptName,
+                    JSON.stringify(data)
+                  );
+                  logger.info(`[DepartmentStore] Loaded department ${deptName} into SQLite`);
+                }
               }
+            } catch (err) {
+              logger.error(`[DepartmentStore] Failed to load initial department file ${file}:`, err.message);
             }
-            // Rename to .json.migrated to avoid re-processing, unless it is Demo.json (required for MSI packaging)
-            if (file.toLowerCase() !== 'demo.json') {
-              fs.renameSync(filePath, `${filePath}.migrated`);
-            }
-          } catch (err) {
-            logger.error(`[DepartmentStore] Failed to migrate legacy file ${file}:`, err.message);
           }
         }
+      } catch (err) {
+        logger.error('[DepartmentStore] Initial departments loading error:', err.message);
       }
-    } catch (err) {
-      logger.error('[DepartmentStore] Migration error:', err.message);
+    }
+
+    // Ensure Demo department exists if DB is completely empty
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM departments').get();
+    if (!countRow || countRow.count === 0) {
+      const demoData = {
+        password: null,
+        projects: [],
+        meta: {
+          updatedAt: new Date().toISOString(),
+          updatedBy: 'system',
+          revision: 1
+        }
+      };
+      ensureIDs(demoData);
+      db.prepare('INSERT INTO departments (name, data) VALUES (?, ?)').run('Demo', JSON.stringify(demoData));
+      logger.info('[DepartmentStore] Initialized default Demo department');
     }
   }
 
@@ -127,7 +135,8 @@ function createDepartmentStore({ dataDir, dbName = 'reparti.db', logger = consol
   }
 
   return {
-    runMigrations,
+    ensureDefaultDepartments,
+    runMigrations: ensureDefaultDepartments,
     get,
     set,
     list,

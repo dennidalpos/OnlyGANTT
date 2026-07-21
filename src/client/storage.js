@@ -1,14 +1,10 @@
 (function() {
-  'use strict';
-
-  window.OnlyGantt = window.OnlyGantt || {};
-
   const USER_KEY = 'currentUser';
   const ACTIVE_SESSION_KEY = 'onlygantt_active_session';
   const sessionPasswords = new Map();
 
   function getHostnameKey() {
-    return window.location.host.toLowerCase();
+    return typeof window !== 'undefined' ? window.location.host.toLowerCase() : 'localhost';
   }
 
   function getPasswordsKey(userName) {
@@ -17,10 +13,12 @@
   }
 
   function getCurrentUser() {
+    if (typeof localStorage === 'undefined') return '';
     return localStorage.getItem(USER_KEY) || '';
   }
 
   function setCurrentUser(userName) {
+    if (typeof localStorage === 'undefined') return;
     if (userName) {
       localStorage.setItem(USER_KEY, userName);
     } else {
@@ -30,6 +28,7 @@
 
   function getActiveSession() {
     try {
+      if (typeof sessionStorage === 'undefined') return {};
       const rawSession = sessionStorage.getItem(ACTIVE_SESSION_KEY);
       if (!rawSession) return {};
 
@@ -49,6 +48,7 @@
 
   function setActiveSession(session) {
     try {
+      if (typeof sessionStorage === 'undefined') return;
       const nextSession = {
         userName: session?.userName || '',
         department: session?.department || null,
@@ -67,6 +67,7 @@
 
   function clearActiveSession() {
     try {
+      if (typeof sessionStorage === 'undefined') return;
       sessionStorage.removeItem(ACTIVE_SESSION_KEY);
     } catch {}
   }
@@ -79,7 +80,6 @@
 
   function savePasswords(userName, passwords) {
     if (!userName) return;
-
     const key = getPasswordsKey(userName);
     sessionPasswords.set(key, { ...(passwords || {}) });
   }
@@ -101,7 +101,7 @@
     savePasswords(userName, passwords);
   }
 
-  window.OnlyGantt.storage = {
+  const storageObj = {
     getCurrentUser,
     setCurrentUser,
     getActiveSession,
@@ -109,6 +109,24 @@
     clearActiveSession,
     getPassword,
     setPassword,
-    removePassword
+    removePassword,
+    default: {
+      getCurrentUser,
+      setCurrentUser,
+      getActiveSession,
+      setActiveSession,
+      clearActiveSession,
+      getPassword,
+      setPassword,
+      removePassword
+    }
   };
+
+  if (typeof window !== 'undefined') {
+    window.OnlyGantt = window.OnlyGantt || {};
+    window.OnlyGantt.storage = storageObj;
+  }
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = storageObj;
+  }
 })();

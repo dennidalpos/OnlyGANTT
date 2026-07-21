@@ -1,40 +1,24 @@
+const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
-function createLockStore({ dataDir, fileName = 'locks.json', logger = console }) {
+function createLockStore({ dataDir, dbName = 'locks.db', logger = console }) {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const dbPath = path.join(dataDir, dbName);
+  const db = new DatabaseSync(dbPath);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS locks (
+      department_normalized TEXT PRIMARY KEY,
+      department TEXT NOT NULL,
+      data TEXT NOT NULL
+    )
+  `);
+
   const locks = new Map();
-  const filePath = path.join(dataDir, fileName);
-
-  function ensureDataDir() {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-  }
-
-  function atomicWrite(data) {
-    ensureDataDir();
-    const tmpPath = `${filePath}.tmp`;
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    try {
-      const fd = fs.openSync(tmpPath, 'r+');
-      fs.fsyncSync(fd);
-      fs.closeSync(fd);
-    } catch (err) {
-      logger.warn(`Unable to fsync temp file ${tmpPath}:`, err.message);
-    }
-    fs.renameSync(tmpPath, filePath);
-  }
-
-  function serializeLocks() {
-    return {
-      savedAt: new Date().toISOString(),
-      locks: Array.from(locks.values())
-    };
-  }
-
-  function persist() {
-    atomicWrite(serializeLocks());
-  }
 
   function isExpired(lock, now = new Date()) {
     if (!lock || !lock.expiresAt) return true;
@@ -47,77 +31,104 @@ function createLockStore({ dataDir, fileName = 'locks.json', logger = console })
     );
   }
 
+  function persistLock(department, lock) {
+    if (!department) return;
+    const norm = department.toLowerCase();
+    if (!lock) {
+      db.prepare('DELETE FROM locks WHERE department_normalized = ?').run(norm);
+    } else {
+      db.prepare('INSERT OR REPLACE INTO locks (department_normalized, department, data) VALUES (?, ?, ?)').run(
+        norm,
+        lock.department || department,
+        JSON.stringify(lock)
+      );
+    }
+  }
+
   function cleanExpiredLocks() {
     const now = new Date();
     let removed = 0;
     for (const [department, lock] of locks.entries()) {
       if (isExpired(lock, now)) {
         locks.delete(department);
+        persistLock(department, null);
         removed += 1;
         logExpiredLock(lock);
       }
-    }
-    if (removed > 0) {
-      persist();
     }
     return removed;
   }
 
   function loadFromDisk() {
-    ensureDataDir();
-    if (!fs.existsSync(filePath)) {
-      return { loaded: 0, expired: 0 };
-    }
-
-    let payload;
-    try {
-      payload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch (err) {
-      logger.warn(`[LockStore] failed to parse ${filePath}: ${err.message}`);
-      return { loaded: 0, expired: 0 };
-    }
-
-    const list = Array.isArray(payload) ? payload : payload?.locks;
-    if (!Array.isArray(list)) {
-      logger.warn(`[LockStore] invalid lock payload in ${filePath}`);
-      return { loaded: 0, expired: 0 };
-    }
-
-    const now = new Date();
     let loaded = 0;
     let expired = 0;
+    const now = new Date();
 
-    list.forEach(lock => {
-      if (!lock || typeof lock.department !== 'string') return;
-      if (isExpired(lock, now)) {
-        expired += 1;
-        logExpiredLock(lock);
-        return;
+    // 1. Migrate legacy locks.json if it exists
+    const legacyPath = path.join(dataDir, 'locks.json');
+    if (fs.existsSync(legacyPath)) {
+      try {
+        const content = fs.readFileSync(legacyPath, 'utf8');
+        const payload = JSON.parse(content);
+        const list = Array.isArray(payload) ? payload : payload?.locks;
+        if (Array.isArray(list)) {
+          list.forEach(lock => {
+            if (lock && typeof lock.department === 'string') {
+              if (isExpired(lock, now)) {
+                expired += 1;
+              } else {
+                locks.set(lock.department, lock);
+                persistLock(lock.department, lock);
+                loaded += 1;
+              }
+            }
+          });
+        }
+        fs.unlinkSync(legacyPath);
+      } catch (err) {
+        logger.warn(`[LockStore] legacy locks.json migration warning: ${err.message}`);
       }
-      locks.set(lock.department, lock);
-      loaded += 1;
-    });
+    }
 
-    if (expired > 0) {
-      persist();
+    // 2. Load active locks from SQLite
+    try {
+      const rows = db.prepare('SELECT department, data FROM locks').all();
+      rows.forEach(row => {
+        try {
+          const lock = JSON.parse(row.data);
+          if (isExpired(lock, now)) {
+            expired += 1;
+            persistLock(row.department, null);
+            logExpiredLock(lock);
+          } else {
+            locks.set(row.department, lock);
+            loaded += 1;
+          }
+        } catch (_) {}
+      });
+    } catch (err) {
+      logger.error(`[LockStore] Error loading locks from SQLite:`, err.message);
     }
 
     return { loaded, expired };
   }
 
   function get(department) {
+    if (!department) return null;
     return locks.get(department);
   }
 
   function set(department, lock) {
+    if (!department) return;
     locks.set(department, lock);
-    persist();
+    persistLock(department, lock);
   }
 
   function remove(department) {
+    if (!department) return false;
     const removed = locks.delete(department);
     if (removed) {
-      persist();
+      persistLock(department, null);
     }
     return removed;
   }
@@ -134,6 +145,12 @@ function createLockStore({ dataDir, fileName = 'locks.json', logger = console })
     return interval;
   }
 
+  function close() {
+    try {
+      db.close();
+    } catch (_) {}
+  }
+
   return {
     loadFromDisk,
     cleanExpiredLocks,
@@ -141,7 +158,8 @@ function createLockStore({ dataDir, fileName = 'locks.json', logger = console })
     set,
     remove,
     entries,
-    startCleanup
+    startCleanup,
+    close
   };
 }
 

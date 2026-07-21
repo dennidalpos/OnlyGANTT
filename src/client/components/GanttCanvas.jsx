@@ -1,684 +1,532 @@
-(function() {
-  'use strict';
+import gantt from '../../domain/ganttCalculator.js';
+import dateUtils from '../../utils/dateUtils.js';
+import AppConfig from '../../app-config.js';
 
-  const { useRef, useEffect, useState, useCallback } = React;
+const { useRef, useEffect, useState, useCallback } = React;
 
-  window.OnlyGantt = window.OnlyGantt || {};
-  window.OnlyGantt.components = window.OnlyGantt.components || {};
+export function GanttCanvas({
+  viewMode,
+  projects,
+  filters,
+  scrollToTodayTrigger,
+  refreshTrigger,
+  onPhaseContextMenu,
+  hoveredProjectId,
+  onProjectHover,
+  verticalScrollTop,
+  onVerticalScrollChange,
+  sidebarCollapsed
+}) {
+  const canvasRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const viewportRef = useRef(null);
+  const topScrollbarRef = useRef(null);
+  const bottomScrollbarRef = useRef(null);
+  const [tooltip, setTooltip] = useState(null);
+  const [layout, setLayout] = useState(null);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [scrollLabels, setScrollLabels] = useState([]);
+  const scrollPositionsRef = useRef({});
+  const lastViewModeRef = useRef(viewMode);
+  const scrollLeftRef = useRef(0);
+  const scrollbarWidthRef = useRef(0);
+  const scrollRafRef = useRef(null);
+  const pendingScrollLeftRef = useRef(0);
+  const handledScrollToTodayTriggerRef = useRef(0);
+  const verticalScrollContainerRef = useRef(null);
+  const syncedVerticalScrollTopRef = useRef(null);
 
-  const gantt = window.OnlyGantt.gantt;
-  const dateUtils = window.OnlyGantt.dateUtils;
-  const config = window.AppConfig;
-
-  function GanttCanvas({
-    viewMode,
-    projects,
-    filters,
-    scrollToTodayTrigger,
-    refreshTrigger,
-    onPhaseContextMenu,
-    hoveredProjectId,
-    onProjectHover,
-    verticalScrollTop,
-    onVerticalScrollChange,
-    sidebarCollapsed
-  }) {
-    const canvasRef = useRef(null);
-    const wrapperRef = useRef(null);
-    const viewportRef = useRef(null);
-    const topScrollbarRef = useRef(null);
-    const bottomScrollbarRef = useRef(null);
-    const [tooltip, setTooltip] = useState(null);
-    const [layout, setLayout] = useState(null);
-    const [scrollLeft, setScrollLeft] = useState(0);
-    const [contextMenu, setContextMenu] = useState(null);
-    const [scrollLabels, setScrollLabels] = useState([]);
-    const scrollPositionsRef = useRef({});
-    const lastViewModeRef = useRef(viewMode);
-    const scrollLeftRef = useRef(0);
-    const scrollbarWidthRef = useRef(0);
-    const scrollRafRef = useRef(null);
-    const pendingScrollLeftRef = useRef(0);
-    const handledScrollToTodayTriggerRef = useRef(0);
-    const verticalScrollContainerRef = useRef(null);
-    const syncedVerticalScrollTopRef = useRef(null);
-
-    useEffect(() => {
-      if (verticalScrollContainerRef.current && verticalScrollTop !== undefined) {
-        if (Math.abs(verticalScrollContainerRef.current.scrollTop - verticalScrollTop) > 0.5) {
-          syncedVerticalScrollTopRef.current = verticalScrollTop;
-          verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
-        }
+  useEffect(() => {
+    if (verticalScrollContainerRef.current && verticalScrollTop !== undefined) {
+      if (Math.abs(verticalScrollContainerRef.current.scrollTop - verticalScrollTop) > 0.5) {
+        syncedVerticalScrollTopRef.current = verticalScrollTop;
+        verticalScrollContainerRef.current.scrollTop = verticalScrollTop;
       }
-    }, [verticalScrollTop]);
+    }
+  }, [verticalScrollTop]);
 
-    const currentVerticalScrollTop = verticalScrollTop || 0;
+  const currentVerticalScrollTop = verticalScrollTop || 0;
 
-    const handleVerticalScroll = useCallback((e) => {
-      const syncedScrollTop = syncedVerticalScrollTopRef.current;
-      if (syncedScrollTop !== null && Math.abs(e.target.scrollTop - syncedScrollTop) <= 0.5) {
-        syncedVerticalScrollTopRef.current = null;
-        return;
-      }
-
+  const handleVerticalScroll = useCallback((e) => {
+    const syncedScrollTop = syncedVerticalScrollTopRef.current;
+    if (syncedScrollTop !== null && Math.abs(e.target.scrollTop - syncedScrollTop) <= 0.5) {
       syncedVerticalScrollTopRef.current = null;
-      if (onVerticalScrollChange) {
-        onVerticalScrollChange(e.target.scrollTop);
-      }
-    }, [onVerticalScrollChange]);
+      return;
+    }
 
-    const handleVerticalWheel = useCallback((e) => {
-      const container = verticalScrollContainerRef.current;
-      if (!container || !onVerticalScrollChange || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    syncedVerticalScrollTopRef.current = null;
+    if (onVerticalScrollChange) {
+      onVerticalScrollChange(e.target.scrollTop);
+    }
+  }, [onVerticalScrollChange]);
 
-      const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      if (maxScrollTop <= 0) return;
+  const handleVerticalWheel = useCallback((e) => {
+    const container = verticalScrollContainerRef.current;
+    if (!container || !onVerticalScrollChange || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
 
-      const nextScrollTop = Math.min(
-        Math.max(0, container.scrollTop + e.deltaY),
-        maxScrollTop
-      );
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (maxScrollTop <= 0) return;
 
-      if (Math.abs(nextScrollTop - container.scrollTop) <= 0.5) return;
+    const nextScrollTop = Math.min(
+      Math.max(0, container.scrollTop + e.deltaY),
+      maxScrollTop
+    );
 
-      e.preventDefault();
-      syncedVerticalScrollTopRef.current = nextScrollTop;
-      container.scrollTop = nextScrollTop;
-      onVerticalScrollChange(nextScrollTop);
-    }, [onVerticalScrollChange]);
+    if (Math.abs(nextScrollTop - container.scrollTop) <= 0.5) return;
 
-    useEffect(() => {
-      const container = verticalScrollContainerRef.current;
-      if (!container) return;
+    e.preventDefault();
+    syncedVerticalScrollTopRef.current = nextScrollTop;
+    container.scrollTop = nextScrollTop;
+    onVerticalScrollChange(nextScrollTop);
+  }, [onVerticalScrollChange]);
 
-      container.addEventListener('wheel', handleVerticalWheel, { passive: false });
-      return () => {
-        container.removeEventListener('wheel', handleVerticalWheel);
-      };
-    }, [handleVerticalWheel]);
+  useEffect(() => {
+    const container = verticalScrollContainerRef.current;
+    if (!container) return;
 
-    const updateScrollbars = useCallback((newLayout) => {
-      if (!topScrollbarRef.current || !bottomScrollbarRef.current || viewMode !== '4months') {
-        return;
-      }
+    container.addEventListener('wheel', handleVerticalWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleVerticalWheel);
+    };
+  }, [handleVerticalWheel]);
 
-      const containerWidth = wrapperRef.current ? wrapperRef.current.clientWidth : 0;
-      const scrollbarWidth = Math.max(newLayout.canvasWidth, containerWidth);
-      if (scrollbarWidthRef.current !== scrollbarWidth) {
-        const ensureScrollbarContent = (scrollbar) => {
-          let content = scrollbar.querySelector('.gantt-scrollbar-content');
-          if (!content) {
-            content = document.createElement('div');
-            content.className = 'gantt-scrollbar-content';
-            scrollbar.innerHTML = '';
-            scrollbar.appendChild(content);
-          }
-          return content;
-        };
+  const updateScrollbars = useCallback((newLayout) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !newLayout) return;
 
-        const topContent = ensureScrollbarContent(topScrollbarRef.current);
-        const bottomContent = ensureScrollbarContent(bottomScrollbarRef.current);
-        topContent.style.width = `${scrollbarWidth}px`;
-        topContent.style.height = '1px';
-        bottomContent.style.width = `${scrollbarWidth}px`;
-        bottomContent.style.height = '1px';
-        scrollbarWidthRef.current = scrollbarWidth;
-      }
+    const containerWidth = viewport.clientWidth;
+    const contentWidth = newLayout.canvasWidth;
+    scrollbarWidthRef.current = contentWidth;
 
-      const currentScroll = scrollLeftRef.current;
-      topScrollbarRef.current.scrollLeft = currentScroll;
-      bottomScrollbarRef.current.scrollLeft = currentScroll;
-    }, [viewMode]);
-
-    const render = useCallback(() => {
-      const canvas = canvasRef.current;
-      const wrapper = wrapperRef.current;
-      const verticalContainer = viewportRef.current;
-      if (!canvas || !wrapper) return;
-
-      const ctx = canvas.getContext('2d');
-      const containerWidth = wrapper.clientWidth;
-
-      const newLayout = gantt.getLayout(viewMode, projects, containerWidth, filters);
-      setLayout(newLayout);
-
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = newLayout.canvasWidth * dpr;
-      canvas.height = newLayout.canvasHeight * dpr;
-      canvas.style.width = `${newLayout.canvasWidth}px`;
-      canvas.style.height = `${newLayout.canvasHeight}px`;
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const viewportTop = verticalContainer ? verticalContainer.scrollTop : (verticalScrollTop || 0);
-      const viewportHeight = verticalContainer ? verticalContainer.clientHeight : 0;
-      const viewport = viewportHeight > 0 ? {
-        top: viewportTop,
-        bottom: viewportTop + viewportHeight
-      } : null;
-
-      const hideProjectLabels = sidebarCollapsed === false;
-      gantt.render(ctx, newLayout, { hoveredProjectId, hideProjectLabels, viewport });
-
-      updateScrollbars(newLayout);
-    }, [viewMode, projects, filters, updateScrollbars, sidebarCollapsed, hoveredProjectId, verticalScrollTop]);
-
-    const prevHoveredProjectIdRef = useRef(null);
-
-    const redraw = useCallback(() => {
-      const canvas = canvasRef.current;
-      const verticalContainer = viewportRef.current;
-      if (!canvas || !layout) return;
-
-      const ctx = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const viewportTop = verticalContainer ? verticalContainer.scrollTop : (verticalScrollTop || 0);
-      const viewportHeight = verticalContainer ? verticalContainer.clientHeight : 0;
-      const viewport = viewportHeight > 0 ? {
-        top: viewportTop,
-        bottom: viewportTop + viewportHeight
-      } : null;
-
-      const hideProjectLabels = sidebarCollapsed === false;
-      gantt.render(ctx, layout, { hoveredProjectId, hideProjectLabels, viewport });
-      prevHoveredProjectIdRef.current = hoveredProjectId;
-    }, [layout, hoveredProjectId, sidebarCollapsed, verticalScrollTop]);
-
-    useEffect(() => {
-      redraw();
-    }, [verticalScrollTop, redraw]);
-
-    const initialRenderDoneRef = useRef(false);
-    const prevSidebarCollapsedRef = useRef(sidebarCollapsed);
-
-    useEffect(() => {
-      redraw();
-    }, [hoveredProjectId]);
-
-    useEffect(() => {
-      const frame = requestAnimationFrame(() => {
-        gantt.invalidateCache();
-        render();
-        initialRenderDoneRef.current = true;
-      });
-      return () => cancelAnimationFrame(frame);
-    }, [projects, viewMode, filters]);
-
-    useEffect(() => {
-      if (refreshTrigger === 0) return;
-      gantt.invalidateCache();
-      render();
-    }, [refreshTrigger]);
-
-    useEffect(() => {
-      if (prevSidebarCollapsedRef.current === sidebarCollapsed && !initialRenderDoneRef.current) {
-        prevSidebarCollapsedRef.current = sidebarCollapsed;
-        return;
-      }
-      prevSidebarCollapsedRef.current = sidebarCollapsed;
-
-      const timeout = setTimeout(() => {
-        gantt.invalidateCache();
-        render();
-      }, 220);
-      return () => clearTimeout(timeout);
-    }, [sidebarCollapsed]);
-
-    useEffect(() => {
-      scrollLeftRef.current = scrollLeft;
-    }, [scrollLeft]);
-
-    useEffect(() => {
-      const previousViewMode = lastViewModeRef.current;
-      if (previousViewMode && previousViewMode !== viewMode) {
-        scrollPositionsRef.current[previousViewMode] = scrollLeftRef.current;
-      }
-
-      lastViewModeRef.current = viewMode;
-      setTooltip(null);
-    }, [viewMode]);
-
-    const restoreScrollPosition = useCallback((targetScroll) => {
-      if (!layout || !wrapperRef.current) return;
-
-      const maxScroll = Math.max(0, layout.canvasWidth - wrapperRef.current.clientWidth);
-      const clampedScroll = Math.min(targetScroll, maxScroll);
-
-      if (topScrollbarRef.current) {
-        topScrollbarRef.current.scrollLeft = clampedScroll;
-      }
-      if (bottomScrollbarRef.current) {
-        bottomScrollbarRef.current.scrollLeft = clampedScroll;
-      }
-      setScrollLeft(clampedScroll);
-    }, [layout]);
-
-    useEffect(() => {
-      if (viewMode !== '4months') {
-        setScrollLeft(0);
-        scrollbarWidthRef.current = 0;
-        return;
-      }
-      if (!layout) return;
-      const savedScroll = scrollPositionsRef.current[viewMode] || 0;
-      if (savedScroll > 0) {
-        restoreScrollPosition(savedScroll);
-      }
-    }, [viewMode, restoreScrollPosition]);
-
-    useEffect(() => {
-      if (viewMode !== '4months' || !layout) return;
-      const frame = window.requestAnimationFrame(() => {
-        updateScrollbars(layout);
-      });
-      return () => window.cancelAnimationFrame(frame);
-    }, [viewMode, layout, updateScrollbars]);
-
-    useEffect(() => {
-      const handleResize = () => {
-        gantt.invalidateCache();
-        render();
-      };
-
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }, [render]);
-
-    useEffect(() => {
-      if (!layout || !wrapperRef.current) return;
-
-      const maxScroll = Math.max(0, layout.canvasWidth - wrapperRef.current.clientWidth);
-      const clampedScroll = Math.min(scrollLeft, maxScroll);
-
-      if (topScrollbarRef.current) {
-        topScrollbarRef.current.scrollLeft = clampedScroll;
-      }
-      if (bottomScrollbarRef.current) {
-        bottomScrollbarRef.current.scrollLeft = clampedScroll;
-      }
-      if (clampedScroll !== scrollLeft) {
-        setScrollLeft(clampedScroll);
-      }
-    }, [layout, scrollLeft]);
-
-    useEffect(() => {
-      if (!layout) return;
-      updateScrollbars(layout);
-    }, [layout, updateScrollbars]);
-
-    const updateScrollLabels = useCallback(() => {
-      if (!layout || !wrapperRef.current || viewMode !== '4months') {
-        setScrollLabels([]);
-        return;
-      }
-
-      const containerWidth = wrapperRef.current.clientWidth;
-      const viewportLeft = scrollLeftRef.current;
-      const verticalViewportTop = verticalScrollTop || 0;
-      const verticalViewportHeight = viewportRef.current ? viewportRef.current.clientHeight : 0;
-      const verticalViewportBottom = verticalViewportHeight > 0
-        ? verticalViewportTop + verticalViewportHeight
-        : null;
-      const labels = [];
-
-      layout.rows.forEach(row => {
-        if (verticalViewportBottom !== null) {
-          const rowBottom = row.y + row.height;
-          if (rowBottom < verticalViewportTop || row.y > verticalViewportBottom) {
-            return;
-          }
+    [topScrollbarRef, bottomScrollbarRef].forEach(ref => {
+      if (ref.current) {
+        const contentEl = ref.current.querySelector('.gantt-scrollbar-content');
+        if (contentEl) {
+          contentEl.style.width = `${contentWidth}px`;
         }
+      }
+    });
 
-        const project = row.project;
-        if (Array.isArray(project.fasi)) {
-          project.fasi.forEach(fase => {
-            if (!fase.milestone && fase.dataInizio && fase.dataFine && fase.nome) {
-              const fx1 = layout.dateToX[fase.dataInizio];
-              const fx2 = layout.dateToX[fase.dataFine];
+    const maxScroll = Math.max(0, contentWidth - containerWidth);
+    const validScrollLeft = Math.min(scrollLeftRef.current, maxScroll);
 
-              if (fx1 !== null && fx2 !== null) {
-                const faseWidth = fx2 - fx1 + layout.pixelsPerDay;
-                const faseRight = fx1 + faseWidth;
+    [topScrollbarRef, bottomScrollbarRef, viewportRef].forEach(ref => {
+      if (ref.current && Math.abs(ref.current.scrollLeft - validScrollLeft) > 1) {
+        ref.current.scrollLeft = validScrollLeft;
+      }
+    });
 
-                if (fx1 < viewportLeft && faseRight > viewportLeft) {
-                  const faseY = row.y + 4;
-                  const faseHeight = row.height - 8;
-                  const percentage = fase.percentualeCompletamento || 0;
-                  const showPercent = filters.showPhasePercentages;
-                  const labelText = showPercent ? `${fase.nome} ${percentage}%` : fase.nome;
-                  labels.push({
-                    text: labelText,
-                    y: faseY,
-                    height: faseHeight,
-                    color: fase.colore || project.colore || '#3b82f6'
-                  });
-                }
-              }
+    scrollLeftRef.current = validScrollLeft;
+    setScrollLeft(validScrollLeft);
+  }, []);
+
+  const updateLayout = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const containerWidth = viewport.clientWidth;
+    const newLayout = gantt.getLayout(viewMode, projects, containerWidth, filters);
+    setLayout(newLayout);
+    updateScrollbars(newLayout);
+  }, [viewMode, projects, filters, updateScrollbars]);
+
+  useEffect(() => {
+    updateLayout();
+  }, [updateLayout, refreshTrigger]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      gantt.invalidateCache();
+      updateLayout();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateLayout]);
+
+  useEffect(() => {
+    if (sidebarCollapsed !== undefined) {
+      gantt.invalidateCache();
+      const timer = setTimeout(() => {
+        updateLayout();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [sidebarCollapsed, updateLayout]);
+
+  const scrollToDate = useCallback((dateStr) => {
+    if (!layout || !viewportRef.current) return;
+
+    const dateX = layout.dateToX[dateStr];
+    if (dateX !== null && dateX !== undefined) {
+      const containerWidth = viewportRef.current.clientWidth;
+      const targetScrollLeft = Math.max(0, dateX - containerWidth / 2);
+
+      [topScrollbarRef, bottomScrollbarRef, viewportRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.scrollLeft = targetScrollLeft;
+        }
+      });
+
+      scrollLeftRef.current = targetScrollLeft;
+      setScrollLeft(targetScrollLeft);
+    }
+  }, [layout]);
+
+  const scrollToToday = useCallback(() => {
+    const todayStr = dateUtils.formatDate(new Date());
+    scrollToDate(todayStr);
+  }, [scrollToDate]);
+
+  useEffect(() => {
+    if (scrollToTodayTrigger && scrollToTodayTrigger !== handledScrollToTodayTriggerRef.current) {
+      handledScrollToTodayTriggerRef.current = scrollToTodayTrigger;
+      scrollToToday();
+    }
+  }, [scrollToTodayTrigger, scrollToToday]);
+
+  useEffect(() => {
+    if (lastViewModeRef.current !== viewMode) {
+      scrollPositionsRef.current[lastViewModeRef.current] = scrollLeft;
+      const savedScroll = scrollPositionsRef.current[viewMode];
+      if (savedScroll !== undefined) {
+        setTimeout(() => {
+          [topScrollbarRef, bottomScrollbarRef, viewportRef].forEach(ref => {
+            if (ref.current) {
+              ref.current.scrollLeft = savedScroll;
             }
           });
-        }
-      });
+          scrollLeftRef.current = savedScroll;
+          setScrollLeft(savedScroll);
+        }, 0);
+      } else {
+        setTimeout(scrollToToday, 0);
+      }
+      lastViewModeRef.current = viewMode;
+    }
+  }, [viewMode, scrollLeft, scrollToToday]);
 
-      setScrollLabels(labels);
-    }, [layout, viewMode, filters.showPhasePercentages, verticalScrollTop]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const viewport = viewportRef.current;
+    if (!canvas || !viewport || !layout) return;
 
-    const scrollToToday = useCallback(() => {
-      if (!layout || !wrapperRef.current) return false;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
 
-      const todayStr = dateUtils.formatDate(new Date());
-      const todayX = layout.dateToX[todayStr];
-      if (todayX === null || todayX === undefined) return false;
+    canvas.width = layout.canvasWidth * dpr;
+    canvas.height = layout.canvasHeight * dpr;
+    canvas.style.width = `${layout.canvasWidth}px`;
+    canvas.style.height = `${layout.canvasHeight}px`;
 
-      const wrapperWidth = wrapperRef.current.clientWidth;
-      const maxScroll = Math.max(0, layout.canvasWidth - wrapperWidth);
-      const targetScroll = Math.min(
-        Math.max(0, todayX - wrapperWidth / 2),
-        maxScroll
-      );
+    ctx.scale(dpr, dpr);
 
+    const renderViewport = {
+      top: currentVerticalScrollTop,
+      bottom: currentVerticalScrollTop + viewport.clientHeight
+    };
+
+    gantt.render(ctx, layout, {
+      hoveredProjectId,
+      viewport: renderViewport
+    });
+  }, [layout, scrollLeft, hoveredProjectId, currentVerticalScrollTop]);
+
+  const syncScrollLeft = (newScrollLeft) => {
+    pendingScrollLeftRef.current = newScrollLeft;
+
+    if (scrollRafRef.current) return;
+
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const targetScroll = pendingScrollLeftRef.current;
       scrollLeftRef.current = targetScroll;
-      pendingScrollLeftRef.current = targetScroll;
-      if (topScrollbarRef.current) {
-        topScrollbarRef.current.scrollLeft = targetScroll;
-      }
-      if (bottomScrollbarRef.current) {
-        bottomScrollbarRef.current.scrollLeft = targetScroll;
-      }
-      setScrollLeft(targetScroll);
-      window.requestAnimationFrame(updateScrollLabels);
-      return true;
-    }, [layout, updateScrollLabels]);
 
-    useEffect(() => {
-      if (!scrollToTodayTrigger || viewMode !== '4months') return;
-      if (handledScrollToTodayTriggerRef.current === scrollToTodayTrigger) return;
-
-      const frame = window.requestAnimationFrame(() => {
-        if (scrollToToday()) {
-          handledScrollToTodayTriggerRef.current = scrollToTodayTrigger;
+      [topScrollbarRef, bottomScrollbarRef, viewportRef].forEach(ref => {
+        if (ref.current && Math.abs(ref.current.scrollLeft - targetScroll) > 1) {
+          ref.current.scrollLeft = targetScroll;
         }
       });
-      return () => window.cancelAnimationFrame(frame);
-    }, [scrollToTodayTrigger, viewMode, scrollToToday]);
 
-    const handleScroll = useCallback((source) => {
-      const left = source.scrollLeft;
-      scrollLeftRef.current = left;
-      pendingScrollLeftRef.current = left;
+      setScrollLeft(targetScroll);
+      scrollRafRef.current = null;
+    });
+  };
 
-      if (scrollRafRef.current === null) {
-        scrollRafRef.current = window.requestAnimationFrame(() => {
-          scrollRafRef.current = null;
-          setScrollLeft(pendingScrollLeftRef.current);
-          updateScrollLabels();
-        });
-      }
+  const handleScrollbarScroll = (e) => {
+    syncScrollLeft(e.target.scrollLeft);
+  };
 
-      if (source !== topScrollbarRef.current && topScrollbarRef.current) {
-        topScrollbarRef.current.scrollLeft = left;
-      }
-      if (source !== bottomScrollbarRef.current && bottomScrollbarRef.current) {
-        bottomScrollbarRef.current.scrollLeft = left;
-      }
-    }, [updateScrollLabels]);
+  const handleViewportScroll = (e) => {
+    syncScrollLeft(e.target.scrollLeft);
+  };
 
-    useEffect(() => {
-      const topScrollbar = topScrollbarRef.current;
-      const bottomScrollbar = bottomScrollbarRef.current;
+  const handleMouseMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !layout) return;
 
-      if (!topScrollbar || !bottomScrollbar) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-      const handleTopScroll = () => handleScroll(topScrollbar);
-      const handleBottomScroll = () => handleScroll(bottomScrollbar);
+    const result = gantt.hitTest(mouseX, mouseY, layout);
 
-      topScrollbar.addEventListener('scroll', handleTopScroll);
-      bottomScrollbar.addEventListener('scroll', handleBottomScroll);
-
-      return () => {
-        topScrollbar.removeEventListener('scroll', handleTopScroll);
-        bottomScrollbar.removeEventListener('scroll', handleBottomScroll);
-      };
-    }, [handleScroll, viewMode]);
-
-    useEffect(() => () => {
-      if (scrollRafRef.current !== null) {
-        window.cancelAnimationFrame(scrollRafRef.current);
-        scrollRafRef.current = null;
-      }
-    }, []);
-
-    useEffect(() => {
-      updateScrollLabels();
-    }, [layout, scrollLeft, viewMode, filters, updateScrollLabels]);
-
-    const handleMouseMove = useCallback((e) => {
-      if (!layout) {
-        setTooltip(null);
-        if (onProjectHover) onProjectHover(null);
-        return;
-      }
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const hit = gantt.hitTest(mouseX, mouseY, layout);
-
-      let hoveredProject = null;
-      for (const row of layout.rows) {
-        if (mouseY >= row.y && mouseY < row.y + row.height) {
-          hoveredProject = row.project;
-          break;
+    if (result) {
+      if (result.type === 'phase') {
+        const fase = result.phase;
+        const project = result.project;
+        let text = `${project.nome}: ${fase.nome}`;
+        if (fase.dataInizio && fase.dataFine) {
+          text += ` (${fase.dataInizio} - ${fase.dataFine})`;
+        } else if (fase.dataFine) {
+          text += ` (${fase.dataFine})`;
         }
-      }
-      if (onProjectHover) {
-        onProjectHover(hoveredProject ? hoveredProject.id : null);
-      }
+        if (fase.percentualeCompletamento !== null) {
+          text += ` - ${fase.percentualeCompletamento}%`;
+        }
+        if (fase.note) {
+          text += `\nNote: ${fase.note}`;
+        }
+        setTooltip({
+          x: e.clientX,
+          y: e.clientY,
+          text
+        });
 
-      if (hit) {
-        if (hit.type === 'phase') {
-          const { phase, project } = hit;
-          const percentage = phase.percentualeCompletamento || 0;
-          const phaseLabel = phase.milestone ? 'Milestone' : 'Fase';
-          const stateLabel = config.stateLabels?.[phase.stato] || phase.stato;
-          const tooltipText = `${phaseLabel}: ${phase.nome || 'Senza nome'}\n${percentage}%\nProgetto: ${project.nome}\n${phase.dataInizio || '?'} - ${phase.dataFine || '?'}\nStato: ${stateLabel}`;
+        if (onProjectHover && project.id !== hoveredProjectId) {
+          onProjectHover(project.id);
+        }
+      } else if (result.type === 'project') {
+        const project = result.project;
+        let text = project.nome;
+        if (project.dataInizio && project.dataFine) {
+          text += ` (${project.dataInizio} - ${project.dataFine})`;
+        }
+        setTooltip({
+          x: e.clientX,
+          y: e.clientY,
+          text
+        });
 
-          setTooltip({
-            x: e.clientX,
-            y: e.clientY,
-            text: tooltipText
-          });
-        } else if (hit.type === 'project') {
-          const { project } = hit;
-          const tooltipText = `${project.nome}\n${project.dataInizio || '?'} - ${project.dataFine || '?'}`;
-
-          setTooltip({
-            x: e.clientX,
-            y: e.clientY,
-            text: tooltipText
-          });
-        } else if (hit.type === 'date') {
-          const date = dateUtils.parseDate(hit.date);
-          const dateStr = date ? date.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : hit.date;
-          const holidayName = date ? dateUtils.getHolidayName(date) : null;
-
-          let tooltipText = dateStr;
-          if (holidayName) {
-            tooltipText += `\n${holidayName}`;
-          }
-
-          setTooltip({
-            x: e.clientX,
-            y: e.clientY,
-            text: tooltipText
-          });
+        if (onProjectHover && project.id !== hoveredProjectId) {
+          onProjectHover(project.id);
         }
       } else {
         setTooltip(null);
+        if (onProjectHover && hoveredProjectId !== null) {
+          onProjectHover(null);
+        }
       }
-    }, [layout, onProjectHover]);
-
-    const handleMouseLeave = useCallback(() => {
+    } else {
       setTooltip(null);
-      if (onProjectHover) onProjectHover(null);
-    }, [onProjectHover]);
+      if (onProjectHover && hoveredProjectId !== null) {
+        onProjectHover(null);
+      }
+    }
+  };
 
-    const handleContextMenu = useCallback((e) => {
-      if (!layout) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+  const handleMouseLeave = () => {
+    setTooltip(null);
+    if (onProjectHover && hoveredProjectId !== null) {
+      onProjectHover(null);
+    }
+  };
 
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const hit = gantt.hitTest(mouseX, mouseY, layout);
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas || !layout) return;
 
-      if (hit && hit.type === 'phase') {
-        e.preventDefault();
-        setContextMenu({
-          x: e.clientX,
-          y: e.clientY,
-          project: hit.project
-        });
-      } else if (contextMenu) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const result = gantt.hitTest(mouseX, mouseY, layout);
+
+    if (result && (result.type === 'phase' || result.type === 'project')) {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        phase: result.phase,
+        project: result.project
+      });
+    } else {
+      setContextMenu(null);
+    }
+  };
+
+  const handleMenuAction = () => {
+    if (contextMenu && contextMenu.project) {
+      const projectRow = layout?.rows.find(r => r.project.id === contextMenu.project.id);
+      if (projectRow && verticalScrollContainerRef.current) {
+        verticalScrollContainerRef.current.scrollTop = projectRow.y - AppConfig.gantt.CANVAS_TOP_MARGIN;
+      }
+    }
+    setContextMenu(null);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenu && !e.target.closest('.gantt-context-menu')) {
         setContextMenu(null);
       }
-    }, [layout, contextMenu]);
+    };
 
-    const handleMenuAction = useCallback(() => {
-      if (contextMenu?.project && onPhaseContextMenu) {
-        onPhaseContextMenu(contextMenu.project);
-      }
-      setContextMenu(null);
-    }, [contextMenu, onPhaseContextMenu]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [contextMenu]);
 
-    useEffect(() => {
-      if (!contextMenu) return;
-      const handleClick = () => setContextMenu(null);
-      const handleEscape = (event) => {
-        if (event.key === 'Escape') {
-          setContextMenu(null);
+  useEffect(() => {
+    if (!layout || scrollLeft <= AppConfig.gantt.CANVAS_LEFT_MARGIN) {
+      setScrollLabels([]);
+      return;
+    }
+
+    const labels = [];
+    const minVisibleY = currentVerticalScrollTop;
+    const maxVisibleY = currentVerticalScrollTop + (viewportRef.current?.clientHeight || 800);
+
+    layout.rows.forEach(row => {
+      const rowTop = row.y;
+      const rowBottom = row.y + row.height;
+
+      if (rowBottom >= minVisibleY && rowTop <= maxVisibleY) {
+        const project = row.project;
+        if (project.dataInizio && project.dataFine) {
+          const x1 = layout.dateToX[project.dataInizio];
+          const x2 = layout.dateToX[project.dataFine];
+
+          if (x1 !== null && x2 !== null) {
+            const barWidth = x2 - x1 + layout.pixelsPerDay;
+            const barRight = x1 + barWidth;
+
+            if (scrollLeft > x1 && scrollLeft < barRight) {
+              labels.push({
+                text: project.nome,
+                y: row.y + 4,
+                height: row.height - 8,
+                color: project.colore || '#3b82f6'
+              });
+            }
+          }
         }
-      };
-      window.addEventListener('click', handleClick);
-      window.addEventListener('keydown', handleEscape);
-      return () => {
-        window.removeEventListener('click', handleClick);
-        window.removeEventListener('keydown', handleEscape);
-      };
-    }, [contextMenu]);
+      }
+    });
 
-    const isScrollable = viewMode === '4months';
+    setScrollLabels(labels);
+  }, [layout, scrollLeft, currentVerticalScrollTop]);
 
-    return (
-      <div className="gantt-canvas-wrapper">
-        {isScrollable && (
-          <div ref={topScrollbarRef} className="gantt-scrollbar">
-            <div className="gantt-scrollbar-content"></div>
-          </div>
-        )}
+  const isScrollable = layout && layout.canvasWidth > (viewportRef.current?.clientWidth || 0);
 
-        <div ref={wrapperRef} className="gantt-canvas-container-fixed">
+  return (
+    <div className="gantt-canvas-container">
+      {isScrollable && (
+        <div ref={topScrollbarRef} className="gantt-scrollbar" onScroll={handleScrollbarScroll}>
+          <div className="gantt-scrollbar-content"></div>
+        </div>
+      )}
+
+      <div ref={wrapperRef} className="gantt-canvas-wrapper">
+        <div
+          ref={viewportRef}
+          className="gantt-viewport"
+          onScroll={handleViewportScroll}
+        >
           <div
-            ref={(node) => {
-              viewportRef.current = node;
-              verticalScrollContainerRef.current = node;
-            }}
-            className="gantt-canvas-viewport"
+            ref={verticalScrollContainerRef}
+            className="gantt-vertical-scroll-container"
             onScroll={handleVerticalScroll}
+            style={{
+              height: layout ? `${layout.canvasHeight}px` : 'auto',
+              maxHeight: '70vh',
+              overflowY: 'auto'
+            }}
           >
-            <div
-              className="gantt-canvas-inner"
-              style={{
-                transform: `translateX(-${scrollLeft}px)`,
-                willChange: 'transform'
-              }}
-            >
-              <canvas
-                ref={canvasRef}
-                className="gantt-canvas"
-                role="img"
-                aria-label="Diagramma Gantt dei progetti visibili"
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                onContextMenu={handleContextMenu}
-              />
-            </div>
+            <canvas
+              ref={canvasRef}
+              className="gantt-canvas"
+              role="img"
+              aria-label="Diagramma Gantt dei progetti visibili"
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              onContextMenu={handleContextMenu}
+            />
           </div>
-
-          {scrollLabels.map((label, i) => (
-            <div
-              key={i}
-              className="gantt-scroll-label"
-              style={{
-                top: `${label.y}px`,
-                transform: `translateY(-${currentVerticalScrollTop}px)`,
-                left: '24px',
-                height: `${label.height}px`,
-                backgroundColor: label.color,
-                position: 'absolute',
-                padding: '0 8px',
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: '600',
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-                zIndex: 10,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                border: '1px solid rgba(30, 41, 59, 0.5)'
-              }}
-            >
-              {label.text}
-            </div>
-          ))}
         </div>
 
-        {isScrollable && (
-          <div ref={bottomScrollbarRef} className="gantt-scrollbar">
-            <div className="gantt-scrollbar-content"></div>
-          </div>
-        )}
-
-        {tooltip && (
+        {scrollLabels.map((label, i) => (
           <div
-            className="gantt-tooltip"
+            key={i}
+            className="gantt-scroll-label"
             style={{
-              left: `${tooltip.x + 10}px`,
-              top: `${tooltip.y + 10}px`
+              top: `${label.y}px`,
+              transform: `translateY(-${currentVerticalScrollTop}px)`,
+              left: '24px',
+              height: `${label.height}px`,
+              backgroundColor: label.color,
+              position: 'absolute',
+              padding: '0 8px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(30, 41, 59, 0.5)'
             }}
-            role="tooltip"
           >
-            {tooltip.text.split('\n').map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
+            {label.text}
           </div>
-        )}
-
-        {contextMenu && (
-          <div
-            className="gantt-context-menu"
-            style={{
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`
-            }}
-            role="menu"
-          >
-            <button type="button" onClick={handleMenuAction} role="menuitem">
-              Vai su Progetto: {contextMenu.project?.nome || 'Senza nome'}
-            </button>
-          </div>
-        )}
+        ))}
       </div>
-    );
-  }
 
+      {isScrollable && (
+        <div ref={bottomScrollbarRef} className="gantt-scrollbar">
+          <div className="gantt-scrollbar-content"></div>
+        </div>
+      )}
+
+      {tooltip && (
+        <div
+          className="gantt-tooltip"
+          style={{
+            left: `${tooltip.x + 10}px`,
+            top: `${tooltip.y + 10}px`
+          }}
+          role="tooltip"
+        >
+          {tooltip.text.split('\n').map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="gantt-context-menu"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`
+          }}
+          role="menu"
+        >
+          <button type="button" onClick={handleMenuAction} role="menuitem">
+            Vai su Progetto: {contextMenu.project?.nome || 'Senza nome'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+if (typeof window !== 'undefined') {
+  window.OnlyGantt = window.OnlyGantt || {};
+  window.OnlyGantt.components = window.OnlyGantt.components || {};
   window.OnlyGantt.components.GanttCanvas = GanttCanvas;
-})();
+}
+
+export default GanttCanvas;

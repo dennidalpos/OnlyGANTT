@@ -179,16 +179,21 @@ Only stage or commit when explicitly requested.
 
 ## 12. Custom Skills
 
-Custom skills are used to customize agent behavior and are located at:
-- Project root: `skills/onlygantt/SKILL.md` (for sharing across systems)
-- Workspace-specific: `.agents/skills/onlygantt/SKILL.md` (active local environment)
-- Global config: `~/.gemini/config/skills/onlygantt/SKILL.md` (active machine environment)
+Custom skills customize agent behavior during development and are maintained in three synchronized locations:
+- Project root: `skills/<skill_name>/SKILL.md` (master repo copy for sharing across systems/PCs)
+- Workspace-specific: `.agents/skills/<skill_name>/SKILL.md` (active local environment)
+- Global config: `~/.gemini/config/skills/<skill_name>/SKILL.md` (active machine environment)
 
-When working on OnlyGANTT, the agent must check for these skill files and load the `onlygantt` skill. If any updates are made to the codebase that impact build scripts, environment variables, or testing commands, the agent MUST update all copies of the `onlygantt` skill file to keep them in sync.
+### Project Skills Inventory:
+1. `onlygantt`: Core repository development, environment rules, PowerShell script orchestration, and architecture guide.
+2. `dotnet-windows-service`: C# .NET 10 Windows Service host, single-file compilation, and service control.
+3. `express-react-app`: Express 5 server, React 19 client, esbuild bundler, LDAP auth, and locking mechanism.
+4. `wix-installer`: WiX 3.14 MSI package authoring, Burn setup bootstrapper, and installer lifecycle verification.
 
-When setting up on a new PC:
-1. Ensure the `onlygantt` skill folder (`skills/onlygantt/`) is copied into either `.agents/skills/` or `~/.gemini/config/skills/` of the local machine.
-2. The agent will automatically detect and load the skill.
+### Mandatory Agent Directives:
+- **Skill Loading**: Before starting work on any component or task, the agent MUST inspect and load the relevant skill file(s) from `skills/` or `.agents/skills/`.
+- **Skill Synchronization**: Whenever changes are made to the codebase, build scripts, environment variables, dependencies, test commands, or architectural patterns, the agent MUST update and sync all copies of affected skill files across `skills/`, `.agents/skills/`, and `~/.gemini/config/skills/`.
+- **Multi-PC Setup**: When transferring or setting up the repository on another PC, copy all skill directories from `skills/` into `.agents/skills/` or `~/.gemini/config/skills/` to automatically enable all required skills.
 
 ---
 

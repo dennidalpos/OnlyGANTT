@@ -5,7 +5,11 @@ const vm = require('vm');
 
 function loadBrowserScript(context, relativePath) {
   const filePath = path.join(__dirname, '..', relativePath);
-  const source = fs.readFileSync(filePath, 'utf8');
+  let source = fs.readFileSync(filePath, 'utf8');
+  source = source
+    .replace(/^import\s+.*?;?\s*$/gm, '')
+    .replace(/^export\s+default\s+.*?;?\s*$/gm, '')
+    .replace(/^export\s+(function|const|let|var)\s+/gm, '$1 ');
   vm.runInContext(source, context, { filename: filePath });
 }
 
@@ -78,11 +82,21 @@ function createClientContext() {
 
   const context = vm.createContext(sandbox);
   loadBrowserScript(context, 'src/app-config.js');
-  loadBrowserScript(context, 'src/utils/easter.js');
-  loadBrowserScript(context, 'src/utils/utils-date.js');
-  loadBrowserScript(context, 'src/utils/utils-logic.js');
-  loadBrowserScript(context, 'src/utils/utils-gantt.js');
+  sandbox.AppConfig = sandbox.window.AppConfig;
+
+  loadBrowserScript(context, 'src/domain/holidayCalendar.js');
+  loadBrowserScript(context, 'src/utils/dateUtils.js');
+  sandbox.dateUtils = sandbox.window.OnlyGantt.dateUtils;
+
+  loadBrowserScript(context, 'src/domain/projectLogic.js');
+  sandbox.logic = sandbox.window.OnlyGantt.logic;
+
+  loadBrowserScript(context, 'src/domain/ganttCalculator.js');
+  sandbox.gantt = sandbox.window.OnlyGantt.gantt;
+
   loadBrowserScript(context, 'src/client/storage.js');
+  sandbox.storage = sandbox.window.OnlyGantt.storage;
+
   return context;
 }
 
@@ -187,7 +201,7 @@ function main() {
   assertNoNativeDialogs(repoRoot);
 
   const context = createClientContext();
-  const easter = context.window.OnlyGantt.easter;
+  const easter = context.window.OnlyGantt.holidayCalendar;
   const dateUtils = context.window.OnlyGantt.dateUtils;
   const logic = context.window.OnlyGantt.logic;
   const gantt = context.window.OnlyGantt.gantt;
@@ -339,6 +353,18 @@ function main() {
 
   const dateHit = gantt.hitTest(context.window.AppConfig.gantt.CANVAS_LEFT_MARGIN + 1, layout.rows[0].y - 10, layout);
   assert.strictEqual(dateHit.type, 'date');
+
+  const appJsxSource = fs.readFileSync(path.join(repoRoot, 'src', 'client', 'app.jsx'), 'utf8');
+  assert.ok(
+    /useNotifications\(\)|const\s*\[\s*notifications\s*,\s*setNotifications\s*\]\s*=\s*useState\(/.test(appJsxSource),
+    'app.jsx must declare notification management hook'
+  );
+
+  const apiJsSource = fs.readFileSync(path.join(repoRoot, 'src', 'client', 'api.js'), 'utf8');
+  assert.ok(
+    /const\s+api\s*=\s*\{[\s\S]*?\bsetAdminToken\b[\s\S]*?\};/.test(apiJsSource),
+    'api.js default export object must include setAdminToken'
+  );
 
   console.log('Client logic regression check passed');
 }
