@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy & GDPR Compliance — OnlyGANTT</title>
+  <meta name="description" content="Informativa sulla Privacy e conformità al Regolamento Generale sulla Protezione dei Dati (GDPR) per l'applicazione OnlyGANTT.">
+  <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+  <link rel="shortcut icon" href="assets/brand/onlygantt.ico">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- FLOATING NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">
+      <img src="assets/brand/onlygantt-mark.svg" alt="OnlyGANTT Logo">
+      OnlyGANTT
+      <span class="tag">v1.0</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html#features" data-i18n="nav_features">Funzionalità</a></li>
+      <li><a href="index.html#gallery" data-i18n="nav_gallery">Workflow & Galleria</a></li>
+      <li><a href="index.html#downloads" data-i18n="nav_downloads">Download Pacchetti</a></li>
+      <li><a href="index.html#architecture" data-i18n="nav_arch">Architettura</a></li>
+      <li><a href="privacy.html" class="active" data-i18n="nav_privacy">Privacy & GDPR</a></li>
+    </ul>
+    <div class="nav-actions">
+      <!-- LANGUAGE SWITCHER -->
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="ita">ITA 🇮🇹</button>
+        <button class="lang-btn" data-lang="eng">ENG 🇬🇧</button>
+      </div>
+      <a href="index.html" class="btn btn-secondary" style="padding: 0.5rem 1.1rem; font-size: 0.85rem;">← Home</a>
+    </div>
+  </nav>
+
+  <!-- MAIN PRIVACY CONTENT CONTAINER -->
+  <main class="privacy-page">
+    <div class="container">
+      <div class="privacy-container">
+        
+        <!-- SIDEBAR TOC -->
+        <aside class="privacy-sidebar">
+          <ul class="privacy-nav">
+            <li><a href="#sec1" class="active">1. Local-First & Telemetria Zero</a></li>
+            <li><a href="#sec2">2. Dati Trattati e Finalità</a></li>
+            <li><a href="#cookie">3. Cookie e Sessioni</a></li>
+            <li><a href="#diritti">4. Diritti GDPR (Art. 15-22)</a></li>
+            <li><a href="#contatti">5. Amministrazione Locale</a></li>
+          </ul>
+        </aside>
+
+        <!-- PRIVACY TEXT BODY -->
+        <article class="privacy-content">
+          <h1 data-i18n="priv_title">Privacy Policy & Conformità GDPR</h1>
+          <span class="privacy-updated" data-i18n="priv_updated">Ultimo aggiornamento: 20 Luglio 2026</span>
+
+          <p data-i18n="priv_intro">
+            La presente informativa descrive le modalità di gestione del software OnlyGANTT con riferimento al trattamento dei dati personali degli utenti in conformità al Regolamento Generale sulla Protezione dei Dati (GDPR - Regolamento UE 2016/679).
+          </p>
+
+          <!-- CALLOUT BOX -->
+          <div class="callout-box">
+            <h4 data-i18n="callout_gdpr_title">🛡️ Garanzia di Riservatezza dei Dati Aziendali</h4>
+            <p data-i18n="callout_gdpr_desc">
+              Tutti i dati di progetto e le credenziali rimangono sotto il controllo esclusivo dell’organizzazione che ospita l’istanza di OnlyGANTT.
+            </p>
+          </div>
+
+          <!-- SECTION 1 -->
+          <h2 id="sec1" data-i18n="priv_h2_1">1. Principio di Archiviazione Local-First e Telemetria Zero</h2>
+          <p data-i18n="priv_p_1">
+            OnlyGANTT è un’applicazione web progettata per funzionare in ambiente locale o su server aziendali dedicati. **Nessun dato relativo ai progetti, agli utenti, alle password o all’utilizzo viene trasmesso a server esterni o terze parti**. Il software include zero sistemi di tracciamento o telemetria.
+          </p>
+
+          <!-- SECTION 2 -->
+          <h2 id="sec2" data-i18n="priv_h2_2">2. Tipologia dei Dati Trattati e Finalità</h2>
+          <p data-i18n="priv_p_2">
+            OnlyGANTT tratta esclusivamente i dati inseriti dall’amministratore locale dell’infrastruttura:
+          </p>
+          <ul>
+            <li data-i18n="priv_li_2_1">Dati di autenticazione locale (username e password criptate con algoritmo di hash sicuro).</li>
+            <li data-i18n="priv_li_2_2">Credenziali di binding LDAP (se abilitate, conservate esclusivamente in configurazioni locali riservate).</li>
+            <li data-i18n="priv_li_2_3">Dati di progetto e diagrammi di Gantt salvati nei file di reparto (`Data/reparti/*.json`).</li>
+            <li data-i18n="priv_li_2_4">Stato dei blocchi di concorrenza (`Data/config/locks.json`).</li>
+          </ul>
+
+          <!-- SECTION 3 -->
+          <h2 id="cookie" data-i18n="priv_h2_3">3. Cookie e Sessioni di Navigazione</h2>
+          <p data-i18n="priv_p_3">
+            Il software utilizza esclusivamente cookie tecnici di sessione strettamente necessari al funzionamento del sistema di autenticazione e mantenimento della sessione utente. Non vengono utilizzati cookie di profilazione o di terze parti.
+          </p>
+
+          <!-- SECTION 4 -->
+          <h2 id="diritti" data-i18n="priv_h2_4">4. Diritti dell’Interessato ai sensi del GDPR (Art. 15-22)</h2>
+          <p data-i18n="priv_p_4">
+            Gli utenti dell’infrastruttura aziendale su cui è installato OnlyGANTT possono esercitare in qualsiasi momento i diritti previsti dagli articoli 15 e seguenti del GDPR direttamente tramite l’amministratore di sistema locale (accesso, rettifica, cancellazione ed esportazione JSON dei propri progetti).
+          </p>
+
+          <!-- SECTION 5 -->
+          <h2 id="contatti">5. Amministrazione di Sistema e Sicurezza Locale</h2>
+          <p>
+            Per qualsiasi chiarimento riguardante la gestione dei dati personali o l'esercizio dei propri diritti relativi all'istanza di OnlyGANTT in uso presso la propria organizzazione, fare riferimento all'Amministratore IT o al Responsabile della Protezione dei Dati (DPO) aziendale.
+          </p>
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <span data-i18n="footer_copy">© 2026 OnlyGANTT. Tutti i diritti riservati.</span>
+        <div>
+          <a href="index.html" style="margin-right: 1.5rem;">Torna alla Home</a>
+          <a href="index.html#downloads" data-i18n="nav_downloads">Download Packages</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
