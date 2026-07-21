@@ -15,13 +15,16 @@ export function GanttCanvas({
   onProjectHover,
   verticalScrollTop,
   onVerticalScrollChange,
-  sidebarCollapsed
+  sidebarCollapsed,
+  onIsScrollableChange
 }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const viewportRef = useRef(null);
   const topScrollbarRef = useRef(null);
   const bottomScrollbarRef = useRef(null);
+  const verticalScrollContainerRef = useRef(null);
+  const syncedVerticalScrollTopRef = useRef(0);
   const [tooltip, setTooltip] = useState(null);
   const [layout, setLayout] = useState(null);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -413,6 +416,12 @@ export function GanttCanvas({
   }, [layout, scrollLeft, currentVerticalScrollTop]);
 
   const isScrollable = layout && layout.canvasWidth > (viewportRef.current?.clientWidth || 0);
+
+  useEffect(() => {
+    if (onIsScrollableChange) {
+      onIsScrollableChange(Boolean(isScrollable));
+    }
+  }, [isScrollable, onIsScrollableChange]);
 
   return (
     <div className="gantt-canvas-container">

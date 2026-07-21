@@ -34,7 +34,8 @@ export function ProjectSidebar({
   onSelectProject,
   verticalScrollTop,
   onVerticalScrollChange,
-  onCollapsedChange
+  onCollapsedChange,
+  isScrollable
 }) {
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -100,7 +101,8 @@ export function ProjectSidebar({
     onSelectedProjectIdsChange(next);
   };
 
-  const topSpacerHeight = Math.max(0, AppConfig.gantt.CANVAS_TOP_MARGIN - SIDEBAR_HEADER_HEIGHT);
+  const topScrollbarOffset = isScrollable ? 16 : 0;
+  const topSpacerHeight = Math.max(0, AppConfig.gantt.CANVAS_TOP_MARGIN - SIDEBAR_HEADER_HEIGHT) + topScrollbarOffset;
 
   return (
     <aside className={`project-sidebar ${collapsed ? 'collapsed' : 'expanded'}`}>

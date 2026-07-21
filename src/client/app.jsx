@@ -69,6 +69,7 @@ export function App() {
   const [ganttRefreshTrigger, setGanttRefreshTrigger] = useState(0);
   const [hoveredProjectId, setHoveredProjectId] = useState(null);
   const [verticalScrollTop, setVerticalScrollTop] = useState(0);
+  const [isGanttScrollable, setIsGanttScrollable] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('onlygantt_sidebar_collapsed') === 'true';
@@ -912,6 +913,7 @@ export function App() {
                           ganttHeaderHeight={(AppConfig?.gantt?.CANVAS_TOP_MARGIN || AppConfig?.default?.gantt?.CANVAS_TOP_MARGIN || 156)}
                           onCollapsedChange={setSidebarCollapsed}
                           viewMode={filtersState.viewMode}
+                          isScrollable={isGanttScrollable}
                         />
                         <div className="gantt-main-area">
                           <GanttCanvas
@@ -926,6 +928,7 @@ export function App() {
                             verticalScrollTop={verticalScrollTop}
                             onVerticalScrollChange={setVerticalScrollTop}
                             sidebarCollapsed={sidebarCollapsed}
+                            onIsScrollableChange={setIsGanttScrollable}
                           />
                         </div>
                       </div>
