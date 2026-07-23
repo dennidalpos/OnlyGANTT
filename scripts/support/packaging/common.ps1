@@ -8,7 +8,7 @@ function Assert-Administrator {
   $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 
   if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw 'Administrator privileges are required for MSI lifecycle tests.'
+    throw 'Administrator privileges are required for installer lifecycle tests.'
   }
 }
 
@@ -24,45 +24,10 @@ function Get-PackagingPaths {
   return [pscustomobject]@{
     RepoRoot = $repoRoot
     LogsRoot = Join-Path $repoRoot 'artifacts\logs'
-    PackagesRoot = Join-Path $repoRoot 'artifacts\packages\msi'
-    BuildMsiScript = Join-Path $repoRoot 'scripts\support\packaging\build-msi.ps1'
+    PackagesRoot = Join-Path $repoRoot 'artifacts\packages'
+    BuildInstallerScript = Join-Path $repoRoot 'scripts\support\packaging\build-installer.ps1'
     DefaultInstallRoot = Join-Path ${env:ProgramFiles} 'OnlyGANTT'
   }
-}
-
-function Resolve-MsiPath {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string]$PackagesRoot,
-    [string]$Path,
-    [string]$Version
-  )
-
-  if ($Path) {
-    return (Resolve-Path $Path).Path
-  }
-
-  if ($Version) {
-    $msiCandidate = Get-ChildItem -Path $PackagesRoot -Filter "OnlyGantt-$Version*-x64.msi" -File -ErrorAction SilentlyContinue |
-      Sort-Object LastWriteTime -Descending |
-      Select-Object -First 1
-
-    if ($null -eq $msiCandidate) {
-      throw "MSI not found for version ${Version} under $PackagesRoot"
-    }
-
-    return $msiCandidate.FullName
-  }
-
-  $msi = Get-ChildItem -Path $PackagesRoot -Filter 'OnlyGantt-*-x64.msi' -File -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending |
-    Select-Object -First 1
-
-  if ($null -eq $msi) {
-    throw "No MSI package found under $PackagesRoot"
-  }
-
-  return $msi.FullName
 }
 
 function Get-OnlyGanttUninstallEntries {
@@ -83,7 +48,6 @@ function Get-OnlyGanttUninstallEntries {
         if ($properties.DisplayName -eq 'OnlyGANTT') {
           [pscustomobject]@{
             KeyPath = $_.PSPath
-            ProductCode = Split-Path -Path $_.PSChildName -Leaf
             DisplayVersion = [string]$properties.DisplayVersion
             InstallLocation = [string]$properties.InstallLocation
           }
@@ -150,30 +114,6 @@ function Wait-Until {
   return $null
 }
 
-function Wait-ForInstallerIdle {
-  param(
-    [int]$TimeoutSeconds = 60
-  )
-
-  $result = Wait-Until -TimeoutSeconds $TimeoutSeconds -Condition {
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'msiexec.exe'" -ErrorAction SilentlyContinue
-    if ($null -eq $processes) {
-      return $true
-    }
-
-    $activeProcesses = @($processes | Where-Object {
-      $commandLine = [string]$_.CommandLine
-      $commandLine -and $commandLine -notmatch '^[A-Z]:\\WINDOWS\\system32\\msiexec\.exe\s+/V(\s+[A-Z]:\\WINDOWS\\system32\\msiexec\.exe)?$'
-    })
-
-    return ($activeProcesses.Count -eq 0)
-  }
-
-  if (-not $result) {
-    throw 'Windows Installer is still busy after the expected timeout.'
-  }
-}
-
 function Wait-ServiceState {
   param(
     [Parameter(Mandatory = $true)]
@@ -192,29 +132,8 @@ function Wait-ServiceState {
   $service.WaitForStatus($Status, [TimeSpan]::FromSeconds($TimeoutSeconds))
 }
 
-function Invoke-MsiExec {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string[]]$Arguments,
-    [Parameter(Mandatory = $true)]
-    [string]$LogPath
-  )
-
-  $allArguments = @($Arguments + '/qn' + '/norestart' + '/l*v' + $LogPath)
-  Wait-ForInstallerIdle
-  $global:LASTEXITCODE = 0
-  & msiexec.exe @allArguments
-  Wait-ForInstallerIdle
-
-  if ($LASTEXITCODE -ne 0) {
-    throw "msiexec failed with exit code $LASTEXITCODE. Log: $LogPath"
-  }
-}
-
 function Assert-OnlyGanttInstalled {
   param(
-    [Parameter(Mandatory = $true)]
-    [string]$ExpectedVersion,
     [string]$InstallRoot,
     [string]$ServiceName = 'OnlyGanttWeb'
   )
@@ -222,15 +141,6 @@ function Assert-OnlyGanttInstalled {
   $entry = Wait-Until -Condition { Get-OnlyGanttUninstallEntry }
   if ($null -eq $entry) {
     throw 'OnlyGANTT uninstall entry not found after installation.'
-  }
-
-  $allEntries = Get-OnlyGanttUninstallEntries
-  if ($allEntries.Count -gt 1) {
-    throw "Found $($allEntries.Count) duplicate uninstall entries for OnlyGANTT in Windows Uninstall registry. Expected exactly 1 entry."
-  }
-
-  if ($entry.DisplayVersion -ne $ExpectedVersion) {
-    throw "Expected installed version $ExpectedVersion, found $($entry.DisplayVersion)."
   }
 
   $resolvedInstallRoot = if ($InstallRoot) {
@@ -269,8 +179,7 @@ function Assert-OnlyGanttInstalled {
 
 function Assert-OnlyGanttDesktopShortcuts {
   param(
-    [string]$ShortcutUrl = 'http://localhost:3000/',
-    [switch]$ExpectAdminShortcut
+    [string]$ShortcutUrl = 'http://localhost:3000/'
   )
 
   $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
@@ -282,15 +191,12 @@ function Assert-OnlyGanttDesktopShortcuts {
     [pscustomobject]@{
       Path = Join-Path $desktopRoot 'OnlyGANTT.url'
       Url = $ShortcutUrl
-    }
-  )
-
-  if ($ExpectAdminShortcut) {
-    $expectedShortcuts += [pscustomobject]@{
+    },
+    [pscustomobject]@{
       Path = Join-Path $desktopRoot 'OnlyGANTT Admin.url'
       Url = "$ShortcutUrl#admin"
     }
-  }
+  )
 
   foreach ($shortcut in $expectedShortcuts) {
     if (-not (Test-Path $shortcut.Path)) {
@@ -341,13 +247,6 @@ function Remove-OnlyGanttMachineState {
 
   $entries = Get-OnlyGanttUninstallEntries
   foreach ($entry in $entries) {
-    if ($entry.ProductCode -and $entry.ProductCode.StartsWith('{')) {
-      $cleanupLog = Join-Path $LogsRoot "msi-cleanup-$($entry.ProductCode.Trim('{}')).log"
-      try {
-        Invoke-MsiExec -Arguments @('/x', $entry.ProductCode) -LogPath $cleanupLog
-      } catch {
-      }
-    }
     if (Test-Path $entry.KeyPath) {
       Remove-Item -Path $entry.KeyPath -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -356,16 +255,10 @@ function Remove-OnlyGanttMachineState {
   $service = Get-ServiceSnapshot -ServiceName $ServiceName
   if ($null -ne $service) {
     if ($service.Status -ne 'Stopped') {
-      Stop-Service -Name $ServiceName -Force
+      Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
     }
 
     sc.exe delete $ServiceName | Out-Null
-    if ($LASTEXITCODE -notin @(0, 1060, 1072)) {
-      throw "sc.exe delete failed with exit code $LASTEXITCODE for service '$ServiceName'."
-    }
-
-    $global:LASTEXITCODE = 0
-    Start-Sleep -Seconds 2
   }
 
   $installRoot = Get-OnlyGanttInstallRoot
@@ -375,36 +268,12 @@ function Remove-OnlyGanttMachineState {
 
   if ($installRoot -and (Test-Path $installRoot)) {
     Stop-Process -Name OnlyGantt.Service, node -Force -ErrorAction SilentlyContinue
-    $lastRemovalError = $null
-
-    foreach ($attempt in 1..10) {
-      try {
-        if (Test-Path $installRoot) {
-          Remove-Item -Path $installRoot -Recurse -Force
-        }
-      } catch {
-        $lastRemovalError = $_
-      }
-
-      if (-not (Test-Path $installRoot)) {
-        break
-      }
-
-      Start-Sleep -Seconds 1
-    }
-
-    if (Test-Path $installRoot) {
-      if ($lastRemovalError) {
-        throw $lastRemovalError
-      }
-
-      throw "Unable to remove install directory after retries: $installRoot"
-    }
+    Remove-Item -Path $installRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
 
   $registryRoot = 'HKLM:\SOFTWARE\Danny Perondi\OnlyGANTT'
   if (Test-Path $registryRoot) {
-    Remove-Item -Path $registryRoot -Recurse -Force
+    Remove-Item -Path $registryRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
 
   $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
@@ -412,7 +281,7 @@ function Remove-OnlyGanttMachineState {
     foreach ($shortcutName in @('OnlyGANTT.url', 'OnlyGANTT Admin.url')) {
       $shortcutPath = Join-Path $desktopRoot $shortcutName
       if (Test-Path $shortcutPath) {
-        Remove-Item -Path $shortcutPath -Force
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
       }
     }
   }

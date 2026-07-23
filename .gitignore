@@ -10,7 +10,6 @@ out/
 output/
 publish/
 tmp/
-tools/wix314-binaries/
 .playwright-cli/
 playwright-report/
 

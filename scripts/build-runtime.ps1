@@ -51,10 +51,8 @@ $manifest = [ordered]@{
   )
   packaging = [ordered]@{
     pack = 'scripts/package-project.ps1'
-    buildMsi = 'scripts/support/packaging/build-msi.ps1'
-    buildSetup = 'scripts/support/packaging/build-setup.ps1'
-    provisionWix = 'scripts/support/packaging/provision-wix.ps1'
-    provisionNode = 'scripts/support/packaging/provision-node.ps1'
+    buildInstaller = 'scripts/support/packaging/build-installer.ps1'
+    nsisSource = 'tools/nsis/installer.nsi'
   }
   windows = [ordered]@{
     service = 'scripts/manage-service.ps1'

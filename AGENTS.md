@@ -149,7 +149,7 @@ Canonical validation commands:
 - `npm run build`: Bundles the client code and compiles the Windows service host.
 - `npm run test`: Executes the local regression test suite and service lifecycle check.
 - `npm run gate`: Preflight check, test run, and package compilation quality gate.
-- `npm run pack`: Builds the x64 MSI installer and Setup bootstrapper.
+- `npm run pack`: Builds the x64 NSIS setup installer.
 
 Run relevant available checks and report exact commands and results. Do not stop at the first failed check if useful static review can continue.
 
@@ -188,7 +188,6 @@ Custom skills customize agent behavior during development and are maintained in 
 1. `onlygantt`: Core repository development, environment rules, PowerShell script orchestration, and architecture guide.
 2. `dotnet-windows-service`: C# .NET 10 Windows Service host, single-file compilation, and service control.
 3. `express-react-app`: Express 5 server, React 19 client, esbuild bundler, LDAP auth, and locking mechanism.
-4. `wix-installer`: WiX 3.14 MSI package authoring, Burn setup bootstrapper, and installer lifecycle verification.
 
 ### Mandatory Agent Directives:
 - **Skill Loading**: Before starting work on any component or task, the agent MUST inspect and load the relevant skill file(s) from `skills/` or `.agents/skills/`.

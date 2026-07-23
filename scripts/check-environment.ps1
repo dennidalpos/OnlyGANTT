@@ -26,11 +26,10 @@ $requiredPaths = @(
   @{ Path = (Join-Path $repoRoot 'scripts\support\prerequisites.ps1'); Label = 'prerequisite helper' },
   @{ Path = (Join-Path $repoRoot 'tests\smoke-check.js'); Label = 'smoke test' },
   @{ Path = (Join-Path $repoRoot 'tests\prerequisite-regression-check.ps1'); Label = 'prerequisite regression check' },
-  @{ Path = (Join-Path $repoRoot 'tools\wix\Product.wxs'); Label = 'WiX source' },
-  @{ Path = (Join-Path $repoRoot 'tools\wix\Bundle.wxs'); Label = 'WiX bootstrapper source' },
+  @{ Path = (Join-Path $repoRoot 'tools\nsis\installer.nsi'); Label = 'NSIS installer script' },
   @{ Path = (Join-Path $repoRoot 'src\service\OnlyGantt.Service\OnlyGantt.Service.csproj'); Label = 'Windows service host project' },
   @{ Path = (Join-Path $repoRoot 'scripts\manage-service.ps1'); Label = 'Windows service management script' },
-  @{ Path = (Join-Path $repoRoot 'scripts\support\packaging\provision-node.ps1'); Label = 'Node.js prerequisite provisioning script' }
+  @{ Path = (Join-Path $repoRoot 'scripts\support\packaging\build-installer.ps1'); Label = 'NSIS installer build script' }
 )
 
 foreach ($item in $requiredPaths) {
