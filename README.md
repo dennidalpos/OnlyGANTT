@@ -165,7 +165,7 @@ Not currently present:
 - x86 MSI packaging;
 - versioned CI workflow.
 
-Open residual work is tracked in [`PROJECT_STATUS.json`](PROJECT_STATUS.json).
+Open residual work is tracked in `02-areas/products/OnlyGANTT/tracker.json (nel dossier SecondBrain)` (SecondBrain: `02-areas/products/OnlyGANTT/tracker.json`).
 
 ## Technical Docs
 
