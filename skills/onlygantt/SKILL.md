@@ -5,15 +5,15 @@ description: Primary skill for developing, testing, building, packaging, and mai
 
 # OnlyGANTT Core Development Skill
 
-This skill serves as the primary developer guide and runtime instructions for agents working on the [OnlyGANTT](file:///d:/GITHUB/OnlyGANTT) repository. It ensures that all modifications preserve architectural boundaries, follow security and credential protocols, maintain department lock integrity, and utilize official scripting pathways.
+This skill serves as the primary developer guide and runtime instructions for agents working on the [OnlyGANTT](../..) repository. It ensures that all modifications preserve architectural boundaries, follow security and credential protocols, maintain department lock integrity, and utilize official scripting pathways.
 
 ## Documentation Reference Map
 
-- **Script Inventory**: Deep-dive on script names, execution purposes, and inputs in [script.md](file:///d:/GITHUB/OnlyGANTT/scripts/script.md).
-- **Brand Assets**: Logos, colors, and asset generation rules in [brand-assets.md](file:///d:/GITHUB/OnlyGANTT/docs/brand-assets.md).
+- **Script Inventory**: Deep-dive on script names, execution purposes, and inputs in [script.md](../../scripts/script.md).
+- **Brand Assets**: Logos, colors, and asset generation rules in [brand-assets.md](../../docs/brand-assets.md).
 - **Component Skills**:
-  - [.NET 10 Windows Service Host](file:///d:/GITHUB/OnlyGANTT/skills/dotnet-windows-service/SKILL.md)
-  - [Express 5 & React 19 Web App](file:///d:/GITHUB/OnlyGANTT/skills/express-react-app/SKILL.md)
+  - [.NET 10 Windows Service Host](../../skills/dotnet-windows-service/SKILL.md)
+  - [Express 5 & React 19 Web App](../../skills/express-react-app/SKILL.md)
 
 ---
 
@@ -25,10 +25,10 @@ This skill serves as the primary developer guide and runtime instructions for ag
 - Administrator elevation is required only for native Windows service installation/control and installer lifecycle validation.
 
 ### 2. Component Boundaries
-- **[Client React UI](file:///d:/GITHUB/OnlyGANTT/src/client)**: React 19 application built via `esbuild`. The compiled bundle is outputted to `artifacts/build/client/app.bundle.js` and served by the Express server.
-- **[Express Server](file:///d:/GITHUB/OnlyGANTT/src/server)**: Node.js web server serving the frontend, managing authentication, department authorization, LDAP bindings, and 100% SQLite database persistence (`node:sqlite`).
-- **[OnlyGantt.Service](file:///d:/GITHUB/OnlyGANTT/src/service/OnlyGantt.Service)**: A C# .NET 10 (target framework `net10.0-windows`) Windows service host. It compiles to a single-file, self-contained executable.
-- **[Installer Packaging](file:///d:/GITHUB/OnlyGANTT/tools/nsis)**: NSIS (Nullsoft Scriptable Install System) x64 based packaging that generates a setup installer executable (`OnlyGANTT-Setup-x64.exe`).
+- **[Client React UI](../../src/client)**: React 19 application built via `esbuild`. The compiled bundle is outputted to `artifacts/build/client/app.bundle.js` and served by the Express server.
+- **[Express Server](../../src/server)**: Node.js web server serving the frontend, managing authentication, department authorization, LDAP bindings, and 100% SQLite database persistence (`node:sqlite`).
+- **[OnlyGantt.Service](../../src/service/OnlyGantt.Service)**: A C# .NET 10 (target framework `net10.0-windows`) Windows service host. It compiles to a single-file, self-contained executable.
+- **[Installer Packaging](../../tools/nsis)**: NSIS (Nullsoft Scriptable Install System) x64 based packaging that generates a setup installer executable (`OnlyGANTT-Setup-x64.exe`).
 
 ### 3. Data & Multi-User Locking
 - **SQLite Database Persistence**: All runtime persistence uses native Node.js `node:sqlite` (`DatabaseSync`):
