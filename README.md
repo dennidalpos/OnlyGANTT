@@ -165,7 +165,7 @@ Not currently present:
 - x86 MSI packaging;
 - versioned CI workflow.
 
-Open residual work is tracked in `02-areas/products/OnlyGANTT/tracker.json (nel dossier SecondBrain)` (SecondBrain: `02-areas/products/OnlyGANTT/tracker.json`).
+GitHub Actions are disabled for this repository: build, test and package locally.
 
 ## Technical Docs
 
@@ -174,4 +174,8 @@ Open residual work is tracked in `02-areas/products/OnlyGANTT/tracker.json (nel 
 
 ## License
 
-This repository is marked `UNLICENSED` in `package.json` and includes a `LICENSE` file. Confirm distribution policy before publishing artifacts.
+Proprietary, all rights reserved (`UNLICENSED` in `package.json`). See [LICENSE](LICENSE). Third-party npm components are listed in [CREDITS.md](CREDITS.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) to report a vulnerability.
