@@ -29,7 +29,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "express": "^5.2.1",
-    "ldapts": "^9.0.0",
+    "ldapts": "^9.2.0",
     "multer": "^2.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
