@@ -54,16 +54,16 @@ Spacing, radius and shadow tokens remain in `src/public/styles/00-foundation.css
 | `src/public/brand/favicon-32.png` | 32x32 PNG | Versioned duplicate of root favicon fallback generated with the kit. |
 | `src/public/brand/pwa-icon-192.png` | 192x192 PNG | Referenced by `src/public/site.webmanifest`. |
 | `src/public/brand/pwa-icon-512.png` | 512x512 PNG | Referenced by `src/public/site.webmanifest`. |
-| `src/public/brand/onlygantt.ico` | ICO | MSI uninstall/program entry, setup bootstrapper icon and all-users desktop URL shortcut. |
+| `src/public/brand/onlygantt.ico` | ICO | NSIS installer/uninstaller icon and desktop URL shortcut icon. |
 | `src/public/brand/social-og-1200x630.png` | 1200x630 PNG | Open Graph image referenced by `src/public/index.html`. |
 | `src/public/brand/social-x-large-1200x600.png` | 1200x600 PNG | Twitter/X large image referenced by `src/public/index.html`. |
 | `src/public/brand/social-linkedin-1200x627.png` | 1200x627 PNG | LinkedIn-style social image. |
 | `src/public/brand/post-square-1080x1080.png` | 1080x1080 PNG | Base square announcement/post image. |
 | `src/public/brand/post-portrait-1080x1350.png` | 1080x1350 PNG | Base portrait announcement/post image. |
-| `src/public/brand/setup-banner-493x58.png` | 493x58 PNG | Portable preview/export of the setup banner with a blank title area for WiX controls. |
-| `src/public/brand/setup-dialog-493x312.png` | 493x312 PNG | Portable preview/export of the setup dialog image with a left-side brand panel and blank text area for WiX controls. |
-| `src/public/brand/setup-banner-493x58.bmp` | 493x58 BMP | WiX banner bitmap wired through `WixUIBannerBmp`. |
-| `src/public/brand/setup-dialog-493x312.bmp` | 493x312 BMP | WiX dialog bitmap wired through `WixUIDialogBmp`. |
+| `src/public/brand/setup-banner-493x58.png` | 493x58 PNG | Retained banner artwork; not referenced by the current NSIS installer. |
+| `src/public/brand/setup-dialog-493x312.png` | 493x312 PNG | Retained dialog artwork; not referenced by the current NSIS installer. |
+| `src/public/brand/setup-banner-493x58.bmp` | 493x58 BMP | Retained WiX-era bitmap; not consumed by the current NSIS source. |
+| `src/public/brand/setup-dialog-493x312.bmp` | 493x312 BMP | Retained WiX-era bitmap; not consumed by the current NSIS source. |
 
 ## Consumption
 
@@ -71,8 +71,4 @@ Spacing, radius and shadow tokens remain in `src/public/styles/00-foundation.css
 
 `src/public/index.html` consumes favicon, apple touch icon, web manifest, Open Graph image and Twitter/X image metadata.
 
-`tools/wix/Product.wxs` and `tools/wix/Bundle.wxs` receive `src/public/brand/onlygantt.ico` through the packaging scripts. The MSI also writes that ICO path into the all-users `OnlyGANTT.url` and optional `OnlyGANTT Admin.url` desktop shortcuts.
-
-`tools/wix/Product.wxs` receives `setup-banner-493x58.bmp` and `setup-dialog-493x312.bmp` through `scripts/support/packaging/build-msi.ps1` for the standard WiX UI bitmaps.
-
-The current MSI creates an all-users desktop URL shortcut named `OnlyGANTT.url` and can create `OnlyGANTT Admin.url`, which opens the login screen with the Admin tab selected. It does not create a Start Menu shortcut.
+The current `tools/nsis/installer.nsi` consumes `onlygantt.ico` for installer, uninstaller and desktop URL shortcut icons. It writes `OnlyGANTT.url` and `OnlyGANTT Admin.url` to the selected desktop context; it does not create a Start Menu shortcut. The setup images and BMP files above remain versioned artwork, with no current NSIS reference. Do not remove them solely because the packaging implementation changed.
