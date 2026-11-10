@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+bin/
+obj/
+build/
+dist/
+out/
+output/
+publish/
+tmp/
+.playwright-cli/
+playwright-report/
+
+# Artifacts
+artifacts/**
+!artifacts/
+!artifacts/**/
+!artifacts/**/.gitkeep
+
+# Runtime Data & Database Files
+Data/**/*.db
+Data/**/*.db-journal
+Data/**/*.db-wal
+Data/**/*.db-shm
+Data/**/*.bak
+Data/**/*.tmp
+Data/**/*.log
+Data/config/system-config.local.json
+Data/config/locks.json
+Data/config/locks.db
+Data/utenti/users.db
+
+# Environment & IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+*.bak
+*.tmp

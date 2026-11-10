@@ -1,0 +1,290 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot '..\common.ps1')
+
+function Assert-Administrator {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+
+  if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Administrator privileges are required for installer lifecycle tests.'
+  }
+}
+
+function Get-PackagingPaths {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ScriptRoot
+  )
+
+  $repoRoot = (Resolve-Path (Join-Path $ScriptRoot '..\..\..')).Path
+  Ensure-ArtifactsLayout -RepoRoot $repoRoot
+
+  return [pscustomobject]@{
+    RepoRoot = $repoRoot
+    LogsRoot = Join-Path $repoRoot 'artifacts\logs'
+    PackagesRoot = Join-Path $repoRoot 'artifacts\packages'
+    BuildInstallerScript = Join-Path $repoRoot 'scripts\support\packaging\build-installer.ps1'
+    DefaultInstallRoot = Join-Path ${env:ProgramFiles} 'OnlyGANTT'
+  }
+}
+
+function Get-OnlyGanttUninstallEntries {
+  $registryRoots = @(
+    'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+    'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+  )
+
+  $entries = @()
+  foreach ($root in $registryRoots) {
+    if (-not (Test-Path $root)) {
+      continue
+    }
+
+    $found = Get-ChildItem -Path $root -ErrorAction SilentlyContinue | ForEach-Object {
+      try {
+        $properties = Get-ItemProperty -Path $_.PSPath -ErrorAction Stop
+        if ($properties.DisplayName -eq 'OnlyGANTT') {
+          [pscustomobject]@{
+            KeyPath = $_.PSPath
+            DisplayVersion = [string]$properties.DisplayVersion
+            InstallLocation = [string]$properties.InstallLocation
+          }
+        }
+      } catch {
+      }
+    }
+
+    if ($found) {
+      $entries += $found
+    }
+  }
+
+  return $entries
+}
+
+function Get-OnlyGanttUninstallEntry {
+  $entries = Get-OnlyGanttUninstallEntries
+  if ($entries -and $entries.Count -gt 0) {
+    return $entries[0]
+  }
+
+  return $null
+}
+
+function Get-OnlyGanttInstallRoot {
+  $registryPath = 'HKLM:\SOFTWARE\Danny Perondi\OnlyGANTT\Installer'
+  if (Test-Path $registryPath) {
+    $installRoot = (Get-ItemProperty -Path $registryPath -ErrorAction SilentlyContinue).InstallRoot
+    if ($installRoot) {
+      return $installRoot.TrimEnd('\')
+    }
+  }
+
+  return $null
+}
+
+function Get-ServiceSnapshot {
+  param(
+    [string]$ServiceName = 'OnlyGanttWeb'
+  )
+
+  return Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+}
+
+function Wait-Until {
+  param(
+    [Parameter(Mandatory = $true)]
+    [scriptblock]$Condition,
+    [int]$TimeoutSeconds = 30,
+    [int]$PollMilliseconds = 500
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    $result = & $Condition
+    if ($result) {
+      return $result
+    }
+
+    Start-Sleep -Milliseconds $PollMilliseconds
+  } while ((Get-Date) -lt $deadline)
+
+  return $null
+}
+
+function Wait-ServiceState {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ServiceName,
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('Running', 'Stopped')]
+    [string]$Status,
+    [int]$TimeoutSeconds = 30
+  )
+
+  $service = Get-ServiceSnapshot -ServiceName $ServiceName
+  if ($null -eq $service) {
+    throw "Service '$ServiceName' not found."
+  }
+
+  $service.WaitForStatus($Status, [TimeSpan]::FromSeconds($TimeoutSeconds))
+}
+
+function Assert-OnlyGanttInstalled {
+  param(
+    [string]$InstallRoot,
+    [string]$ServiceName = 'OnlyGanttWeb'
+  )
+
+  $entry = Wait-Until -Condition { Get-OnlyGanttUninstallEntry }
+  if ($null -eq $entry) {
+    throw 'OnlyGANTT uninstall entry not found after installation.'
+  }
+
+  $resolvedInstallRoot = if ($InstallRoot) {
+    $InstallRoot
+  } elseif ($entry.InstallLocation) {
+    $entry.InstallLocation.TrimEnd('\')
+  } else {
+    Get-OnlyGanttInstallRoot
+  }
+
+  if (-not $resolvedInstallRoot -or -not (Test-Path $resolvedInstallRoot)) {
+    throw 'OnlyGANTT install directory not found after installation.'
+  }
+
+  foreach ($relativePath in @(
+    'src\server\server.js',
+    'src\public\index.html',
+    'artifacts\build\client\app.bundle.js',
+    'service\OnlyGantt.Service.exe'
+  )) {
+    $targetPath = Join-Path $resolvedInstallRoot $relativePath
+    if (-not (Test-Path $targetPath)) {
+      throw "Installed file not found: $targetPath"
+    }
+  }
+
+  $service = Wait-Until -Condition { Get-ServiceSnapshot -ServiceName $ServiceName }
+  if ($null -eq $service) {
+    throw "Service '$ServiceName' not found after installation."
+  }
+
+  if ($service.Status -ne 'Running') {
+    Wait-ServiceState -ServiceName $ServiceName -Status 'Running'
+  }
+}
+
+function Assert-OnlyGanttDesktopShortcuts {
+  param(
+    [string]$ShortcutUrl = 'http://localhost:3000/'
+  )
+
+  $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
+  if (-not $desktopRoot) {
+    throw 'Common desktop directory could not be resolved.'
+  }
+
+  $expectedShortcuts = @(
+    [pscustomobject]@{
+      Path = Join-Path $desktopRoot 'OnlyGANTT.url'
+      Url = $ShortcutUrl
+    },
+    [pscustomobject]@{
+      Path = Join-Path $desktopRoot 'OnlyGANTT Admin.url'
+      Url = "$ShortcutUrl#admin"
+    }
+  )
+
+  foreach ($shortcut in $expectedShortcuts) {
+    if (-not (Test-Path $shortcut.Path)) {
+      throw "Expected desktop shortcut not found: $($shortcut.Path)"
+    }
+
+    $shortcutContent = Get-Content -Path $shortcut.Path -Raw
+    if ($shortcutContent -notmatch [regex]::Escape("URL=$($shortcut.Url)")) {
+      throw "Desktop shortcut '$($shortcut.Path)' does not target '$($shortcut.Url)'."
+    }
+  }
+}
+
+function Assert-OnlyGanttRemoved {
+  param(
+    [string]$ServiceName = 'OnlyGanttWeb',
+    [string]$InstallRoot
+  )
+
+  $entryStillPresent = Wait-Until -Condition { Get-OnlyGanttUninstallEntry } -TimeoutSeconds 30
+  if ($entryStillPresent) {
+    throw 'OnlyGANTT uninstall entry still present after removal.'
+  }
+
+  $serviceStillPresent = Wait-Until -Condition { Get-ServiceSnapshot -ServiceName $ServiceName } -TimeoutSeconds 30
+  if ($serviceStillPresent) {
+    throw "Service '$ServiceName' still present after removal."
+  }
+
+  $resolvedInstallRoot = if ($InstallRoot) { $InstallRoot } else { Get-OnlyGanttInstallRoot }
+  if ($resolvedInstallRoot -and (Test-Path $resolvedInstallRoot)) {
+    throw "Install directory still present after removal: $resolvedInstallRoot"
+  }
+
+  $registryPath = 'HKLM:\SOFTWARE\Danny Perondi\OnlyGANTT'
+  if (Test-Path $registryPath) {
+    throw "Installer registry key still present after removal: $registryPath"
+  }
+}
+
+function Remove-OnlyGanttMachineState {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$LogsRoot,
+    [string]$ServiceName = 'OnlyGanttWeb',
+    [string]$FallbackInstallRoot
+  )
+
+  $entries = Get-OnlyGanttUninstallEntries
+  foreach ($entry in $entries) {
+    if (Test-Path $entry.KeyPath) {
+      Remove-Item -Path $entry.KeyPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  $service = Get-ServiceSnapshot -ServiceName $ServiceName
+  if ($null -ne $service) {
+    if ($service.Status -ne 'Stopped') {
+      Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    }
+
+    sc.exe delete $ServiceName | Out-Null
+  }
+
+  $installRoot = Get-OnlyGanttInstallRoot
+  if (-not $installRoot) {
+    $installRoot = $FallbackInstallRoot
+  }
+
+  if ($installRoot -and (Test-Path $installRoot)) {
+    Stop-Process -Name OnlyGantt.Service, node -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  $registryRoot = 'HKLM:\SOFTWARE\Danny Perondi\OnlyGANTT'
+  if (Test-Path $registryRoot) {
+    Remove-Item -Path $registryRoot -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  $desktopRoot = [Environment]::GetFolderPath('CommonDesktopDirectory')
+  if ($desktopRoot) {
+    foreach ($shortcutName in @('OnlyGANTT.url', 'OnlyGANTT Admin.url')) {
+      $shortcutPath = Join-Path $desktopRoot $shortcutName
+      if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+
+  $global:LASTEXITCODE = 0
+}

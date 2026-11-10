@@ -1,0 +1,43 @@
+{
+  "name": "onlygantt",
+  "version": "1.0.1",
+  "description": "OnlyGANTT - Interactive Gantt chart application with multi-user locking",
+  "main": "src/server/server.js",
+  "scripts": {
+    "bootstrap": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/install-dependencies.ps1",
+    "doctor": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-environment.ps1",
+    "compile": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-runtime.ps1",
+    "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-project.ps1",
+    "test": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test-project.ps1",
+    "pack": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/package-project.ps1",
+    "publish": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/publish-packages.ps1",
+    "clean": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/clean-artifacts.ps1",
+    "gate": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/gate.ps1",
+    "prestart": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-runtime.ps1",
+    "start": "node src/server/server.js",
+    "service:install": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/manage-service.ps1 -Action Install",
+    "service:uninstall": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/manage-service.ps1 -Action Uninstall",
+    "service:start": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/manage-service.ps1 -Action Start",
+    "service:stop": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/manage-service.ps1 -Action Stop",
+    "service:cleanup": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/manage-service.ps1 -Action Cleanup"
+  },
+  "keywords": [
+    "gantt",
+    "project-management"
+  ],
+  "author": "Danny Perondi",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^5.3.0",
+    "ldapts": "^9.0.0",
+    "multer": "^2.5.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

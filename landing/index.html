@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnlyGANTT — Enterprise Local-First Gantt Chart Management for Windows</title>
+  <meta name="description" content="Web application per la gestione di diagrammi di Gantt aziendali per reparto in ambiente Windows. Multi-user file locking, festività italiane, Windows Service Host e pacchetti MSI / EXE.">
+  <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+  <link rel="shortcut icon" href="assets/brand/onlygantt.ico">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- FLOATING NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">
+      <img src="assets/brand/onlygantt-mark.svg" alt="OnlyGANTT Logo">
+      OnlyGANTT
+      <span class="tag">v1.0</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features" data-i18n="nav_features">Funzionalità</a></li>
+      <li><a href="#gallery" data-i18n="nav_gallery">Workflow & Galleria</a></li>
+      <li><a href="#downloads" data-i18n="nav_downloads">Download Pacchetti</a></li>
+      <li><a href="#architecture" data-i18n="nav_arch">Architettura</a></li>
+      <li><a href="privacy.html" data-i18n="nav_privacy">Privacy & GDPR</a></li>
+    </ul>
+    <div class="nav-actions">
+      <!-- LANGUAGE SWITCHER -->
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="ita">ITA 🇮🇹</button>
+        <button class="lang-btn" data-lang="eng">ENG 🇬🇧</button>
+      </div>
+      <a href="#downloads" class="btn btn-primary" style="padding: 0.5rem 1.1rem; font-size: 0.85rem;" data-i18n="btn_download_msi">Download</a>
+    </div>
+  </nav>
+
+  <!-- HERO SECTION -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero-badge" data-i18n="hero_badge">
+        ⚡ Web Application Windows-Native per Gantt
+      </div>
+      <h1 class="hero-title" data-i18n="hero_title">
+        Gestione Diagrammi di Gantt aziendali in ambiente Windows local-first.
+      </h1>
+      <p class="hero-subtitle" data-i18n="hero_subtitle">
+        OnlyGANTT offre un’interfaccia web responsive per la pianificazione di progetti per reparto, con blocco multi-utente persisto, supporto festività italiane, auth LDAP facoltativa e Windows Service Host nativo.
+      </p>
+      <div class="hero-cta">
+        <a href="../artifacts/packages/setup/OnlyGantt-Setup-1.0.0-x64.exe" download class="btn btn-green" data-i18n="btn_download_setup">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Scarica Setup EXE (Node 24 Incluso)
+        </a>
+        <a href="../artifacts/packages/msi/OnlyGantt-1.0.0-x64.msi" download class="btn btn-secondary" data-i18n="btn_download_msi">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Scarica Installer MSI
+        </a>
+        <a href="#gallery" class="btn btn-secondary" data-i18n="btn_explore_workflows">
+          Esplora i Workflow ↓
+        </a>
+      </div>
+
+      <!-- HERO VISUAL FRAME -->
+      <div class="hero-visual">
+        <div class="hero-visual-inner">
+          <div class="hero-visual-bar">
+            <span class="window-dot dot-red"></span>
+            <span class="window-dot dot-yellow"></span>
+            <span class="window-dot dot-green"></span>
+            <span class="window-title" data-i18n="window_title">OnlyGANTT - Dashboard Gantt di Reparto</span>
+          </div>
+          <img src="assets/gallery/workflow-gantt-timeline.jpg" alt="OnlyGANTT Gantt Chart Timeline Screenshot">
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FEATURES GRID SECTION -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="sec_features_tag">POTENZA E SEMPLICITÀ</span>
+        <h2 class="section-title" data-i18n="sec_features_title">Funzionalità integrate per i team aziendali</h2>
+        <p class="section-subtitle" data-i18n="sec_features_sub">Progettato per funzionare in locale o in rete aziendale Windows, con persistenza sicura senza dipendenze cloud terze.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat1_title">Gantt Interattivo e Festività</h3>
+          <p class="feature-desc" data-i18n="feat1_desc">Cronoprogramma con fasi, percentuali, pietre miliari, avvisi di ritardo e calendario completo delle festività italiane.</p>
+        </div>
+
+        <div class="feature-card green">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat2_title">Blocco Concorrenza Multi-Utente</h3>
+          <p class="feature-desc" data-i18n="feat2_desc">Gestione dei file `.json` per reparto con lock persistente (`locks.json`), timeout configurabile e prevenzione dei conflitti.</p>
+        </div>
+
+        <div class="feature-card amber">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat3_title">Autenticazione Enterprise & LDAP</h3>
+          <p class="feature-desc" data-i18n="feat3_desc">Accesso locale, password di reparto, supporto LDAP facoltativo con fallback locale e reset protetto per l’amministratore.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat4_title">Windows Service Host (.NET 10)</h3>
+          <p class="feature-desc" data-i18n="feat4_desc">Servizio Windows autonomo eseguibile in background (`OnlyGantt.Service.exe`) compilato in single-file self-contained.</p>
+        </div>
+
+        <div class="feature-card green">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat5_title">Export / Import e Backup</h3>
+          <p class="feature-desc" data-i18n="feat5_desc">Importazione ed esportazione immediata di progetti in formato JSON e gestione automatica dei file di backup `.bak`.</p>
+        </div>
+
+        <div class="feature-card amber">
+          <div class="feature-icon">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          </div>
+          <h3 class="feature-title" data-i18n="feat6_title">Installer WiX 3.14.1 Offline</h3>
+          <p class="feature-desc" data-i18n="feat6_desc">Pacchetti MSI ed EXE che includono Node.js 24 LTS x64 come prerequisito per un’installazione completa offline.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKFLOW GALLERY SECTION -->
+  <section class="section" id="gallery" style="background: rgba(15, 23, 42, 0.5);">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="sec_gallery_tag">GALLERIA WORKFLOW</span>
+        <h2 class="section-title" data-i18n="sec_gallery_title">Esplora i flussi di lavoro principali</h2>
+        <p class="section-subtitle" data-i18n="sec_gallery_sub">Clicca su ciascuna schedula per visualizzare l’anteprima interattiva ed i dettagli operativi.</p>
+      </div>
+
+      <div class="gallery-grid">
+        <!-- Workflow Card 1 -->
+        <div class="gallery-card" data-workflow="wf1">
+          <div class="gallery-thumb">
+            <img src="assets/gallery/workflow-gantt-timeline.jpg" alt="Workflow Gantt Timeline">
+            <div class="gallery-overlay">
+              <span class="gallery-badge" data-i18n="wf1_badge">Gantt timeline</span>
+            </div>
+          </div>
+          <div class="gallery-content">
+            <h3 class="gallery-title" data-i18n="wf1_title">1. Cronoprogramma & Gantt di Reparto</h3>
+            <p class="gallery-desc" data-i18n="wf1_desc">Pianificazione visiva delle fasi di progetto con zoom dinamico (Giorno, 4-Mesi, Anno), indicatori di stato e milestone.</p>
+          </div>
+        </div>
+
+        <!-- Workflow Card 2 -->
+        <div class="gallery-card" data-workflow="wf2">
+          <div class="gallery-thumb">
+            <img src="assets/gallery/workflow-user-locks.jpg" alt="Workflow User Locks">
+            <div class="gallery-overlay">
+              <span class="gallery-badge" data-i18n="wf2_badge">Concurrency Control</span>
+            </div>
+          </div>
+          <div class="gallery-content">
+            <h3 class="gallery-title" data-i18n="wf2_title">2. Gestione Lock Multi-Utente</h3>
+            <p class="gallery-desc" data-i18n="wf2_desc">Controllo della concorrenza sui file JSON dei reparti con stato di blocco in tempo reale e rilascio automatico.</p>
+          </div>
+        </div>
+
+        <!-- Workflow Card 3 -->
+        <div class="gallery-card" data-workflow="wf3">
+          <div class="gallery-thumb">
+            <img src="assets/gallery/workflow-enterprise-auth.jpg" alt="Workflow Enterprise Auth">
+            <div class="gallery-overlay">
+              <span class="gallery-badge" data-i18n="wf3_badge">Enterprise Security</span>
+            </div>
+          </div>
+          <div class="gallery-content">
+            <h3 class="gallery-title" data-i18n="wf3_title">3. Autenticazione & Sicurezza LDAP</h3>
+            <p class="gallery-desc" data-i18n="wf3_desc">Integrazione con Active Directory/LDAP aziendale o autenticazione locale con password criptata per reparto.</p>
+          </div>
+        </div>
+
+        <!-- Workflow Card 4 -->
+        <div class="gallery-card" data-workflow="wf4">
+          <div class="gallery-thumb">
+            <img src="assets/gallery/workflow-windows-service.jpg" alt="Workflow Windows Service">
+            <div class="gallery-overlay">
+              <span class="gallery-badge" data-i18n="wf4_badge">Windows Packaging</span>
+            </div>
+          </div>
+          <div class="gallery-content">
+            <h3 class="gallery-title" data-i18n="wf4_title">4. Servizio Windows & Installer WiX</h3>
+            <p class="gallery-desc" data-i18n="wf4_desc">Setup bootstrapper EXE standalone con prerequisito Node.js 24 LTS e servizio Windows nativo per l’avvio automatico.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIGHTBOX MODAL -->
+  <div class="lightbox-modal" id="lightboxModal">
+    <div class="lightbox-container">
+      <button class="lightbox-close">&times;</button>
+      <div class="lightbox-img-wrapper">
+        <img src="" alt="Workflow Preview" class="lightbox-img">
+      </div>
+      <div class="lightbox-body">
+        <h3 class="lightbox-title"></h3>
+        <p class="lightbox-detail"></p>
+        <div class="lightbox-highlights">
+          <div class="highlight-item">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <span class="lh-1"></span>
+          </div>
+          <div class="highlight-item">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <span class="lh-2"></span>
+          </div>
+          <div class="highlight-item">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            <span class="lh-3"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD PACKAGES SECTION -->
+  <section class="section" id="downloads">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="sec_packages_tag">DOWNLOAD UFFICIALI</span>
+        <h2 class="section-title" data-i18n="sec_packages_title">Scarica i pacchetti generati dal repository</h2>
+        <p class="section-subtitle" data-i18n="sec_packages_sub">Scegli la modalità di installazione o l’archivio portabile più adatto al tuo ambiente Windows.</p>
+      </div>
+
+      <div class="packages-grid">
+        <!-- Package Card 1: Setup Bootstrapper EXE -->
+        <div class="package-card featured">
+          <div class="package-header">
+            <span class="package-type" data-i18n="pkg1_tag">RACCOMANDATO</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">x64 Win10/11</span>
+          </div>
+          <h3 class="package-title" data-i18n="pkg1_title">Setup Bootstrapper EXE</h3>
+          <div class="package-meta">
+            <span>Size: ~45 MB</span>
+            <span>Includes: Node.js 24 LTS</span>
+          </div>
+          <ul class="package-features">
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg1_f1">Installazione guidata completa</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg1_f2">Include prerequisito Node.js 24 LTS x64</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg1_f3">Configurazione automatica Servizio Windows</span>
+            </li>
+          </ul>
+
+          <div class="package-cmd">
+            <span>npm run pack</span>
+            <button class="btn-copy" data-copy="npm run pack">Copy</button>
+          </div>
+
+          <a href="../artifacts/packages/setup/OnlyGantt-Setup-1.0.0-x64.exe" download class="btn btn-green" data-i18n="btn_download_now">
+            Scarica Ora (.exe)
+          </a>
+        </div>
+
+        <!-- Package Card 2: Standalone MSI -->
+        <div class="package-card">
+          <div class="package-header">
+            <span class="package-type" data-i18n="pkg2_tag">ENTERPRISE MSI</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">x64 MSI</span>
+          </div>
+          <h3 class="package-title" data-i18n="pkg2_title">Installer Standalone MSI</h3>
+          <div class="package-meta">
+            <span>Size: ~12 MB</span>
+            <span>Req: Node.js 20+</span>
+          </div>
+          <ul class="package-features">
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg2_f1">Installazione nativa Windows x64 per macchina</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg2_f2">Pronto per deployment GPO / Active Directory</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg2_f3">Richiede Node.js 20+ già presente sul sistema</span>
+            </li>
+          </ul>
+
+          <div class="package-cmd">
+            <span>msiexec /i OnlyGantt-1.0.0-x64.msi</span>
+            <button class="btn-copy" data-copy="msiexec /i OnlyGantt-1.0.0-x64.msi">Copy</button>
+          </div>
+
+          <a href="../artifacts/packages/msi/OnlyGantt-1.0.0-x64.msi" download class="btn btn-secondary" data-i18n="btn_download_msi_action">
+            Scarica MSI (.msi)
+          </a>
+        </div>
+
+        <!-- Package Card 3: Source Code / Portable ZIP -->
+        <div class="package-card">
+          <div class="package-header">
+            <span class="package-type" data-i18n="pkg3_tag">PORTABLE ZIP</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Source Code</span>
+          </div>
+          <h3 class="package-title" data-i18n="pkg3_title">Pacchetto Sorgente / ZIP</h3>
+          <div class="package-meta">
+            <span>Size: ~8 MB</span>
+            <span>Req: Node.js + npm</span>
+          </div>
+          <ul class="package-features">
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg3_f1">Esecuzione diretta via `npm start`</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg3_f2">Codice sorgente React 19 + Express</span>
+            </li>
+            <li>
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="pkg3_f3">Nessuna modifica al registro di Windows</span>
+            </li>
+          </ul>
+
+          <div class="package-cmd">
+            <span>npm run bootstrap; npm start</span>
+            <button class="btn-copy" data-copy="npm run bootstrap; npm start">Copy</button>
+          </div>
+
+          <a href="https://github.com/dennidalpos/OnlyGANTT/archive/refs/heads/main.zip" target="_blank" class="btn btn-secondary" data-i18n="btn_download_zip_action">
+            Scarica ZIP Sorgenti
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK SECTION -->
+  <section class="section" id="architecture" style="background: rgba(15, 23, 42, 0.5);">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="sec_arch_tag">STACK TECNOLOGICO</span>
+        <h2 class="section-title" data-i18n="sec_arch_title">Architettura moderna e performante</h2>
+        <p class="section-subtitle" data-i18n="sec_arch_sub">Costruito su tecnologie solide per garantire la massima stabilità in ambienti enterprise.</p>
+      </div>
+
+      <div class="architecture-box">
+        <div class="arch-item">
+          <div class="arch-icon">⚡</div>
+          <h4 class="arch-title" data-i18n="arch1_title">Node.js 24 LTS</h4>
+          <p class="arch-subtitle" data-i18n="arch1_sub">Web server Express 5 per la gestione delle API e delle risorse.</p>
+        </div>
+        <div class="arch-item">
+          <div class="arch-icon">⚙️</div>
+          <h4 class="arch-title" data-i18n="arch2_title">.NET 10 C# Service</h4>
+          <p class="arch-subtitle" data-i18n="arch2_sub">Host di servizio Windows self-contained compilato native x64.</p>
+        </div>
+        <div class="arch-item">
+          <div class="arch-icon">⚛️</div>
+          <h4 class="arch-title" data-i18n="arch3_title">React 19 + esbuild</h4>
+          <p class="arch-subtitle" data-i18n="arch3_sub">Interfaccia utente ultra-veloce con bundling ottimizzato.</p>
+        </div>
+        <div class="arch-item">
+          <div class="arch-icon">📦</div>
+          <h4 class="arch-title" data-i18n="arch4_title">WiX Packaging 3.14</h4>
+          <p class="arch-subtitle" data-i18n="arch4_sub">Bootstrapper offline e MSI installer aziendale.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <a href="index.html" class="navbar-brand">
+            <img src="assets/brand/onlygantt-mark.svg" alt="OnlyGANTT Logo">
+            OnlyGANTT
+          </a>
+          <p data-i18n="footer_desc">
+            OnlyGANTT è l’applicazione web Windows-native per la gestione moderna dei diagrammi di Gantt di reparto.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h5 data-i18n="nav_features">Funzionalità</h5>
+          <ul>
+            <li><a href="#features">Gantt Timeline</a></li>
+            <li><a href="#features">Multi-User Locks</a></li>
+            <li><a href="#features">LDAP Security</a></li>
+            <li><a href="#features">Windows Service</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5 data-i18n="nav_downloads">Download</h5>
+          <ul>
+            <li><a href="#downloads">Setup Bootstrapper EXE</a></li>
+            <li><a href="#downloads">Standalone MSI</a></li>
+            <li><a href="#downloads">Portable ZIP</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Conformità</h5>
+          <ul>
+            <li><a href="privacy.html" data-i18n="nav_privacy">Privacy & GDPR Policy</a></li>
+            <li><a href="privacy.html#cookie">Cookie Policy</a></li>
+            <li><a href="privacy.html#diritti">Diritti Utente</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span data-i18n="footer_copy">© 2026 OnlyGANTT. Tutti i diritti riservati.</span>
+        <div>
+          <a href="privacy.html" style="margin-right: 1.5rem;" data-i18n="nav_privacy">Privacy Policy</a>
+          <a href="#downloads" data-i18n="nav_downloads">Download Packages</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
